@@ -11,10 +11,22 @@ TMP = '/var/openerp/'
 FILE_PATHS = PropertyDict(
         updates = TMP+'user_updates',
         failed = TMP+'user_updates_failed',
-        emp_table = OE+'employees',
-        modules = OE+'sync_modules',
-        db = OE+'database',
+        emp_table = TMP+'employees',
+        modules = TMP+'sync_modules',
+        db = TMP+'database',
+        force_update = TMP+'force_update',
         )
+
+# format of employee dbf file
+#   login C(25)
+#   password C(26)
+#   emp_num N(6,0)
+#   name C(50)
+#   active L
+#   groups C(50)
+#   old_login C(25)
+#   image_crc N(10,0)
+#   email C(50)
 
 try:
     with open(FILE_PATHS.db) as db:
@@ -30,7 +42,7 @@ def adjust_permissions(oe_groups, allowed_groups, user):
             continue
         ints = set(ints)
         if group_name in allowed_groups:
-            if not ints & permissions:  # add default of nothing already there
+            if not ints & permissions:  # add default if nothing already there
                 permissions.add(oe_groups[group_name + '_default'][0])
         else:  # remove all priveleges for this group
             permissions -= ints
