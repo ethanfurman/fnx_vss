@@ -34,7 +34,7 @@ class OpenERPcsv(object):
         with open(filename) as source:
             self.data = source.readlines()
         self.row = 0        # skip header during iteration
-        header = self._convert_line(self.data[0])
+        header = self.header = self._convert_line(self.data[0])
         self.types = []
         known = globals()
         for name in header:
