@@ -1,6 +1,9 @@
 import binascii
 import string
 
+String = str, unicode
+Integer = int, long
+
 def crc32(binary_data):
     "wrapper around binascii.crc32 that is consistent across python versions"
     return binascii.crc32(binary_data) & 0xffffffff
@@ -18,7 +21,7 @@ def translator(frm='', to='', delete='', keep=None):
     for chr in delete:
         uni_table[ord(chr)] = None
     def translate(s):
-        if type(s) is unicode:
+        if isinstance(s, unicode):
             s = s.translate(uni_table)
             if keep is not None:
                 for chr in set(s) - set(keep):
@@ -273,40 +276,63 @@ mixed_case_names = {
     'tj'        : 'TJ',
     }
 
-def NameCase(name):
-    if not name:
-        return name
-    pieces = name.lower().split()
-    result = []
-    for i, piece in enumerate(pieces):
-        if '-' in piece:
-            piece = ' '.join(piece.replace('-',' ').split())
-            piece = '-'.join(NameCase(piece).split())
-        elif alpha_num(piece) in ('i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'):
-            piece = piece.upper()
-        elif piece in ('and', 'de', 'del', 'der', 'el', 'la', 'van', ):
-            pass
-        elif piece[:2] == 'mc':
-            piece = 'Mc' + piece[2:].title()
-        else:
-            possible = mixed_case_names.get(piece, None)
-            if possible is not None:
-                piece = possible
-            else:
-                piece = piece.title()
-                if piece[-2:].startswith("'"):
-                    piece = piece[:-1] + piece[-1].lower()
-        result.append(piece)
-    if result[0] == result[0].lower():
-        result[0] = result[0].title()
-    if result[-1] == result[-1].lower():
-        result[-1] = result[-1].title()
-    return ' '.join(result)
 
-def AddrCase(fields):
+def tuples(func):
+    def wrapper(*args):
+        print args
+        if len(args) == 1 and not isinstance(args[0], String):
+            args = args[0]
+        print args
+        result = tuple(func(*args))
+        if len(result) == 1:
+            result = result[0]
+        return result
+    #wrapper.__name__ = func.__name___
+    wrapper.__doc__ = func.__doc__
+    return wrapper
+
+
+@tuples
+def NameCase(*names):
+    names = [n.strip() for n in names]
+    if not any(names):
+        return names
     final = []
-    if isinstance(fields, (str, unicode)):
-        fields = (fields, )
+    for name in names:
+        pieces = name.lower().split()
+        result = []
+        for i, piece in enumerate(pieces):
+            if '-' in piece:
+                piece = ' '.join(piece.replace('-',' ').split())
+                piece = '-'.join(NameCase(piece).split())
+            elif alpha_num(piece) in ('i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'):
+                piece = piece.upper()
+            elif piece in ('and', 'de', 'del', 'der', 'el', 'la', 'van', ):
+                pass
+            elif piece[:2] == 'mc':
+                piece = 'Mc' + piece[2:].title()
+            else:
+                possible = mixed_case_names.get(piece, None)
+                if possible is not None:
+                    piece = possible
+                else:
+                    piece = piece.title()
+                    if piece[-2:].startswith("'"):
+                        piece = piece[:-1] + piece[-1].lower()
+            result.append(piece)
+        if result[0] == result[0].lower():
+            result[0] = result[0].title()
+        if result[-1] == result[-1].lower():
+            result[-1] = result[-1].title()
+        final.append(' '.join(result))
+    return final
+
+
+@tuples
+def AddrCase(*fields):
+    if not fields:
+        return fields
+    final = []
     for field in fields:
         result = []
         for word in field.split():
@@ -324,20 +350,23 @@ def AddrCase(fields):
         final.append(' '.join(result))
     return final
 
-def BsnsCase(fields):
-    final = []
+
+@tuples
+def BsnsCase(*fields):
     if not fields:
-        return ['']
-    if isinstance(fields, (str, unicode)):
-        fields = (fields, )
+        return fields
+    final = []
     for name in fields:
+        print 0, final
         pieces = name.split()
+        print 1, pieces
         #if len(pieces) <= 1:
         #    final.append(name)
         #    continue
         mixed = []
         last_piece = ''
         for piece in pieces:
+            print 2, mixed
             #if has_lower(piece):
             #    return name
             lowered = piece.lower()
@@ -362,10 +391,12 @@ def BsnsCase(fields):
                         piece = piece[:-1] + piece[-1].lower()
                 mixed.append(piece)
             last_piece = piece
-        if mixed[0].lower() == mixed[0] and mixed[0] not in lower_okay:
+        print mixed
+        if mixed[0].lower() == mixed[0] and (mixed[0] not in lower_okay and mixed[0][-2:] not in ('st','nd','rd','th')):
             mixed[0] = mixed[0].title()
         final.append(' '.join(mixed))
     return final
+
 
 def BusinessOrAddress(suspect):
     ususpect = suspect.upper().strip()
@@ -391,7 +422,9 @@ def BusinessOrAddress(suspect):
             company = suspect
     return company, address
 
-def Rise(fields):
+
+@tuples
+def Rise(*fields):
     #fields = _fields(args)
     data = []
     empty = []
@@ -403,13 +436,16 @@ def Rise(fields):
     results = data + empty
     return results
 
+
 def Salute(name):
     pieces = name.split()
     for piece in pieces:
         if not piece.upper() in prefixi:
             return piece
 
-def Sift(fields):
+
+@tuples
+def Sift(*fields):
     #fields = _fields(args)
     data = []
     empty = []
@@ -421,6 +457,7 @@ def Sift(fields):
     results = empty + data
     return results
 
+
 class Sentinel(object):
     def __init__(yo, text):
         yo.text = text
@@ -428,6 +465,8 @@ class Sentinel(object):
         return "Sentinel: <%s>" % yo.text
 
 _memory_sentinel = Sentinel("amnesiac")
+
+
 class Memory(object):
     """
     allows attribute and item lookup
@@ -508,3 +547,45 @@ class Memory(object):
             _values[attr] = value
             return value
 
+
+class PostalCode(object):
+    """
+    primarily for US and Canadian postal codes (ignores US +4)
+    """
+
+    def __init__(yo, postal):
+        alpha2num = {
+                'I' : 1,
+                'O' : 0,
+                'S' : 5,
+                }
+        num2alpha = {
+                1   : 'I',
+                0   : 'O',
+                5   : 'S',
+                }
+        if len(postal.replace('-', '')) in (5, 9):
+            yo.code = postal[:5]
+        elif postal[:5].isdigit():
+            yo.code = postal[:5]
+        elif has_alpha(postal) and len(postal.replace(' ', '')) == 6:
+            # alpha-num-alpha num-alpha-num
+            postal = list(postal.replace(' ', '').upper())
+            for i in (0, 2, 4):
+                postal[i] = alpha2num.get(postal[i], postal[i])
+            for i in (1, 3, 5):
+                postal[i] = num2alpha.get(postal[i], postal[i])
+            yo.code = "%s %s" % (''.join(postal[:3]), ''.join(postal[3:]))
+        else:
+            yo.code = postal
+
+    def __eq__(yo, other):
+        if not isinstance(other, (str, unicode, yo.__class__)):
+            return NotImplemented
+        if isinstance(other, yo.__class__):
+            other = other.code
+        return yo.code == other
+    def __ne__(yo, other):
+        return not yo.__eq__(other)
+    def __str__(yo):
+        return yo.code
