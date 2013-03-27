@@ -1,0 +1,638 @@
+1              1 - UBSQ        -DATA DICTIONARY HEADER RECORD MAINT. & I
+2              1 - UBSQ        -DATA DICTIONARY HEADER RECORD MAINT. & I
+UBSQ           1 - UBSQ        -DATA DICTIONARY HEADER RECORD MAINT. & I
+3              3 - UASQA       -SELECTOR DICTIONARY HEADER RECORD MAINT.
+UASQA          3 - UASQA       -SELECTOR DICTIONARY HEADER RECORD MAINT.
+4              4 - UASQB       -CBS SELECTOR DICTIONARY DTL FILE
+UASQB          4 - UASQB       -CBS SELECTOR DICTIONARY DTL FILE
+5              5 - CNVZ**      -COMPANY MASTER FILE
+CNVZ**         5 - CNVZ**      -COMPANY MASTER FILE
+6              6 - CNVZF       -DATA FILE INFORMATION RECORDS
+CNVZF          6 - CNVZF       -DATA FILE INFORMATION RECORDS
+7              7 - CNVZ*G0     -PERIOD-END CONTROL FILE
+CNVZ*G0        7 - CNVZ*G0     -PERIOD-END CONTROL FILE
+8              8 - CNVZD0      -Customer Payment Terms Codes
+CNVZD0         8 - CNVZD0      -Customer Payment Terms Codes
+9              9 - CNVZ^       -G/L INTERFACE RECORDS GENERAL FORMAT (^A
+CNVZ^          9 - CNVZ^       -G/L INTERFACE RECORDS GENERAL FORMAT (^A
+10            10 - CNVZ^A      -G/L CONTROL RECORD - ACCOUNTS RECEIVABLE
+CNVZ^A        10 - CNVZ^A      -G/L CONTROL RECORD - ACCOUNTS RECEIVABLE
+11            11 - CNVZas      -SALES CATEGORY MASTER
+CNVZas        11 - CNVZas      -SALES CATEGORY MASTER
+12            12 - OPERT       -Teminal Control Records
+OPERT         12 - OPERT       -Teminal Control Records
+13            13 - CNVZ^O      -G/L CONTROL RECORD - A/P PAYMENT DISTRIBUTION
+CNVZ^O        13 - CNVZ^O      -G/L CONTROL RECORD - A/P PAYMENT DISTRIBUTION
+14            14 - CNVZ^I0     -G/L INTERFACE RECORD - INVENTORY
+CNVZ^I0       14 - CNVZ^I0     -G/L INTERFACE RECORD - INVENTORY
+15            15 - CNVZ^N      -G/L CONTROL RECORD - A/P PAYABLE DISTRIBUTION
+CNVZ^N        15 - CNVZ^N      -G/L CONTROL RECORD - A/P PAYABLE DISTRIBUTION
+16            16 - CNVZaw      -I/C WAREHOUSE CATEGORY MASTER MAINT. & INQUIRY
+CNVZaw        16 - CNVZaw      -I/C WAREHOUSE CATEGORY MASTER MAINT. & INQUIRY
+17            17 - CNVZ8       -G/L INTERFACE - NCR INVOICING CONTROL RECORD
+CNVZ8         17 - CNVZ8       -G/L INTERFACE - NCR INVOICING CONTROL RECORD
+18            18 - CNVZ^B      -G/L Interface Record - Invoicing
+CNVZ^B        18 - CNVZ^B      -G/L Interface Record - Invoicing
+19            19 - OPER        -Operator Codes Master File
+OPER          19 - OPER        -Operator Codes Master File
+20            20 - CNVZ"       -REPORT HEADING RECORD (GENERAL FORMAT)
+CNVZ"         20 - CNVZ"       -REPORT HEADING RECORD (GENERAL FORMAT)
+21            21 - CNVZRB      -Picking Exception Reason Codes
+CNVZRB        21 - CNVZRB      -Picking Exception Reason Codes
+22            22 - CNVZM       -STANDARD MESSAGE MAINT & INQUIRY
+CNVZM         22 - CNVZM       -STANDARD MESSAGE MAINT & INQUIRY
+23            23 - CNVZC       -COMPANY INFORMATION RECORDS
+CNVZC         23 - CNVZC       -COMPANY INFORMATION RECORDS
+24            24 - CNVZK       -SALES CATEGORY BREAK DESCRIPTIONS
+CNVZK         24 - CNVZK       -SALES CATEGORY BREAK DESCRIPTIONS
+25            25 - CNVZX       -PRICING TYPE MAINT/INQUIRY
+CNVZX         25 - CNVZX       -PRICING TYPE MAINT/INQUIRY
+26            26 - CNVZT       -TAXING AUTHORITY MASTER FILE MAINTENANCE
+CNVZT         26 - CNVZT       -TAXING AUTHORITY MASTER FILE MAINTENANCE
+27            27 - CNVZSV      -CARRIER (SHIP VIA) MASTER FILE MAINTENANCE/INQUIRY
+CNVZSV        27 - CNVZSV      -CARRIER (SHIP VIA) MASTER FILE MAINTENANCE/INQUIRY
+28            28 - CNVZU       -CUSTOMER TYPE MASTER FILE MAINTENANCE &
+CNVZU         28 - CNVZU       -CUSTOMER TYPE MASTER FILE MAINTENANCE &
+29            29 - CNVZ*G1     -GENERAL LEDGER CONTROL RECORD
+119           29 - CNVZ*G1     -GENERAL LEDGER CONTROL RECORD
+CNVZ*G1       29 - CNVZ*G1     -GENERAL LEDGER CONTROL RECORD
+30            30 - CNVZP2      -Quantity Discount Table
+CNVZP2        30 - CNVZP2      -Quantity Discount Table
+31            31 - CNVZL       -MASTER FILE LINKAGES---ALA EZ
+CNVZL         31 - CNVZL       -MASTER FILE LINKAGES---ALA EZ
+32            32 - CNVZV       -CONSTRUCTED VARIABLES
+CNVZV         32 - CNVZV       -CONSTRUCTED VARIABLES
+33            33 - CSMS        -CUSTOMER MASTER FILE - BASIC RECORD
+CSMS          33 - CSMS        -CUSTOMER MASTER FILE - BASIC RECORD
+34            34 - CSMSS       -CUSTOMER MASTER FILE - ADDTN'L SHIP-TO'S
+CSMSS         34 - CSMSS       -CUSTOMER MASTER FILE - ADDTN'L SHIP-TO'S
+35            35 - RDER2       -OPEN ORDER HEADER PART II - SHIP-TO INFO
+RDER2         35 - RDER2       -OPEN ORDER HEADER PART II - SHIP-TO INFO
+36            36 - RDERH       -OPEN ORDER HEADER MAINTENANCE & INQUIRY
+RDERH         36 - RDERH       -OPEN ORDER HEADER MAINTENANCE & INQUIRY
+37            37 - RDERD       -OPEN ORDER DETAIL FILE MAINT. & INQUIRY
+RDERD         37 - RDERD       -OPEN ORDER DETAIL FILE MAINT. & INQUIRY
+38            38 - OEIV        -INVOICE OUT OF STOCK SORT FILE
+OEIV          38 - OEIV        -INVOICE OUT OF STOCK SORT FILE
+39            39 - CSXF        -CUSTOMER ALPHA SORT FILE
+133           39 - CSXF        -CUSTOMER ALPHA SORT FILE
+CSXF          39 - CSXF        -CUSTOMER ALPHA SORT FILE
+40            40 - CNVZo       -ALLOWANCE (ADD-ON'S) CODE CONTROL FILE M
+CNVZo         40 - CNVZo       -ALLOWANCE (ADD-ON'S) CODE CONTROL FILE M
+41            41 - ICPC        -PRICE CHANGE TRANSACTION FILE
+ICPC          41 - ICPC        -PRICE CHANGE TRANSACTION FILE
+42            42 - CNVZS       -SERVICE CHARGE PERIOD MASTER FILE
+CNVZS         42 - CNVZS       -SERVICE CHARGE PERIOD MASTER FILE
+43            43 - SACM        -SALESMAN COMMISSION FILE
+SACM          43 - SACM        -SALESMAN COMMISSION FILE
+44            44 - CNVZt       -FORM TYPE MASTER FILE
+154           44 - CNVZt       -FORM TYPE MASTER FILE
+CNVZt         44 - CNVZt       -FORM TYPE MASTER FILE
+45            45 - SADFC       -SALES ANALYSIS - CATEGORY RECORD
+SADFC         45 - SADFC       -SALES ANALYSIS - CATEGORY RECORD
+46            46 - CNVZCPO     -P/O SYSTEM CONTROL RECORD
+CNVZCPO       46 - CNVZCPO     -P/O SYSTEM CONTROL RECORD
+47            47 - CNVZZ       -CBS SALESMAN MASTER FILE
+CNVZZ         47 - CNVZZ       -CBS SALESMAN MASTER FILE
+48            48 - RCKS        -CASH RECEIPTS CHECK FILE
+RCKS          48 - RCKS        -CASH RECEIPTS CHECK FILE
+49            49 - DASL        -A/R XREF TO CUSTOMERS BY SALESPERSON
+DASL          49 - DASL        -A/R XREF TO CUSTOMERS BY SALESPERSON
+50            50 - CNVZQ       -ORDER SOURCE CODES FILE MAINTENANCE & IN
+200           50 - CNVZQ       -ORDER SOURCE CODES FILE MAINTENANCE & IN
+CNVZQ         50 - CNVZQ       -ORDER SOURCE CODES FILE MAINTENANCE & IN
+51            51 - CNVZD1      -Vendor Purchase Terms Codes
+CNVZD1        51 - CNVZD1      -Vendor Purchase Terms Codes
+52            52 - ARTP        -TEMPORARY INVOICE LOAD SORT FILE
+ARTP          52 - ARTP        -TEMPORARY INVOICE LOAD SORT FILE
+53            53 - CRIR        -CASH RECEIPTS JOURNAL
+CRIR          53 - CRIR        -CASH RECEIPTS JOURNAL
+54            54 - OPAR        -OPEN ACCOUNTS RECEIVABLE FILE MAINTENANC
+OPAR          54 - OPAR        -OPEN ACCOUNTS RECEIVABLE FILE MAINTENANC
+55            55 - AUTO        -AUTOMATIC CASH APPLICATION SORT FILE
+AUTO          55 - AUTO        -AUTOMATIC CASH APPLICATION SORT FILE
+56            56 - ARBK        -ACCOUNTS RECEIVABLE BROKER STATEMENT FIL
+ARBK          56 - ARBK        -ACCOUNTS RECEIVABLE BROKER STATEMENT FIL
+57            57 - ARHI        -Accounts Receivable History
+ARHI          57 - ARHI        -Accounts Receivable History
+58            58 - SVCG        -SERVICE CHARGE TRANSACTION
+SVCG          58 - SVCG        -SERVICE CHARGE TRANSACTION
+59            59 - CNVZ6       -General Ledger Interface Record - Payroll
+CNVZ6         59 - CNVZ6       -General Ledger Interface Record - Payroll
+60            60 - CNVZB       -CUSTOMER BUILD-UP ITEMS
+CNVZB         60 - CNVZB       -CUSTOMER BUILD-UP ITEMS
+61            61 - OEHI        -Invoice Detail History
+OEHI          61 - OEHI        -Invoice Detail History
+62            62 - CNVZI       -INVENTORY COMPANY CONTROL RECORD MAINTEN
+CNVZI         62 - CNVZI       -INVENTORY COMPANY CONTROL RECORD MAINTEN
+63            63 - APST        -OPEN ACCOUNTS PAYABLE SORT FILE
+APST          63 - APST        -OPEN ACCOUNTS PAYABLE SORT FILE
+64            64 - OPAF        -OPEN ACCOUNTS PAYABLE MASTER FILE MAINT.
+OPAF          64 - OPAF        -OPEN ACCOUNTS PAYABLE MASTER FILE MAINT.
+65            65 - VNMS        -VENDOR MASTER FILE MAINT & INQUIRY
+VNMS          65 - VNMS        -VENDOR MASTER FILE MAINT & INQUIRY
+66            66 - GLDA        -DAILY GENERAL LEDGER DISTRIBUTION FILE M
+GLDA          66 - GLDA        -DAILY GENERAL LEDGER DISTRIBUTION FILE M
+67            67 - PYRH        -ACCOUNTS PAYABLE REGISTER MAINT & INQUIR
+PYRH          67 - PYRH        -ACCOUNTS PAYABLE REGISTER MAINT & INQUIR
+68            68 - PYRD        -ACCOUNTS PAYABLE REGISTER (DETAIL) MAINT
+PYRD          68 - PYRD        -ACCOUNTS PAYABLE REGISTER (DETAIL) MAINT
+69            69 - VNCK        -ACCOUNTS PAYABLE CHECK FILE
+VNCK          69 - VNCK        -ACCOUNTS PAYABLE CHECK FILE
+70            70 - MCRG        -MONTHLY CHECK REGISTER MAINT & INQUIRY
+MCRG          70 - MCRG        -MONTHLY CHECK REGISTER MAINT & INQUIRY
+71            71 - APAJH       -A/P ADJUSTMENTS HEADER
+APAJH         71 - APAJH       -A/P ADJUSTMENTS HEADER
+72            72 - APAJD       -ADJUSTMENT JOURNAL ENTRY (DISTRIBUTION D
+APAJD         72 - APAJD       -ADJUSTMENT JOURNAL ENTRY (DISTRIBUTION D
+73            73 - CNOF        -VENDOR CHECK NUMBERS (KEYS ONLY) MAINT &
+CNOF          73 - CNOF        -VENDOR CHECK NUMBERS (KEYS ONLY) MAINT &
+74            74 - EMP1        -P/R EMPLOYEE MASTER BASIC RECORD MAINT/INQUIRY
+EMP1          74 - EMP1        -P/R EMPLOYEE MASTER BASIC RECORD MAINT/INQUIRY
+75            75 - EMP2        -EMPLOYEE MASTER, DEDUCTION RECORD
+EMP2          75 - EMP2        -EMPLOYEE MASTER, DEDUCTION RECORD
+76            76 - EMP3        -EMPLOYEE MASTER FILE, Y-T-D RECORD
+EMP3          76 - EMP3        -EMPLOYEE MASTER FILE, Y-T-D RECORD
+77            77 - EMP4        -EMPLOYEE PAYROLL HISTORY FILE MAINTENANC
+EMP4          77 - EMP4        -EMPLOYEE PAYROLL HISTORY FILE MAINTENANC
+78            78 - VNMD        -Vendor Monthly Detail File
+VNMD          78 - VNMD        -Vendor Monthly Detail File
+79            79 - VNMB        -
+80            79 - VNMB        -
+81            79 - VNMB        -
+VNMB          79 - VNMB        -
+82            82 - PWKF        -P/R Check File
+PWKF          82 - PWKF        -P/R Check File
+83            83 - ITTB        -PAYROLL INSURANCE TAX TABLES FILE MAINT & INQUIRY
+ITTB          83 - ITTB        -PAYROLL INSURANCE TAX TABLES FILE MAINT & INQUIRY
+84            84 - GLJE        -G/L JOURNAL ENTRY WORK FILE
+GLJE          84 - GLJE        -G/L JOURNAL ENTRY WORK FILE
+85            85 - CNVZ<       -FORMULA REVISION REASON CODE MASTER FILE
+339           85 - CNVZ<       -FORMULA REVISION REASON CODE MASTER FILE
+CNVZ<         85 - CNVZ<       -FORMULA REVISION REASON CODE MASTER FILE
+86            86 - GLWF2       -GENERAL LEDGER BUDGET REPORT WORK FILE
+GLWF2         86 - GLWF2       -GENERAL LEDGER BUDGET REPORT WORK FILE
+87            87 - GLMS        -GENERAL LEDGER MASTER
+GLMS          87 - GLMS        -GENERAL LEDGER MASTER
+88            88 - GLMT        -MONTHLY GENERAL LEDGER DISTRIBUTION FILE
+GLMT          88 - GLMT        -MONTHLY GENERAL LEDGER DISTRIBUTION FILE
+89            89 - GLTR        -GENERAL LEDGER TRANSACTION FILE MAINTENA
+GLTR          89 - GLTR        -GENERAL LEDGER TRANSACTION FILE MAINTENA
+90            90 - GLIS        -G/L INCOME STATEMENT LINE HEADING FILE
+GLIS          90 - GLIS        -G/L INCOME STATEMENT LINE HEADING FILE
+91            91 - UDED        -DATA ENTRY DICTIONARY MAINTENANCE & INQU
+UDED          91 - UDED        -DATA ENTRY DICTIONARY MAINTENANCE & INQU
+92            92 - OPST        -OPERATOR STATISTICS FILE MAINTENANCE & I
+OPST          92 - OPST        -OPERATOR STATISTICS FILE MAINTENANCE & I
+93            93 - OPERL       -System Log-on Operator Codes
+OPERL         93 - OPERL       -System Log-on Operator Codes
+94            94 - UDEH        -Data Entry Screen Control Record
+UDEH          94 - UDEH        -Data Entry Screen Control Record
+95            95 - PINI        -
+PINI          95 - PINI        -
+96            96 - OEBK        -Broker Statement Detail File
+OEBK          96 - OEBK        -Broker Statement Detail File
+97            97 - CNVZaa      -Inventory Availability Codes
+CNVZaa        97 - CNVZaa      -Inventory Availability Codes
+98            98 - GLXR        -GENERAL LEDGER JOURNAL TRANSACTION XREF
+GLXR          98 - GLXR        -GENERAL LEDGER JOURNAL TRANSACTION XREF
+99            99 - CBSF        -FILE LAYOUT DOCUMENTATION MAINT. & INQUI
+CBSF          99 - CBSF        -FILE LAYOUT DOCUMENTATION MAINT. & INQUI
+100          100 - CNVZY0      -Route Code
+CNVZY0       100 - CNVZY0      -Route Code
+101          101 - WRK1        -CBS SORT WORK FILE
+WRK1         101 - WRK1        -CBS SORT WORK FILE
+102          102 - CNVZE       -PAYROLL EMPLOYER STATE TAX I.D. NUMBERS
+CNVZE        102 - CNVZE       -PAYROLL EMPLOYER STATE TAX I.D. NUMBERS
+103          103 - IPCT        -Catalog Section Headings
+IPCT         103 - IPCT        -Catalog Section Headings
+104          104 - CNVZY1      -Geogaphic Territory Code
+CNVZY1       104 - CNVZY1      -Geogaphic Territory Code
+105          105 - TTTL        -CBS AUDIT FILE MAINTENANCE & INQUIRY
+TTTL         105 - TTTL        -CBS AUDIT FILE MAINTENANCE & INQUIRY
+106          106 - CNVZi       -Inventory Cycle Count Codes
+CNVZi        106 - CNVZi       -Inventory Cycle Count Codes
+107          107 - LMOD        -CBS SELECTOR/DATA ENTRY LOAD MODULE WORK
+LMOD         107 - LMOD        -CBS SELECTOR/DATA ENTRY LOAD MODULE WORK
+108          108 - CNVZab      -Brand Master
+CNVZab       108 - CNVZab      -Brand Master
+109          109 - CNVZac      -Catalog Category Descriptions
+CNVZac       109 - CNVZac      -Catalog Category Descriptions
+110          110 - CNVZag      -INVENTORY G/L CATEGORY MAINTENANCE & INQUIRY
+CNVZag       110 - CNVZag      -INVENTORY G/L CATEGORY MAINTENANCE & INQUIRY
+111          111 - ITTC        -California Personal Exemption Deductions
+ITTC         111 - ITTC        -California Personal Exemption Deductions
+112          112 - CNVZ9       -G/L CONTROL RECORD - INCOME STATEMENT
+CNVZ9        112 - CNVZ9       -G/L CONTROL RECORD - INCOME STATEMENT
+113          113 - CSXFN       -Customers Requiring Price Change Notices
+CSXFN        113 - CSXFN       -Customers Requiring Price Change Notices
+114          114 - DEST        -DATA ENTRY SCREEN SORT FILE
+DEST         114 - DEST        -DATA ENTRY SCREEN SORT FILE
+115          115 - CORE        -CBS SYSTEM PARAMETER SAVE FILE
+CORE         115 - CORE        -CBS SYSTEM PARAMETER SAVE FILE
+116          116 - GHcc        -GENERAL LEDGER HISTORY FILE MAINTENANCE
+GHcc         116 - GHcc        -GENERAL LEDGER HISTORY FILE MAINTENANCE
+117          117 - INVC        -Catalog List File
+INVC         117 - INVC        -Catalog List File
+118          118 - ICDT        -INVENTORY MONTH-TO-DATE HISTORY FILE MAINTENANCE
+ICDT         118 - ICDT        -INVENTORY MONTH-TO-DATE HISTORY FILE MAINTENANCE
+120          120 - POBF        -Supplier Broker File
+POBF         120 - POBF        -Supplier Broker File
+351          120 - POBF        -Supplier Broker File
+121          121 - CNVZw       -WAREHOUSE MASTER MAINTENANCE & INQUIRY
+122          121 - CNVZw       -WAREHOUSE MASTER MAINTENANCE & INQUIRY
+123          121 - CNVZw       -WAREHOUSE MASTER MAINTENANCE & INQUIRY
+124          121 - CNVZw       -WAREHOUSE MASTER MAINTENANCE & INQUIRY
+125          121 - CNVZw       -WAREHOUSE MASTER MAINTENANCE & INQUIRY
+CNVZw        121 - CNVZw       -WAREHOUSE MASTER MAINTENANCE & INQUIRY
+126          126 - OEIFC       -OPEN ORDER CUSTOMER XREF BY CUSTOMER NO
+OEIFC        126 - OEIFC       -OPEN ORDER CUSTOMER XREF BY CUSTOMER NO
+127          127 - OETC        -Case Picking Xref - Area,loc,route
+OETC         127 - OETC        -Case Picking Xref - Area,loc,route
+128          128 - OEIFS       -ROUTE/REVERSE STOP XREF FILE
+OEIFS        128 - OEIFS       -ROUTE/REVERSE STOP XREF FILE
+130          130 - OEIFE       -Inventory Order Exceptions
+OEIFE        130 - OEIFE       -Inventory Order Exceptions
+131          131 - OETE        -Each Picking Xref - Route,area,cust,loc
+OETE         131 - OETE        -Each Picking Xref - Route,area,cust,loc
+132          132 - NVPA        -Inventory Promotion Allowances
+NVPA         132 - NVPA        -Inventory Promotion Allowances
+134          134 - NXRFw       -INVENTORY XREF - WAREHOUSE RECORD
+NXRFw        134 - NXRFw       -INVENTORY XREF - WAREHOUSE RECORD
+135          135 - NVTY1       -INVENTORY MASTER (STATUS & DESCRIPTION)
+NVTY1        135 - NVTY1       -INVENTORY MASTER (STATUS & DESCRIPTION)
+136          136 - NVTY2       -INVENTORY PRICING RECORD FILE MAINTENANC
+NVTY2        136 - NVTY2       -INVENTORY PRICING RECORD FILE MAINTENANC
+137          137 - NVPX        -SPECIAL CUSTOMER PRICES XREF BY ITEM
+NVPX         137 - NVPX        -SPECIAL CUSTOMER PRICES XREF BY ITEM
+138          138 - NVPRCI      -Customer Item Special Prices
+NVPRCI       138 - NVPRCI      -Customer Item Special Prices
+139          139 - CNVZ:       -SELECTOR ACCESS CONTROL FILE
+CNVZ:        139 - CNVZ:       -SELECTOR ACCESS CONTROL FILE
+140          140 - CSMSB       -CUSTOMER MASTER FILE - DEFAULT SHIP-TO
+CSMSB        140 - CSMSB       -CUSTOMER MASTER FILE - DEFAULT SHIP-TO
+141          141 - CNVZA       -A/R BALANCE FORWARD CONTROL FILE
+CNVZA        141 - CNVZA       -A/R BALANCE FORWARD CONTROL FILE
+142          142 - OETP        -Customer Price Labels Xref - cust,descr
+OETP         142 - OETP        -Customer Price Labels Xref - cust,descr
+143          143 - RCKSA       -A/R CASH RECEIPTS CONTROL RECORDS
+RCKSA        143 - RCKSA       -A/R CASH RECEIPTS CONTROL RECORDS
+144          144 - CNTG        -TAG ACCOUNTING FILE
+CNTG         144 - CNTG        -TAG ACCOUNTING FILE
+145          145 - NVPRCC      -Customer Category Special Prices
+NVPRCC       145 - NVPRCC      -Customer Category Special Prices
+146          146 - NVPRRI      -Customer Special Retail Item Prices
+NVPRRI       146 - NVPRRI      -Customer Special Retail Item Prices
+147          147 - NVPRRC      -Customer Special Retail Category Prices
+NVPRRC       147 - NVPRRC      -Customer Special Retail Category Prices
+148          148 - CNVZp       -CUSTOMER/CATEGORY PRICING FILE
+231          148 - CNVZp       -CUSTOMER/CATEGORY PRICING FILE
+CNVZp        148 - CNVZp       -CUSTOMER/CATEGORY PRICING FILE
+149          149 - CNVZ$       -PAYROLL MISCELLANEOUS DEDUCTIONS CODE CONTROL FILE
+CNVZ$        149 - CNVZ$       -PAYROLL MISCELLANEOUS DEDUCTIONS CODE CONTROL FILE
+150          150 - NVTY5       -INVENTORY - REC # 5 = LIFO/FIFO
+NVTY5        150 - NVTY5       -INVENTORY - REC # 5 = LIFO/FIFO
+151          151 - TKXF        -STOCK RECEIPTS, TRANSFERS & ADJUSTMENTS
+TKXF         151 - TKXF        -STOCK RECEIPTS, TRANSFERS & ADJUSTMENTS
+152          152 - GLWF        -GENERAL LEDGER INCOME STATEMENT WORK FIL
+GLWF         152 - GLWF        -GENERAL LEDGER INCOME STATEMENT WORK FIL
+153          153 - GLJS        -GENERAL LEDGER BUDGET CONTROL FILE MAINT
+GLJS         153 - GLJS        -GENERAL LEDGER BUDGET CONTROL FILE MAINT
+155          155 - ARGL        -NON A/R CASH RECEIPTS WORK FILE MAINTENA
+ARGL         155 - ARGL        -NON A/R CASH RECEIPTS WORK FILE MAINTENA
+156          156 - CNVZ&       -PAYROLL MISCELLANEOUS EARNINGS CODE CONTROL FILE
+CNVZ&        156 - CNVZ&       -PAYROLL MISCELLANEOUS EARNINGS CODE CONTROL FILE
+157          157 - CNVZCSA     -Sales Analysis Control Record
+CNVZCSA      157 - CNVZCSA     -Sales Analysis Control Record
+158          158 - OEDA        -Daily Invoicing Totals
+OEDA         158 - OEDA        -Daily Invoicing Totals
+159          159 - OEVL        -VENDOR LOST SALES FILE
+OEVL         159 - OEVL        -VENDOR LOST SALES FILE
+160          160 - CNVZc       -INVENTORY ITEM UNIT CONVERSION
+CNVZc        160 - CNVZc       -INVENTORY ITEM UNIT CONVERSION
+161          161 - RCKX        -Cash Deposit Xref by Entry Sequence
+RCKX         161 - RCKX        -Cash Deposit Xref by Entry Sequence
+162          162 - SACA        -CA Redemption Sales Detail
+SACA         162 - SACA        -CA Redemption Sales Detail
+163          163 - POSM        -SUPPLIER MASTER FILE
+POSM         163 - POSM        -SUPPLIER MASTER FILE
+164          164 - POXX        -PURCHASE ORDER AUDIT FILE
+POXX         164 - POXX        -PURCHASE ORDER AUDIT FILE
+165          165 - POPU        -PURCHASING UNITS CONVERSION FILE
+POPU         165 - POPU        -PURCHASING UNITS CONVERSION FILE
+166          166 - ICcc        -PHYSICAL INVENTORY COUNT FILE
+ICcc         166 - ICcc        -PHYSICAL INVENTORY COUNT FILE
+167          167 - ICAI        -ADD ITEM ENTRY FILE
+ICAI         167 - ICAI        -ADD ITEM ENTRY FILE
+168          168 - ICAS        -AD ITEM ENTRY SORT FILE
+ICAS         168 - ICAS        -AD ITEM ENTRY SORT FILE
+169          169 - PORN        -RESERVED PURCHASE ORDER NUMBER FILE
+PORN         169 - PORN        -RESERVED PURCHASE ORDER NUMBER FILE
+170          170 - CNVZCAR     -A/R APPLICATION CONTROL RECORD
+CNVZCAR      170 - CNVZCAR     -A/R APPLICATION CONTROL RECORD
+171          171 - CNVZCAP     -AP APPLICATION CONTROL FILE
+CNVZCAP      171 - CNVZCAP     -AP APPLICATION CONTROL FILE
+172          172 - CNVZCGL     -G/L APPLICATION CONTROL RECORDD
+CNVZCGL      172 - CNVZCGL     -G/L APPLICATION CONTROL RECORDD
+173          173 - CNVZj       -STOCK ADJUSTMENT REASON CODE FILE
+CNVZj        173 - CNVZj       -STOCK ADJUSTMENT REASON CODE FILE
+174          174 - POTR        -PURCHASE TREND FILE
+POTR         174 - POTR        -PURCHASE TREND FILE
+175          175 - CNVZCOE     -ORDER PROCESSING APPLICATION CONTROL REC
+CNVZCOE      175 - CNVZCOE     -ORDER PROCESSING APPLICATION CONTROL REC
+176          176 - CNVZH       -DIVISION CONTROL RECORDS
+CNVZH        176 - CNVZH       -DIVISION CONTROL RECORDS
+177          177 - CNVZ/       -DEPARTMENT CONTROL RECORDS MAINTENANCE &
+CNVZ/        177 - CNVZ/       -DEPARTMENT CONTROL RECORDS MAINTENANCE &
+178          178 - CNVZe       -COST CENTER CONTROL RECORDS MAINTENANCE & INQUIRY
+CNVZe        178 - CNVZe       -COST CENTER CONTROL RECORDS MAINTENANCE & INQUIRY
+179          179 - CNVZn       -EMPLOYEE RELATIVE CODES MASTER FILE MAINTENANCE
+CNVZn        179 - CNVZn       -EMPLOYEE RELATIVE CODES MASTER FILE MAINTENANCE
+180          180 - GLBS        -G/L BALANCE SHEET CONTROL FILE
+GLBS         180 - GLBS        -G/L BALANCE SHEET CONTROL FILE
+181          181 - GLWF1       -GENERAL LEDGER BALANCE SHEET WORK FILE
+GLWF1        181 - GLWF1       -GENERAL LEDGER BALANCE SHEET WORK FILE
+182          182 - POHI        -P/O RECEIPTS HISTORY FILE
+POHI         182 - POHI        -P/O RECEIPTS HISTORY FILE
+183          183 - PORF        -PURCHASE ORDER RECEIPTS FILE
+PORF         183 - PORF        -PURCHASE ORDER RECEIPTS FILE
+184          184 - CNVZW       -I/C WAREHOUSE CATEGORY MASTER MAINT. & I
+CNVZW        184 - CNVZW       -I/C WAREHOUSE CATEGORY MASTER MAINT. & I
+185          185 - POCT        -PURCHASE ORDER CONTRACT MASTER FILE
+POCT         185 - POCT        -PURCHASE ORDER CONTRACT MASTER FILE
+186          186 - CNVZr       -CREDIT/DEBIT MEMO REASON CODE FILE MAINT
+273          186 - CNVZr       -CREDIT/DEBIT MEMO REASON CODE FILE MAINT
+286          186 - CNVZr       -CREDIT/DEBIT MEMO REASON CODE FILE MAINT
+CNVZr        186 - CNVZr       -CREDIT/DEBIT MEMO REASON CODE FILE MAINT
+187          187 - CNVZ]       -A/R APPLICATION CONTROL RECORD
+272          187 - CNVZ]       -A/R APPLICATION CONTROL RECORD
+CNVZ]        187 - CNVZ]       -A/R APPLICATION CONTROL RECORD
+188          188 - ICPD        -Customer Inventory Descr for Price Labls
+ICPD         188 - ICPD        -Customer Inventory Descr for Price Labls
+189          189 - CNVZbc      -Bulk Customer Type Codes
+CNVZbc       189 - CNVZbc      -Bulk Customer Type Codes
+190          190 - EOORH       -Electronic Order Header File
+EOORH        190 - EOORH       -Electronic Order Header File
+EOORD        191 - EOORD       -Electronic Order Detail File
+191          191 - EOORD       -Electronic Order Detail File
+192          192 - CNVZO1      -Transmitter Master File
+CNVZO1       192 - CNVZO1      -Transmitter Master File
+EODED        193 - EODED       -Tranmission Format Masks
+193          193 - EODED       -Tranmission Format Masks
+EODEH        194 - EODEH       -Transmitter Format Master
+194          194 - EODEH       -Transmitter Format Master
+195          195 - CNVZO3      -Transmission Data Elements
+CNVZO3       195 - CNVZO3      -Transmission Data Elements
+196          196 - CNVZCEO     -ELECTRONIC ORDER PROCESSING CONTROL RECORD
+CNVZCEO      196 - CNVZCEO     -ELECTRONIC ORDER PROCESSING CONTROL RECORD
+CNVZO2       197 - CNVZO2      -EOP Application Control Record
+197          197 - CNVZO2      -EOP Application Control Record
+198          198 - EOTR        -Raw Received Electronic Orders
+EOTR         198 - EOTR        -Raw Received Electronic Orders
+199          199 - PWKG        -P/R Labor Distribution
+PWKG         199 - PWKG        -P/R Labor Distribution
+201          201 - CNVZmE      -ORDER ENTRY MESSAGE CODES
+CNVZmE       201 - CNVZmE      -ORDER ENTRY MESSAGE CODES
+202          202 - CNVZap      -Warehouse Picking Areas
+CNVZap       202 - CNVZap      -Warehouse Picking Areas
+203          203 - OEOL        -Shipped Orders File
+OEOL         203 - OEOL        -Shipped Orders File
+204          204 - CNVZmI      -INVOICE PRINT MESSAGE CODES
+CNVZmI       204 - CNVZmI      -INVOICE PRINT MESSAGE CODES
+205          205 - ICXF        -ITEM CODE CONVERSION FILE
+ICXF         205 - ICXF        -ITEM CODE CONVERSION FILE
+206          206 - APVH        -A/P VOUCHER HISTORY FILE
+APVH         206 - APVH        -A/P VOUCHER HISTORY FILE
+207          207 - CNVZrp      -ORDER ENTRY CREDIT/DEBIT MEMO REASON CODES
+CNVZrp       207 - CNVZrp      -ORDER ENTRY CREDIT/DEBIT MEMO REASON CODES
+208          208 - IPEX        -Item Pricing Exception File
+IPEX         208 - IPEX        -Item Pricing Exception File
+209          209 - CNVZP1      -Price List Master File
+CNVZP1       209 - CNVZP1      -Price List Master File
+210          210 - CNVZ)       -PURCHASE ORDER PRINT MESSAGES
+CNVZ)        210 - CNVZ)       -PURCHASE ORDER PRINT MESSAGES
+211          211 - CNVZ+       -A/R ADJUSTMENTS REASON CODES
+CNVZ+        211 - CNVZ+       -A/R ADJUSTMENTS REASON CODES
+212          212 - CNVZP4      -Freight Upcharges for Pricing
+CNVZP4       212 - CNVZP4      -Freight Upcharges for Pricing
+213          213 - CNVZP5      -Product Combination Specials
+CNVZP5       213 - CNVZP5      -Product Combination Specials
+214          214 - IPXF        -Price Change Cross-reference
+IPXF         214 - IPXF        -Price Change Cross-reference
+215          215 - NXRF4       -Inventory XREF by Vendor
+NXRF4        215 - NXRF4       -Inventory XREF by Vendor
+NXRF2        216 - NXRF2       -Inventory Xref by Sales Category
+216          216 - NXRF2       -Inventory Xref by Sales Category
+217          217 - NXRF3       -Inventory XREF by Name (First 20 Chars)
+NXRF3        217 - NXRF3       -Inventory XREF by Name (First 20 Chars)
+218          218 - POSX        -SUPPLIER/ITEM XREF FILE
+POSX         218 - POSX        -SUPPLIER/ITEM XREF FILE
+219          219 - POHF        -PURCHASE ORDER HEADER FILE
+POHF         219 - POHF        -PURCHASE ORDER HEADER FILE
+220          220 - PODF        -PURCHASE ORDER DETAIL FILE
+PODF         220 - PODF        -PURCHASE ORDER DETAIL FILE
+221          221 - NXRF1       -X-REFERENCE 1
+NXRF1        221 - NXRF1       -X-REFERENCE 1
+222          222 - CNVZ#       -PAYROLL STANDARD DEDUCTIONS CONTROL RECORDS
+CNVZ#        222 - CNVZ#       -PAYROLL STANDARD DEDUCTIONS CONTROL RECORDS
+223          223 - CNVZq       -RECOMMENDED PURCHASING CATEGORY CODES
+CNVZq        223 - CNVZq       -RECOMMENDED PURCHASING CATEGORY CODES
+224          224 - CNVZ%       -PAYROLL STANDARD EARNINGS CODES
+CNVZ%        224 - CNVZ%       -PAYROLL STANDARD EARNINGS CODES
+225          225 - CNVZb       -PAYROLL BONUS CYCLE DESCRIPTIONS CONTROL RECORDS
+CNVZb        225 - CNVZb       -PAYROLL BONUS CYCLE DESCRIPTIONS CONTROL RECORDS
+226          226 - CNVZu       -PAYROLL UNION CODES FILE MAINTENANCE & INQUIRY
+CNVZu        226 - CNVZu       -PAYROLL UNION CODES FILE MAINTENANCE & INQUIRY
+227          227 - POIX        -ITEM/PURCHASE ORDER XREF FILE
+POIX         227 - POIX        -ITEM/PURCHASE ORDER XREF FILE
+228          228 - NXRF5       -X-REFERENCE 5
+NXRF5        228 - NXRF5       -X-REFERENCE 5
+229          229 - PRLD        -M-T-D LABOR DISTRIBUTION FILE MAINTENANC
+PRLD         229 - PRLD        -M-T-D LABOR DISTRIBUTION FILE MAINTENANC
+PRGL         230 - PRGL        -M-T-D G/L DISTRIBUTION FILE MAINTENANCE
+230          230 - PRGL        -M-T-D G/L DISTRIBUTION FILE MAINTENANCE
+232          232 - PRWD        -W-2 FORM PRINTING FILE
+PRWD         232 - PRWD        -W-2 FORM PRINTING FILE
+233          233 - CNVZpa      -Purchasing Agent Master File
+CNVZpa       233 - CNVZpa      -Purchasing Agent Master File
+234          234 - GLJX        -G/L PERMANENT JOURNAL ENTRIES FILE MAINT
+GLJX         234 - GLJX        -G/L PERMANENT JOURNAL ENTRIES FILE MAINT
+NVTYP        235 - NVTYP       -Inventory Purchasing Information
+235          235 - NVTYP       -Inventory Purchasing Information
+CNVZpw       236 - CNVZpw      -Product Warning Codes
+236          236 - CNVZpw      -Product Warning Codes
+298          236 - CNVZpw      -Product Warning Codes
+237          237 - APMTH       -OPEN ACCOUNTS PAYABLE MONTHLY FILE - HEA
+APMTH        237 - APMTH       -OPEN ACCOUNTS PAYABLE MONTHLY FILE - HEA
+238          238 - APMTD       -OPEN ACCOUNTS PAYABLE MONTHLY FILE - DET
+APMTD        238 - APMTD       -OPEN ACCOUNTS PAYABLE MONTHLY FILE - DET
+239          239 - CNVZkc      -Kosher Categories
+CNVZkc       239 - CNVZkc      -Kosher Categories
+ORccC        240 - ORccC       -O/E EXCEPTIONS - CREDIT LIMIT EXCEEDED F
+240          240 - ORccC       -O/E EXCEPTIONS - CREDIT LIMIT EXCEEDED F
+241          241 - ORccD       -O/E EXCEPTIONS - DELINQUENT ACCOUNTS FIL
+ORccD        241 - ORccD       -O/E EXCEPTIONS - DELINQUENT ACCOUNTS FIL
+242          242 - CNVZic      -Inventory Usage File
+CNVZic       242 - CNVZic      -Inventory Usage File
+243          243 - OEBL        -Bill of Lading Print File
+244          243 - OEBL        -Bill of Lading Print File
+245          243 - OEBL        -Bill of Lading Print File
+OEBL         243 - OEBL        -Bill of Lading Print File
+246          246 - OEBP        -Broker Commission Pct File
+OEBP         246 - OEBP        -Broker Commission Pct File
+247          247 - CNVZJ       -Broker Master File
+CNVZJ        247 - CNVZJ       -Broker Master File
+248          248 - CNVZv       -CA Redemption Codes
+CNVZv        248 - CNVZv       -CA Redemption Codes
+249          249 - POHH        -Purchase Order History Header File
+POHH         249 - POHH        -Purchase Order History Header File
+250          250 - POHD        -Purchase Order History Detail File
+POHD         250 - POHD        -Purchase Order History Detail File
+251          250 - POHD        -Purchase Order History Detail File
+252          252 - ARJH        -A/R ADJUSTMENTS HEADER FILE MAINTENANCE
+ARJH         252 - ARJH        -A/R ADJUSTMENTS HEADER FILE MAINTENANCE
+254          253 - ARJD        -A/R ADJUSTMENTS DETAIL FILE MAINTENANCE
+ARJD         253 - ARJD        -A/R ADJUSTMENTS DETAIL FILE MAINTENANCE
+253          253 - ARJD        -A/R ADJUSTMENTS DETAIL FILE MAINTENANCE
+255          255 - PRGL0       -PAYROLL MONTHLY G/L DISTRIBUTION CONTROL
+PRGL0        255 - PRGL0       -PAYROLL MONTHLY G/L DISTRIBUTION CONTROL
+256          256 - PRLD0       -PAYROLL MONTHLY LABOR DISTRIBUTION CONTR
+PRLD0        256 - PRLD0       -PAYROLL MONTHLY LABOR DISTRIBUTION CONTR
+257          257 - CNVZk       -Ordered By Master File
+CNVZk        257 - CNVZk       -Ordered By Master File
+258          258 - ICTF        -Pallet Tag File
+ICTF         258 - ICTF        -Pallet Tag File
+259          259 - ICTT        -
+ICTT         259 - ICTT        -
+260          260 - CNVZ>       -CASH ACCOUNT MAINTENANCE
+CNVZ>        260 - CNVZ>       -CASH ACCOUNT MAINTENANCE
+261          261 - ARHF        -Customer Payment History
+ARHF         261 - ARHF        -Customer Payment History
+262          262 - ARCI        -Customer Item Code File
+ARCI         262 - ARCI        -Customer Item Code File
+270          270 - CNVZ\       -PAYROLL COMPANY CONTROL RECORD
+CNVZ\        270 - CNVZ\       -PAYROLL COMPANY CONTROL RECORD
+274          274 - SATI        -Customer/Item Weekly S/A Trend
+SATI         274 - SATI        -Customer/Item Weekly S/A Trend
+275          275 - JSIDH       -JOB-STREAM I.D.MASTER FILE - HEADER
+JSIDH        275 - JSIDH       -JOB-STREAM I.D.MASTER FILE - HEADER
+276          276 - JSIDD       -JOB-STREAM I.D. MASTER FILE - DETAIL REC
+JSIDD        276 - JSIDD       -JOB-STREAM I.D. MASTER FILE - DETAIL REC
+277          277 - NCdd        -NCR TRANSACTION FILE
+NCdd         277 - NCdd        -NCR TRANSACTION FILE
+278          278 - NCST        -
+NCST         278 - NCST        -
+279          279 - SATRW       -Weekly Item Sales Trend Analysis File
+SATRW        279 - SATRW       -Weekly Item Sales Trend Analysis File
+280          280 - SATRM       -Monthly Sales Trend File
+SATRM        280 - SATRM       -Monthly Sales Trend File
+281          281 - CNVZP3      -Split Case Charges
+CNVZP3       281 - CNVZP3      -Split Case Charges
+SAVL         282 - SAVL        -Customer Velocity Detail File
+282          282 - SAVL        -Customer Velocity Detail File
+283          283 - SATRC       -Weekly Customer Sales Trend Analysis
+SATRC        283 - SATRC       -Weekly Customer Sales Trend Analysis
+284          284 - SATRD       -Monthly Customer Sales Trend
+SATRD        284 - SATRD       -Monthly Customer Sales Trend
+285          285 - SAHFP       -SALES ANALYSIS CUSTOMER-PROD CATEGORY
+SAHFP        285 - SAHFP       -SALES ANALYSIS CUSTOMER-PROD CATEGORY
+287          287 - SATC        -Customer/Invoice Weekly Trend
+SATC         287 - SATC        -Customer/Invoice Weekly Trend
+288          288 - SADE        -Target Item Sales Detail File
+SADE         288 - SADE        -Target Item Sales Detail File
+SADFR        289 - SADFR       -Sales Analysis - Route Record
+289          289 - SADFR       -Sales Analysis - Route Record
+290          290 - SADFP       -SALES ANALYSIS - PRODUCT RECORD
+SADFP        290 - SADFP       -SALES ANALYSIS - PRODUCT RECORD
+291          291 - SADFS       -SALES ANALYSIS - CUSTOMER RECORD
+SADFS        291 - SADFS       -SALES ANALYSIS - CUSTOMER RECORD
+SADFI        292 - SADFI       -SALES ANALYSIS - INDUSTRY RECORD
+292          292 - SADFI       -SALES ANALYSIS - INDUSTRY RECORD
+293          293 - SADFT       -SALES ANALYSIS - TERRITORY RECORD
+SADFT        293 - SADFT       -SALES ANALYSIS - TERRITORY RECORD
+294          294 - SADT        -SALES ANALYSIS DETAIL FILE MAINTENANCE & INQUIRY
+SADT         294 - SADT        -SALES ANALYSIS DETAIL FILE MAINTENANCE & INQUIRY
+295          295 - SAHFC       -SALES ANALYSIS CUSTOMER - PRODUCT RECORD
+SAHFC        295 - SAHFC       -SALES ANALYSIS CUSTOMER - PRODUCT RECORD
+SAXFC        296 - SAXFC       -CSADF XREF BY CUSTOMER TYPE
+296          296 - SAXFC       -CSADF XREF BY CUSTOMER TYPE
+SAXFT        297 - SAXFT       -CSADF XREF BY TERRITORY
+297          297 - SAXFT       -CSADF XREF BY TERRITORY
+307          307 - CNVZh       -PRODUCT SHAPE CODES
+338          307 - CNVZh       -PRODUCT SHAPE CODES
+CNVZh        307 - CNVZh       -PRODUCT SHAPE CODES
+308          308 - RDCH        -Production Transaction History
+310          308 - RDCH        -Production Transaction History
+312          308 - RDCH        -Production Transaction History
+RDCH         308 - RDCH        -Production Transaction History
+309          308 - RDCH        -Production Transaction History
+311          311 - CNVZsp      -Sales Price Category File
+CNVZsp       311 - CNVZsp      -Sales Price Category File
+ICFS         313 - ICFS        -Inventory Sales Forecast File
+313          313 - ICFS        -Inventory Sales Forecast File
+314          314 - PDCR        -Production Cost Recap File
+PDCR         314 - PDCR        -Production Cost Recap File
+320          320 - IFMS        -FORMULA MASTER FILE
+IFMS         320 - IFMS        -FORMULA MASTER FILE
+321          321 - IFMSH       -FORMULA MASTER - HISTORICAL
+IFMSH        321 - IFMSH       -FORMULA MASTER - HISTORICAL
+322          322 - IFDT        -FORMULA DETAIL - INGREDIENT DETAIL
+IFDT         322 - IFDT        -FORMULA DETAIL - INGREDIENT DETAIL
+323          323 - IFDT1       -FORMULA DETAIL - PRODUCTION INFO
+IFDT1        323 - IFDT1       -FORMULA DETAIL - PRODUCTION INFO
+324          324 - IFTX        -FORMULA DETAIL - BATCHING DIRECTIONS
+IFTX         324 - IFTX        -FORMULA DETAIL - BATCHING DIRECTIONS
+325          325 - IFMFH       -MASTER FORMULA HEADER FILE
+IFMFH        325 - IFMFH       -MASTER FORMULA HEADER FILE
+326          326 - IFMFD       -MASTER FORMULA DETAIL FILE
+IFMFD        326 - IFMFD       -MASTER FORMULA DETAIL FILE
+327          327 - IFIW        -INGREDIENT USAGE BY FORMULA XREF FILE
+IFIW         327 - IFIW        -INGREDIENT USAGE BY FORMULA XREF FILE
+328          328 - IFPP0       -SALES ORDER PRODUCTION PENDING - HEADER
+IFPP0        328 - IFPP0       -SALES ORDER PRODUCTION PENDING - HEADER
+329          329 - IFPP1       -SALES ORDER PRODUCTION PENDING - DETAIL
+IFPP1        329 - IFPP1       -SALES ORDER PRODUCTION PENDING - DETAIL
+330          330 - IFRM        -RAW MATERIAL COMMITTED FILE
+IFRM         330 - IFRM        -RAW MATERIAL COMMITTED FILE
+IFTF         331 - IFTF        -INVENTORY FORMULA TRANSACTION FILE
+331          331 - IFTF        -INVENTORY FORMULA TRANSACTION FILE
+332          332 - IFWF        -INVENTORY FORMULA WORK FILE
+IFWF         332 - IFWF        -INVENTORY FORMULA WORK FILE
+333          333 - IFCC        -FORMULA COMPANY CONTROL RECORD
+334          333 - IFCC        -FORMULA COMPANY CONTROL RECORD
+IFCC         333 - IFCC        -FORMULA COMPANY CONTROL RECORD
+335          335 - PDST        -MAKE TO STOCK PRODUCTION FILE
+PDST         335 - PDST        -MAKE TO STOCK PRODUCTION FILE
+336          336 - PDLH        -PRODUCTION HISTORY BY LOT FILE
+PDLH         336 - PDLH        -PRODUCTION HISTORY BY LOT FILE
+337          337 - PDMP        -PRODUCTION ORDER MASTER
+PDMP         337 - PDMP        -PRODUCTION ORDER MASTER
+340          340 - CNVZ=       -SAFETY/HAZARD/WARNING CODE MASTER FILE
+CNVZ=        340 - CNVZ=       -SAFETY/HAZARD/WARNING CODE MASTER FILE
+341          341 - CNVZf       -PRODUCTION LINE MASTER FILE
+CNVZf        341 - CNVZf       -PRODUCTION LINE MASTER FILE
+342          342 - RDCTH       -PRODUCTION TRANSACTION HEADER
+RDCTH        342 - RDCTH       -PRODUCTION TRANSACTION HEADER
+343          343 - RDCTD       -PRODUCTION TRANSACTION DETAILS
+RDCTD        343 - RDCTD       -PRODUCTION TRANSACTION DETAILS
+344          344 - CNVZ'       -PRODUCTION SYSTEM CONTROL RECORD
+CNVZ'        344 - CNVZ'       -PRODUCTION SYSTEM CONTROL RECORD
+345          345 - CNVZm       -WORK-IN-PROGRESS STATUS CODES
+CNVZm        345 - CNVZm       -WORK-IN-PROGRESS STATUS CODES
+346          346 - FPLB        -PACKAGE LABEL TEXT FILE
+FPLB         346 - FPLB        -PACKAGE LABEL TEXT FILE
+347          347 - IFMX        -FORMULA ALPHA XREF FILE
+IFMX         347 - IFMX        -FORMULA ALPHA XREF FILE
+348          348 - ICTRR       -Production Trend File
+ICTRR        348 - ICTRR       -Production Trend File
+349          349 - ICTRU       -INGREDIENT USAGE TREND FILE
+ICTRU        349 - ICTRU       -INGREDIENT USAGE TREND FILE
+350          350 - RDEH2       -Order History File Header Record 2
+RDEH2        350 - RDEH2       -Order History File Header Record 2
+ICTRA        358 - ICTRA       -
+359          358 - ICTRA       -
+358          358 - ICTRA       -
+360          360 - RDEHH       -Order History Header File
+RDEHH        360 - RDEHH       -Order History Header File
+370          370 - RDEHD       -Order History Detail File
+RDEHD        370 - RDEHD       -Order History Detail File
