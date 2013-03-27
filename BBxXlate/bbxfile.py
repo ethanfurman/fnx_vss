@@ -97,10 +97,10 @@ class BBxFile:
                 leader = simple[:first_ps]
             if last_ps != -1:
                 trailer = simple[last_ps+2:]     # skip the %s ;)
-        if (section is not None
-        and not section.startswith(leader)
-        and not leader.startswith(section)):
-            raise ValueError('no common records between section %r and leader %r' % (section, leader))
+        #if (section is not None
+        #and not section.startswith(leader)
+        #and not leader.startswith(section)):
+        #    raise ValueError('no common records between section %r and leader %r' % (section, leader))
         for ky, rec in getfile(srcefile).items():
             if section is None or ky.startswith(section):
                 if trailer is None or ky.endswith(trailer):
