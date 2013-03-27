@@ -89,10 +89,19 @@ class BBxFile:
     def __init__(self, srcefile, datamap, simple=None, subset=None, section=None):
         records = {}
         datamap = [xx.strip() for xx in datamap]
-        trailer = None
-        if simple and simple.startswith('%s'):
-            trailer=simple[3:]
-        for ky,rec in getfile(srcefile).items():
+        leader = trailer = None
+        if simple:
+            first_ps = simple.find('%s')
+            last_ps = simple.rfind('%s')
+            if first_ps != -1:
+                leader = simple[:first_ps]
+            if last_ps != -1:
+                trailer = simple[last_ps+2:]     # skip the %s ;)
+        if (section is not None
+        and not section.startswith(leader)
+        and not leader.startswith(section)):
+            raise ValueError('no common records between section %r and leader %r' % (section, leader))
+        for ky, rec in getfile(srcefile).items():
             if section is None or ky.startswith(section):
                 if trailer is None or ky.endswith(trailer):
                     records[ky] = BBxRec(rec, datamap)
