@@ -100,12 +100,13 @@ def parse_FIS_Schema(source):
 DATACACHE = {}
 
 def fisData (table, simple=None, section=None):
-    key = table, simple, section
+    filenum = tables[table]['filenum']
+    key = filenum, simple, section
     if key in DATACACHE:
         return DATACACHE[key]
-    datamap = tables[table]['iolist']
-    tablename = tables[table]['name']
-    keygroup = tables[table]['key']
+    datamap = tables[filenum]['iolist']
+    tablename = tables[filenum]['name']
+    keygroup = tables[filenum]['key']
     datafile = os.sep.join([FIS_DATA,"O"+tablename[:4]])
     table = DATACACHE[key] = BBxFile(datafile, datamap, simple=simple, section=section, keygroup=keygroup)
     return table
