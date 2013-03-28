@@ -37,12 +37,14 @@ def applyfieldmap(record, fieldmap):
     return retval
 
 
-class BBxRec:
+class BBxRec(object):
     # define datamap as per the iolist in the subclasses
     datamap = "iolist here".split(",")
+
     def __init__(self, rec, datamap):
         self.rec = rec
         self.datamap = [ xx.strip() for xx in datamap ]
+
     def __getitem__(self, ref):
         if ref in self.datamap:
             var, sub = ref, ''
@@ -59,6 +61,7 @@ class BBxRec:
             #print val,first,last
             val = val[first-1:first+last-1]
         return val
+
     def __setitem__(self, ref, newval):
         var, sub = (ref+"(").split("(")[:2]
         varidx = self.datamap.index(var)
@@ -85,11 +88,14 @@ def getSubset(itemslist, pattern):
     return itemslist
 
 
-class BBxFile:
-    def __init__(self, srcefile, datamap, simple=None, subset=None, section=None):
+class BBxFile(object):
+
+    def __init__(self, srcefile, datamap, simple=None, subset=None, section=None, keygroup=None):
         records = {}
         datamap = [xx.strip() for xx in datamap]
         leader = trailer = None
+        if keygroup:
+            token, start, stop = keygroup
         if simple:
             first_ps = simple.find('%s')
             last_ps = simple.rfind('%s')
@@ -102,6 +108,8 @@ class BBxFile:
         #and not leader.startswith(section)):
         #    raise ValueError('no common records between section %r and leader %r' % (section, leader))
         for ky, rec in getfile(srcefile).items():
+            if keygroup and ky[start:stop] != token:
+                continue
             if section is None or ky.startswith(section):
                 if trailer is None or ky.endswith(trailer):
                     records[ky] = BBxRec(rec, datamap)
@@ -110,12 +118,14 @@ class BBxFile:
         self.simple  = simple
         self.subset  = subset
         self.section = section
-    def get_item_or_single(self,ky):
+
+    def get_item_or_single(self, ky):
         if self.records.has_key(ky):
             return self.records[ky]
         elif self.simple:
             if self.records.has_key(self.simple % ky):
                 return self.records[self.simple % ky]
+
     def __getitem__(self, ky):
         rv = self.get_item_or_single(ky)
         if rv:
@@ -125,18 +135,23 @@ class BBxFile:
             rv = [ (xky,xrec) for (xky,xrec) in self.records.items() if xky.startswith(match) ]
             rv.sort()
             return rv
+
     def __contains__(self, ky):
-        #import pdb; pdb.set_trace()
         return self.get_item_or_single(ky)
+
     def __len__(self):
         return len(self.records)
+
     def keys(self):
         return self.records.keys()
+
     def items(self):
         return self.records.items()
-    def has_key(self,ky):
+
+    def has_key(self, ky):
         #print 'testing for %s ' % ky
         return not not self[ky]
+
     def iterpattern(self, pattern=None):
         xx = getSubset(self.items(), pattern)
         return iter(xx)
