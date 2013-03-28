@@ -105,7 +105,7 @@ def fisData (table, simple=None, section=None):
         return DATACACHE[key]
     datamap = tables[table]['iolist']
     tablename = tables[table]['name']
-    key_group = tables[table]['key']
+    keygroup = tables[table]['key']
     datafile = os.sep.join([FIS_DATA,"O"+tablename[:4]])
     table = DATACACHE[key] = BBxFile(datafile, datamap, simple=simple, section=section, keygroup=keygroup)
     return table
