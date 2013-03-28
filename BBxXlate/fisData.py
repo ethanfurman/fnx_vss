@@ -43,7 +43,7 @@ def parse_FIS_Schema(source):
             parts = line[9:].split(" ( ")
             desc = parts[0].strip()
             filenum = int(parts[1].split()[0])
-            fields = FIS_TABLES.setdefault(filenum, {'name':name, 'desc':desc, 'filenum':filenum, 'fields':[], 'iolist':[]})['fields']
+            fields = FIS_TABLES.setdefault(filenum, {'name':name, 'desc':desc, 'filenum':filenum, 'fields':[], 'iolist':[], 'key':None})['fields']
             if name in FIS_TABLES:
                 del FIS_TABLES[name]    # only allow names if there aren't any duplicates
             else:
@@ -73,6 +73,15 @@ def parse_FIS_Schema(source):
                 fieldvar+=")"                    
             fieldsize = int(fieldsize) if fieldsize else 0
             fields.append(["f%s_%s" % (filenum,fieldnum), fielddesc, fieldsize, fieldvar, sizefrom(fieldmask)])
+            desc = fielddesc.replace(' ','').replace('-','=').lower()
+            if desc.startswith(('key','keygroup','keytyp')) and desc.count('=') == 1:
+                token = fielddesc.replace('-','=').split('=')[1].strip().strip('\'"')
+                start, length = fieldvar.split('(')[1].strip(')').split(',')
+                start, length = int(start) - 1, int(length)
+                if len(token) < length:
+                    length = len(token)
+                stop = start + length
+                FIS_TABLES[filenum]['key'] = token, start, stop
             if textfiles:
                 file_fields.write(str(fields[-1]) + '\n')            
             if "$" in fieldvar:
@@ -81,7 +90,7 @@ def parse_FIS_Schema(source):
                 basevar = fieldvar
             if not basevar in iolist:
                 iolist.append(basevar)
-    if text_files:
+    if textfiles:
         file_iolist.write(str(iolist) + '\n')
         for key, value in sorted(FIS_TABLES.items(), key=lambda kv: kv[1]['filenum']):
             file_tables.write("%-10s %5s - %-10s  %s\n" % (key, value['filenum'], value['name'], value['desc']))            
@@ -96,13 +105,12 @@ def fisData (table, simple=None, section=None):
         return DATACACHE[key]
     datamap = tables[table]['iolist']
     tablename = tables[table]['name']
+    key_group = tables[table]['key']
     datafile = os.sep.join([FIS_DATA,"O"+tablename[:4]])
-    table = DATACACHE[key] = BBxFile(datafile, datamap, simple=simple, section=section)
+    table = DATACACHE[key] = BBxFile(datafile, datamap, simple=simple, section=section, keygroup=keygroup)
     return table
 
-parse_FIS_Schema(FIS_SCHEMAS)
-
-#tables = parse_FIS_Schema(FIS_SCHEMAS)
+tables = parse_FIS_Schema(FIS_SCHEMAS)
 
 #tables['NVTY1']['fields'][77]
 
