@@ -20,7 +20,7 @@ def applyfieldmap(record, fieldmap):
     if fieldmap == None:
         return record
     elif type(fieldmap) != type({}):
-        raise FieldMapTypeError, "FieldMap must be a dictionary of fieldindex[.startpos.endpos]:fieldname"
+        raise FieldMapTypeError("FieldMap must be a dictionary of fieldindex[.startpos.endpos]:fieldname")
     retval = {}
     fieldmapkeys = fieldmap.keys()
     fieldmapkeys.sort()
@@ -41,9 +41,14 @@ class BBxRec(object):
     # define datamap as per the iolist in the subclasses
     datamap = "iolist here".split(",")
 
-    def __init__(self, rec, datamap):
+    def __init__(self, rec, datamap, fieldlist):
         self.rec = rec
         self.datamap = [ xx.strip() for xx in datamap ]
+        if fieldlist is None:
+            fieldlist = []
+            for fieldvar in datamap:
+                fieldlist.append(None, '', None, fieldvar, None)
+        self.fieldlist = fieldlist
 
     def __getitem__(self, ref):
         if ref in self.datamap:
@@ -58,7 +63,6 @@ class BBxRec(object):
         if sub:
             sub = sub[:-1]
             first,last = [ int(x) for x in sub.split(",") ]
-            #print val,first,last
             val = val[first-1:first+last-1]
         return val
 
@@ -72,11 +76,19 @@ class BBxRec(object):
         if sub:
             sub = sub[:-1]
             first,last = [ int(x) for x in sub.split(",") ]
-            #print val,first,last
             val = val[first-1:first+last-1]
             self.rec[varidx][first-1:first+last-1] = newval
         else:
             self.rec[varidx] = newval
+
+    def __repr__(self):
+        return repr(self.rec)
+
+    def __str__(self):
+        lines = []
+        for i, row in enumerate(self.fieldlist):
+            lines.append('%5d | %-12s | %15s | %s' % (i, row[3], self[row[3]], row[1]))
+        return '\n'.join(lines)
 
 
 def getSubset(itemslist, pattern):
@@ -87,44 +99,65 @@ def getSubset(itemslist, pattern):
     itemslist.sort()
     return itemslist
 
+def BBVarLength(datamap, fieldlist):
+    dm_iter = iter(datamap)
+    current_var = next(dm_iter)
+    length = 0
+    result = []
+    for field in fieldlist:
+        if not field[3].startswith(current_var):
+            result.append(length)
+            try:
+                current_var = next(dm_iter)
+            except StopIteration:
+                return result
+            length = 0
+        length += field[2]
+    result.append(length)
+    return result
 
 class BBxFile(object):
 
-    def __init__(self, srcefile, datamap, simple=None, subset=None, section=None, keygroup=None):
+    def __init__(self, srcefile, datamap, fieldlist, keymatch=None, subset=None, section=None, rectype=None):
         records = {}
         datamap = [xx.strip() for xx in datamap]
         leader = trailer = None
-        if keygroup:
-            token, start, stop = keygroup
-        if simple:
-            first_ps = simple.find('%s')
-            last_ps = simple.rfind('%s')
+        if rectype:
+            token, start, stop = rectype
+        if keymatch:
+            first_ps = keymatch.find('%s')
+            last_ps = keymatch.rfind('%s')
             if first_ps != -1:
-                leader = simple[:first_ps]
+                leader = keymatch[:first_ps]
             if last_ps != -1:
-                trailer = simple[last_ps+2:]     # skip the %s ;)
-        #if (section is not None
-        #and not section.startswith(leader)
-        #and not leader.startswith(section)):
-        #    raise ValueError('no common records between section %r and leader %r' % (section, leader))
+                trailer = keymatch[last_ps+2:]     # skip the %s ;)
+        fieldlengths = BBVarLength(datamap, fieldlist)
+        fixedLengthFields = set([fld for fld in fieldlist if '$' in fld and field[-1] != '$'])
         for ky, rec in getfile(srcefile).items():
-            if keygroup and ky[start:stop] != token:
-                continue
+            if (len(ky) != fieldlengths[0]
+            or  len(rec) != len(fieldlengths)
+            or  any(len(field) != length for field, length, name in
+                    zip(rec, fieldlengths, datamap) if name in fixedLengthFields)
+            or  rectype and ky[start:stop] != token):
+                continue    # record is not a match for this table
             if section is None or ky.startswith(section):
                 if trailer is None or ky.endswith(trailer):
-                    records[ky] = BBxRec(rec, datamap)
+                    records[ky] = BBxRec(rec, datamap, fieldlist)
+            else:
         self.records = records
         self.datamap = datamap
-        self.simple  = simple
+        self.fieldlist = fieldlist
+        self.keymatch  = keymatch
         self.subset  = subset
         self.section = section
+        self.rectype = rectype
 
     def get_item_or_single(self, ky):
         if self.records.has_key(ky):
             return self.records[ky]
-        elif self.simple:
-            if self.records.has_key(self.simple % ky):
-                return self.records[self.simple % ky]
+        elif self.keymatch:
+            if self.records.has_key(self.keymatch % ky):
+                return self.records[self.keymatch % ky]
 
     def __getitem__(self, ky):
         rv = self.get_item_or_single(ky)
@@ -157,7 +190,7 @@ class BBxFile(object):
         return iter(xx)
 
 
-def getfile(filename = None, fieldmap = None):
+def getfile(filename=None, fieldmap=None):
     """
 Read BBx Mkeyed, Direct or Indexed file and return it as a dictionary.
 
@@ -181,7 +214,7 @@ Notes:  The entire file is read into memory.
             data = open(srce_loc + os.sep + filename,'rb').read()
         except:
             print "(srce_loc, filename)", (srce_loc, filename)
-            raise "File not found or read/permission error.", (srce_loc, filename)
+            raise Exception("File not found or read/permission error. (%s: %s)" % (filename, srce_loc))
 
     #hexdump(data)
     #raise "Breaking..."
@@ -241,7 +274,7 @@ Notes:  The entire file is read into memory.
             keychainkeycount = keychainkeycount + 1
     else:
         #hexdump(data)
-        raise "UnknownFileTypeError", (filetype)
+        raise Exception("UnknownFileTypeError: %s" % (filetype))
     return keychainkeys
 
 if __name__ == '__main__':
