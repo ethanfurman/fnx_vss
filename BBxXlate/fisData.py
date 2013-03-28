@@ -71,10 +71,19 @@ def parse_FIS_Schema(source):
                     fieldvar = rest[0]
             if "(" in fieldvar and not fieldvar.endswith(")"):
                 fieldvar+=")"                    
+            if "$" in fieldvar:
+                basevar = fieldvar.split("(")[0]
+            else:
+                basevar = fieldvar
+            basevar = basevar.title()
+            if not basevar in iolist:
+                iolist.append(basevar)
             fieldsize = int(fieldsize) if fieldsize else 0
             fields.append(["f%s_%s" % (filenum,fieldnum), fielddesc, fieldsize, fieldvar, sizefrom(fieldmask)])
             desc = fielddesc.replace(' ','').replace('-','=').lower()
-            if desc.startswith(('key','keygroup','keytyp')) and desc.count('=') == 1:
+            if (fieldvar.startswith(iolist[0])
+            and desc.startswith(('key','keygroup','keytyp','rectype','recordtype'))
+            and desc.count('=') == 1):
                 token = fielddesc.replace('-','=').split('=')[1].strip().strip('\'"')
                 start, length = fieldvar.split('(')[1].strip(')').split(',')
                 start, length = int(start) - 1, int(length)
@@ -84,12 +93,6 @@ def parse_FIS_Schema(source):
                 FIS_TABLES[filenum]['key'] = token, start, stop
             if textfiles:
                 file_fields.write(str(fields[-1]) + '\n')            
-            if "$" in fieldvar:
-                basevar = fieldvar.split("(")[0]
-            else:
-                basevar = fieldvar
-            if not basevar in iolist:
-                iolist.append(basevar)
     if textfiles:
         file_iolist.write(str(iolist) + '\n')
         for key, value in sorted(FIS_TABLES.items(), key=lambda kv: kv[1]['filenum']):
@@ -99,23 +102,24 @@ def parse_FIS_Schema(source):
 
 DATACACHE = {}
 
-def fisData (table, simple=None, section=None):
+def fisData (table, keymatch=None, section=None):
     filenum = tables[table]['filenum']
-    key = filenum, simple, section
+    key = filenum, keymatch, section
     if key in DATACACHE:
         return DATACACHE[key]
-    datamap = tables[filenum]['iolist']
     tablename = tables[filenum]['name']
-    keygroup = tables[filenum]['key']
+    datamap = tables[filenum]['iolist']
+    fieldlist = tables[filenum]['fields']
+    rectype = tables[filenum]['key']
     datafile = os.sep.join([FIS_DATA,"O"+tablename[:4]])
-    table = DATACACHE[key] = BBxFile(datafile, datamap, simple=simple, section=section, keygroup=keygroup)
+    table = DATACACHE[key] = BBxFile(datafile, datamap, keymatch=keymatch, section=section, rectype=rectype, fieldlist=fieldlist)
     return table
 
 tables = parse_FIS_Schema(FIS_SCHEMAS)
 
 #tables['NVTY1']['fields'][77]
 
-#NVTY = fisData(135,simple="%s101000    101**")
+#NVTY = fisData(135,keymatch="%s101000    101**")
 
-#vendors = fisData(65,simple='10%s')
+#vendors = fisData(65,keymatch='10%s')
 #vendors['000099']['Gn$']
