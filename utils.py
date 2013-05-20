@@ -811,7 +811,7 @@ def tuples(func):
 
 @tuples
 def NameCase(*names):
-    names = [n.strip() for n in names]
+    '''names should already be stripped of whitespace'''
     if not any(names):
         return names
     final = []
@@ -847,7 +847,7 @@ def NameCase(*names):
 
 @tuples
 def AddrCase(*fields):
-    if not fields:
+    if not any(fields):
         return fields
     final = []
     for field in fields:
@@ -870,7 +870,7 @@ def AddrCase(*fields):
 
 @tuples
 def BsnsCase(*fields):
-    if not fields:
+    if not any(fields):
         return fields
     final = []
     for name in fields:
@@ -1118,6 +1118,5 @@ def fix_date(text):
     text = text.strip()
     if len(text) != 6:
         return None
-    print repr(text)
     yyyy, mm, dd = int(text[4:], 16)-160+2000, int(text[:2]), int(text[2:4])
     return datetime.date(yyyy, mm, dd)
