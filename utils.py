@@ -1,12 +1,18 @@
 import binascii
+import datetime
 import string
 
 String = str, unicode
 Integer = int, long
 
-def crc32(binary_data):
-    "wrapper around binascii.crc32 that is consistent across python versions"
-    return binascii.crc32(binary_data) & 0xffffffff
+spelled_out_numbers = set(['ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN'])
+
+building_subs = set([
+    '#','APARTMENT','APT','BLDG','BUILDING','CONDO','FL','FLR','FLOOR','LOT','LOWER','NO','NUM','NUMBER',
+    'RM','ROOM','SLIP','SLP','SPACE','SP','SPC','STE','SUITE','TRLR','UNIT','UPPER',
+    ])
+caps_okay = set(['UCLA', 'OHSU', 'IBM', 'LLC', 'USA', 'NASA'])
+lower_okay = set(['dba', 'c/o', 'attn'])
 
 def translator(frm='', to='', delete='', keep=None):
     if len(to) == 1:
@@ -32,7 +38,583 @@ def translator(frm='', to='', delete='', keep=None):
             return s.translate(bytes_trans, delete)
     return translate
 
-spelled_out_numbers = set(['ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN'])
+alpha_num = translator(delete='.,:_#')
+non_alpha_num = translator(delete="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,-")
+any_digits = translator(keep='0123456789')
+has_digits = any_digits
+name_chars = translator(to=' ', keep="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' /")
+name_chars_punc = translator(keep="' /")
+grad_year = translator(keep="'0123456789")
+vowels = translator(keep='aeiouyAEIOUY')
+no_vowels = translator(delete='aeiouyAEIOUY')
+has_lower = translator(keep="abcdefghijklmnopqrstuvwxyz")
+has_upper = translator(keep="ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+has_alpha = translator(keep="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+phone = translator(delete=' -().')
+
+mixed_case_names = {
+    'aj'        : 'AJ',
+    'bj'        : 'BJ',
+    'cj'        : 'CJ',
+    'deangelis' : 'DeAngelis',
+    'decarlo'   : 'DeCarlo',
+    'decosta'   : 'DeCosta',
+    'decristoforo' : 'DeCristoforo',
+    'deferrari' : 'DeFerrari',
+    'degrandpre': 'DeGrandpre',
+    'degroat'   : 'DeGroat',
+    'delucia'   : 'DeLucia',
+    'denardis'  : 'DeNardis',
+    'denorch'   : 'DeNorch',
+    'depaola'   : 'DePaola',
+    'deprez'    : 'DePrez',
+    'deshields' : 'DeShields',
+    'deshon'    : 'DeShon',
+    'desousa'   : 'deSousa',
+    'devet'     : 'DeVet',
+    'devida'    : 'DeVida',
+    'devore'    : 'DeVore',
+    'difrederico':'DiFrederico',
+    'diponziano': 'DiPonziano',
+    'jd'        : 'JD',
+    'jj'        : 'JJ',
+    'joann'     : 'JoAnn',
+    'joanne'    : 'JoAnne',
+    'jodee'     : 'JoDee',
+    'jp'        : 'JP',
+    'jumaal'    : 'JuMaal',
+    'delany'    : 'DeLany',
+    'demerritt' : 'DeMerritt',
+    'dewaal'    : 'DeWaal',
+    'lamon'     : 'LaMon',
+    'lebarron'  : 'LeBarron',
+    'leeanne'   : 'LeeAnne',
+    'maryjo'    : 'MaryJo',
+    'tachelle'  : 'TaChelle',
+    'tj'        : 'TJ',
+    }
+
+us_ca_state_abbr = {
+    'AB' : 'ALBERTA' ,
+    'AK' : 'ALASKA' ,
+    'AL' : 'ALABAMA' ,
+    'AR' : 'ARKANSAS' ,
+    'AS' : 'AMERICAN SAMOA' ,
+    'AZ' : 'ARIZONA' ,
+    'BC' : 'BRITISH COLOMBIA' ,
+    'CA' : 'CALIFORNIA' ,
+    'CO' : 'COLORADO' ,
+    'CT' : 'CONNECTICUT' ,
+    'DC' : 'DISTRICT OF COLUMBIA' ,
+    'DE' : 'DELAWARE' ,
+    'FL' : 'FLORIDA' ,
+    'FM' : 'FEDERATED STATES OF MICRONESIA' ,
+    'GA' : 'GEORGIA' ,
+    'GU' : 'GUAM' ,
+    'HI' : 'HAWAII' ,
+    'IA' : 'IOWA' ,
+    'ID' : 'IDAHO' ,
+    'IL' : 'ILLINOIS' ,
+    'IN' : 'INDIANA' ,
+    'KS' : 'KANSAS' ,
+    'KY' : 'KENTUCKY' ,
+    'LA' : 'LOUISIANA' ,
+    'MA' : 'MASSACHUSETTS' ,
+    'MB' : 'MANITOBA' ,
+    'MD' : 'MARYLAND' ,
+    'ME' : 'MAINE' ,
+    'MH' : 'MARSHALL ISLANDS' ,
+    'MI' : 'MICHIGAN' ,
+    'MN' : 'MINNESOTA' ,
+    'MO' : 'MISSOURI' ,
+    'MP' : 'NORTHERN MARIANA ISLANDS' ,
+    'MS' : 'MISSISSIPPI' ,
+    'MT' : 'MONTANA' ,
+    'NB' : 'NEW BRUNSWICK' ,
+    'NC' : 'NORTH CAROLINA' ,
+    'ND' : 'NORTH DAKOTA' ,
+    'NE' : 'NEBRASKA' ,
+    'NH' : 'NEW HAMPSHIRE' ,
+    'NJ' : 'NEW JERSEY' ,
+    'NL' : 'NEWFOUNDLAND' ,
+    'NM' : 'NEW MEXICO' ,
+    'NS' : 'NOVA SCOTIA' ,
+    'NT' : 'NORTHWEST TERRITORY' ,
+    'NU' : 'NUNAVUT' ,
+    'NV' : 'NEVADA' ,
+    'NY' : 'NEW YORK' ,
+    'OH' : 'OHIO' ,
+    'OK' : 'OKLAHOMA' ,
+    'ON' : 'ONTARIO' ,
+    'OR' : 'OREGON' ,
+    'PA' : 'PENNSYLVANIA' ,
+    'PE' : 'PRINCE EDWARD ISLAND' ,
+    'PR' : 'PUERTO RICO' ,
+    'PW' : 'PALAU' ,
+    'QC' : 'QUEBEC' ,
+    'RI' : 'RHODE ISLAND' ,
+    'SC' : 'SOUTH CAROLINA' ,
+    'SD' : 'SOUTH DAKOTA' ,
+    'SK' : 'SASKATCHEWAN' ,
+    'TN' : 'TENNESSEE' ,
+    'TX' : 'TEXAS' ,
+    'UT' : 'UTAH' ,
+    'VA' : 'VIRGINIA' ,
+    'VI' : 'VIRGIN ISLANDS' ,
+    'VT' : 'VERMONT' ,
+    'WA' : 'WASHINGTON' ,
+    'WI' : 'WISCONSIN' ,
+    'WV' : 'WEST VIRGINIA' ,
+    'WY' : 'WYOMING' ,
+    'YT' : 'YUKON' ,
+    }
+us_ca_state_name = dict([(v, k) for k, v in us_ca_state_abbr.items()])
+
+ca_province_abbr = {
+    'AB' : 'ALBERTA' ,
+    'BC' : 'BRITISH COLOMBIA' ,
+    'MB' : 'MANITOBA' ,
+    'NB' : 'NEW BRUNSWICK' ,
+    'NL' : 'NEWFOUNDLAND' ,
+    'NS' : 'NOVA SCOTIA' ,
+    'NT' : 'NORTHWEST TERRITORY' ,
+    'NU' : 'NUNAVUT' ,
+    'ON' : 'ONTARIO' ,
+    'PE' : 'PRINCE EDWARD ISLAND' ,
+    'QC' : 'QUEBEC' ,
+    'SK' : 'SASKATCHEWAN' ,
+    'YT' : 'YUKON' ,
+    }
+ca_province_name = dict([(v, k) for k, v in ca_province_abbr.items()])
+
+addr_abbr = {
+        'rd.'       : 'road',
+        'rd'        : 'road',
+        'st.'       : 'street',
+        'st'        : 'street',
+        'ste'       : 'suite',
+        'ste.'      : 'suite',
+        'ave.'      : 'avenue',
+        'blvd.'     : 'boulevard',
+        'blvd'      : 'boulevard',
+        'e.'        : 'e',
+        'east'      : 'e',
+        'w.'        : 'w',
+        'west'      : 'w',
+        'n.'        : 'n',
+        'north'     : 'n',
+        's.'        : 's',
+        'south'     : 's',
+        'ne.'       : 'ne',
+        'northeast' : 'ne',
+        'se.'       : 'se',
+        'southeast' : 'se',
+        'nw.'       : 'nw',
+        'northwest' : 'nw',
+        'sw.'       : 'sw',
+        'southwest' : 'sw',
+        'so.'       : 's',
+        'highway'   : 'hwy',
+        'hwy.'      : 'hwy',
+        'building'  : 'bldg',
+        'bldg.'     : 'bldg',
+        'ln.'       : 'lane',
+        'apt.'      : 'apt',
+        'apartment' : 'apt',
+        'p.o.'      : 'po',
+        'p.o'       : 'po',
+        'po.'       : 'po',
+        'p.o.box'   : 'po box',
+        'po.box'    : 'po box',
+        'pob'       : 'po box',
+        }
+
+bsns_abbr = {
+        'inc.'      : 'incorporated',
+        'inc'       : 'incorporated',
+        'co.'       : 'company',
+        'co'        : 'company',
+        'corp.'     : 'corporation',
+        'corp'      : 'corporation',
+        'dept.'     : 'department',
+        'dept'      : 'department',
+        'ltd.'      : 'limited',
+        'ltd'       : 'limited',
+        }
+
+country_abbr = {
+    "AF":  "AFGHANISTAN",
+    "AX":  "ALAND ISLANDS",
+    "AL":  "ALBANIA",
+    "DZ":  "ALGERIA",
+    "AS":  "AMERICAN SAMOA",
+    "AD":  "ANDORRA",
+    "AO":  "ANGOLA",
+    "AI":  "ANGUILLA",
+    "AQ":  "ANTARCTICA",
+    "AG":  "ANTIGUA AND BARBUDA",
+    "AR":  "ARGENTINA",
+    "AM":  "ARMENIA",
+    "AW":  "ARUBA",
+    "AU":  "AUSTRALIA",
+    "AT":  "AUSTRIA",
+    "AZ":  "AZERBAIJAN",
+    "BS":  "BAHAMAS",
+    "BH":  "BAHRAIN",
+    "BD":  "BANGLADESH",
+    "BB":  "BARBADOS",
+    "BY":  "BELARUS",
+    "BE":  "BELGIUM",
+    "BZ":  "BELIZE",
+    "BJ":  "BENIN",
+    "BM":  "BERMUDA",
+    "BT":  "BHUTAN",
+    "BO":  "BOLIVIA, PLURINATIONAL STATE OF",
+    "BQ":  "BONAIRE, SINT EUSTATIUS AND SABA",
+    "BA":  "BOSNIA AND HERZEGOVINA",
+    "BW":  "BOTSWANA",
+    "BV":  "BOUVET ISLAND",
+    "BR":  "BRAZIL",
+    "IO":  "BRITISH INDIAN OCEAN TERRITORY",
+    "BN":  "BRUNEI DARUSSALAM",
+    "BG":  "BULGARIA",
+    "BF":  "BURKINA FASO",
+    "BI":  "BURUNDI",
+    "KH":  "CAMBODIA",
+    "CM":  "CAMEROON",
+    "CA":  "CANADA",
+    "CV":  "CAPE VERDE",
+    "KY":  "CAYMAN ISLANDS",
+    "CF":  "CENTRAL AFRICAN REPUBLIC",
+    "TD":  "CHAD",
+    "CL":  "CHILE",
+    "CN":  "CHINA",
+    "CX":  "CHRISTMAS ISLAND",
+    "CC":  "COCOS (KEELING) ISLANDS",
+    "CO":  "COLOMBIA",
+    "KM":  "COMOROS",
+    "CG":  "CONGO",
+    "CD":  "CONGO, THE DEMOCRATIC REPUBLIC OF THE",
+    "CK":  "COOK ISLANDS",
+    "CR":  "COSTA RICA",
+    "CI":  "IVORY COAST",
+    "HR":  "CROATIA",
+    "CU":  "CUBA",
+    "CW":  "CURACAO",
+    "CY":  "CYPRUS",
+    "CZ":  "CZECH REPUBLIC",
+    "DK":  "DENMARK",
+    "DJ":  "DJIBOUTI",
+    "DM":  "DOMINICA",
+    "DO":  "DOMINICAN REPUBLIC",
+    "EC":  "ECUADOR",
+    "EG":  "EGYPT",
+    "SV":  "EL SALVADOR",
+    "GQ":  "EQUATORIAL GUINEA",
+    "ER":  "ERITREA",
+    "EE":  "ESTONIA",
+    "ET":  "ETHIOPIA",
+    "FK":  "FALKLAND ISLANDS (MALVINAS)",
+    "FO":  "FAROE ISLANDS",
+    "FJ":  "FIJI",
+    "FI":  "FINLAND",
+    "FR":  "FRANCE",
+    "GF":  "FRENCH GUIANA",
+    "PF":  "FRENCH POLYNESIA",
+    "TF":  "FRENCH SOUTHERN TERRITORIES",
+    "GA":  "GABON",
+    "GM":  "GAMBIA",
+    "GE":  "GEORGIA",
+    "DE":  "GERMANY",
+    "GH":  "GHANA",
+    "GI":  "GIBRALTAR",
+    "GR":  "GREECE",
+    "GL":  "GREENLAND",
+    "GD":  "GRENADA",
+    "GP":  "GUADELOUPE",
+    "GU":  "GUAM",
+    "GT":  "GUATEMALA",
+    "GG":  "GUERNSEY",
+    "GN":  "GUINEA",
+    "GW":  "GUINEA-BISSAU",
+    "GY":  "GUYANA",
+    "HT":  "HAITI",
+    "HM":  "HEARD ISLAND AND MCDONALD ISLANDS",
+    "VA":  "HOLY SEE (VATICAN CITY STATE)",
+    "HN":  "HONDURAS",
+    "HK":  "HONG KONG",
+    "HU":  "HUNGARY",
+    "IS":  "ICELAND",
+    "IN":  "INDIA",
+    "ID":  "INDONESIA",
+    "IR":  "IRAN, ISLAMIC REPUBLIC OF",
+    "IQ":  "IRAQ",
+    "IE":  "IRELAND",
+    "IM":  "ISLE OF MAN",
+    "IL":  "ISRAEL",
+    "IT":  "ITALY",
+    "JM":  "JAMAICA",
+    "JP":  "JAPAN",
+    "JE":  "JERSEY",
+    "JO":  "JORDAN",
+    "KZ":  "KAZAKHSTAN",
+    "KE":  "KENYA",
+    "KI":  "KIRIBATI",
+    "KP":  "KOREA, DEMOCRATIC PEOPLE'S REPUBLIC OF",
+    "KR":  "KOREA, REPUBLIC OF",
+    "KW":  "KUWAIT",
+    "KG":  "KYRGYZSTAN",
+    "LA":  "LAO PEOPLE'S DEMOCRATIC REPUBLIC",
+    "LV":  "LATVIA",
+    "LB":  "LEBANON",
+    "LS":  "LESOTHO",
+    "LR":  "LIBERIA",
+    "LY":  "LIBYA",
+    "LI":  "LIECHTENSTEIN",
+    "LT":  "LITHUANIA",
+    "LU":  "LUXEMBOURG",
+    "MO":  "MACAO",
+    "MK":  "MACEDONIA, THE FORMER YUGOSLAV REPUBLIC OF",
+    "MG":  "MADAGASCAR",
+    "MW":  "MALAWI",
+    "MY":  "MALAYSIA",
+    "MV":  "MALDIVES",
+    "ML":  "MALI",
+    "MT":  "MALTA",
+    "MH":  "MARSHALL ISLANDS",
+    "MQ":  "MARTINIQUE",
+    "MR":  "MAURITANIA",
+    "MU":  "MAURITIUS",
+    "YT":  "MAYOTTE",
+    "MX":  "MEXICO",
+    "FM":  "MICRONESIA, FEDERATED STATES OF",
+    "MD":  "MOLDOVA, REPUBLIC OF",
+    "MC":  "MONACO",
+    "MN":  "MONGOLIA",
+    "ME":  "MONTENEGRO",
+    "MS":  "MONTSERRAT",
+    "MA":  "MOROCCO",
+    "MZ":  "MOZAMBIQUE",
+    "MM":  "MYANMAR",
+    "NA":  "NAMIBIA",
+    "NR":  "NAURU",
+    "NP":  "NEPAL",
+    "NL":  "NETHERLANDS",
+    "NC":  "NEW CALEDONIA",
+    "NZ":  "NEW ZEALAND",
+    "NI":  "NICARAGUA",
+    "NE":  "NIGER",
+    "NG":  "NIGERIA",
+    "NU":  "NIUE",
+    "NF":  "NORFOLK ISLAND",
+    "MP":  "NORTHERN MARIANA ISLANDS",
+    "NO":  "NORWAY",
+    "OM":  "OMAN",
+    "PK":  "PAKISTAN",
+    "PW":  "PALAU",
+    "PS":  "PALESTINE, STATE OF",
+    "PA":  "PANAMA",
+    "PG":  "PAPUA NEW GUINEA",
+    "PY":  "PARAGUAY",
+    "PE":  "PERU",
+    "PH":  "PHILIPPINES",
+    "PN":  "PITCAIRN",
+    "PL":  "POLAND",
+    "PT":  "PORTUGAL",
+    "PR":  "PUERTO RICO",
+    "QA":  "QATAR",
+    "RE":  "REUNION",
+    "RO":  "ROMANIA",
+    "RU":  "RUSSIAN FEDERATION",
+    "RW":  "RWANDA",
+    "BL":  "SAINT BARTHELEMY",
+    "SH":  "SAINT HELENA, ASCENSION AND TRISTAN DA CUNHA",
+    "KN":  "SAINT KITTS AND NEVIS",
+    "LC":  "SAINT LUCIA",
+    "MF":  "SAINT MARTIN (FRENCH PART)",
+    "PM":  "SAINT PIERRE AND MIQUELON",
+    "VC":  "SAINT VINCENT AND THE GRENADINES",
+    "WS":  "SAMOA",
+    "SM":  "SAN MARINO",
+    "ST":  "SAO TOME AND PRINCIPE",
+    "SA":  "SAUDI ARABIA",
+    "SN":  "SENEGAL",
+    "RS":  "SERBIA",
+    "SC":  "SEYCHELLES",
+    "SL":  "SIERRA LEONE",
+    "SG":  "SINGAPORE",
+    "SX":  "SINT MAARTEN (DUTCH PART)",
+    "SK":  "SLOVAKIA",
+    "SI":  "SLOVENIA",
+    "SB":  "SOLOMON ISLANDS",
+    "SO":  "SOMALIA",
+    "ZA":  "SOUTH AFRICA",
+    "GS":  "SOUTH GEORGIA AND THE SOUTH SANDWICH ISLANDS",
+    "SS":  "SOUTH SUDAN",
+    "ES":  "SPAIN",
+    "LK":  "SRI LANKA",
+    "SD":  "SUDAN",
+    "SR":  "SURINAME",
+    "SJ":  "SVALBARD AND JAN MAYEN",
+    "SZ":  "SWAZILAND",
+    "SE":  "SWEDEN",
+    "CH":  "SWITZERLAND",
+    "SY":  "SYRIAN ARAB REPUBLIC",
+    "TW":  "TAIWAN, PROVINCE OF CHINA",
+    "TJ":  "TAJIKISTAN",
+    "TZ":  "TANZANIA, UNITED REPUBLIC OF",
+    "TH":  "THAILAND",
+    "TL":  "TIMOR-LESTE",
+    "TG":  "TOGO",
+    "TK":  "TOKELAU",
+    "TO":  "TONGA",
+    "TT":  "TRINIDAD AND TOBAGO",
+    "TN":  "TUNISIA",
+    "TR":  "TURKEY",
+    "TM":  "TURKMENISTAN",
+    "TC":  "TURKS AND CAICOS ISLANDS",
+    "TV":  "TUVALU",
+    "UG":  "UGANDA",
+    "UA":  "UKRAINE",
+    "AE":  "UNITED ARAB EMIRATES",
+    "UK":  "UNITED KINGDOM",
+    "GB":  "UNITED KINGDOM",
+    "US":  "UNITED STATES",
+    "UM":  "UNITED STATES MINOR OUTLYING ISLANDS",
+    "UY":  "URUGUAY",
+    "UZ":  "UZBEKISTAN",
+    "VU":  "VANUATU",
+    "VE":  "VENEZUELA, BOLIVARIAN REPUBLIC OF",
+    "VN":  "VIET NAM",
+    "VG":  "VIRGIN ISLANDS, BRITISH",
+    "VI":  "VIRGIN ISLANDS, U.S.",
+    "WF":  "WALLIS AND FUTUNA",
+    "EH":  "WESTERN SAHARA",
+    "YE":  "YEMEN",
+    "ZM":  "ZAMBIA",
+    "ZW":  "ZIMBABWE",
+    }
+country_name = dict([(v, k) for k, v in country_abbr.items()])
+
+def cszk(line1, line2):
+    """
+    parses two lines of text into blah, city, state, zip, country
+
+    supported formats:
+      line1: city (state)
+      line2: zip zip country
+
+      line1: ...
+      line2: city state zip zip country
+
+      line1: city state zip zip
+      line2: country
+
+      line1: ...
+      line2: city, state zip zip
+
+      returns street, city, state, zip, country; but state is only
+      populated if country is US or CA
+    """
+    street = city = state = postal = country = ''
+    try:
+        pieces, line2 = line2.split(), ''
+        k = kountry = ''
+        while pieces:
+            new_k = pieces.pop().upper()
+            if has_digits(new_k):
+                city = k.strip(', ')
+                pieces.append(new_k)
+                break
+            k = (new_k + ' ' + k).strip()
+            if k in country_abbr:
+                k, kountry = country_abbr[k], k
+            if k in country_name:
+                country = k
+                if pieces and pieces[-1].upper() == 'THE':
+                    pieces.pop()
+                break
+            else:
+                # check for a state
+                if k.replace('.','') in us_ca_state_abbr:
+                    k = us_ca_state_abbr[k.replace('.','')]
+                if k in us_ca_state_name:
+                    state = k
+                    break
+        else:
+            pieces = k.split()
+        if pieces and pieces[-1] == ',':
+            pieces.pop()
+        if not pieces:
+            pieces, line1 = line1.split(), ''
+        if pieces and pieces[-1] == ',':
+            pieces.pop()
+        if has_digits(pieces[-1]) or len(pieces[-1]) == 3:  # zip code!
+            if len(pieces) > 1 and (has_digits(pieces[-2]) or len(pieces[-2]) == 3):
+                postal = PostalCode(' '.join(pieces[-2:]), country=country)
+                pieces.pop(); pieces.pop()
+            else:
+                postal = PostalCode(pieces.pop(), country=country)
+        if not pieces:
+            pieces, line1 = line1.split(), ''
+        s = pieces.pop()  # now looking for a state
+        if s[-1] == ')':
+            if s[0] == '(':
+                s = s[1:-1]
+            elif len(pieces) > 1 and pieces[-2][0] == '(':
+                s = pieces.pop()[1:] + ' ' + s[:-1]
+        else: # parens not found, scan for comma
+            for i, p in enumerate(pieces[::-1]):
+                if p.endswith(','):
+                    break
+                s = (p + ' ' + s).strip()
+                pieces.pop()
+        if s.replace('.','') in us_ca_state_abbr:
+            s = us_ca_state_abbr[s.replace('.','')]
+        if s in us_ca_state_name:
+            state = s
+        else:
+            city = (s + ' ' + city).strip(', ')
+        # see if state is canadian
+        if state in ca_province_name and not country:
+            country = 'CANADA'
+        # if state is empty but we have a country, check that country abbreviation is not a state
+        if country and not state:
+            if kountry in us_ca_state_abbr:
+                state = us_ca_state_abbr[kountry]
+                country = ''
+        if pieces:
+            city = (' '.join(pieces) + ' ' + city).strip(', ')
+            pieces[:] = []
+        if city : # early bail
+            street, line1 = line1, ''
+            return street, city, state, postal, country
+        else:
+            city, line1 = line1.strip(', '), ''
+            return street, city, state, postal, country
+    except IndexError:
+        if line1 or line2 or pieces:
+            raise
+        return street, city, state, postal, country
+
+
+
+def crc32(binary_data):
+    "wrapper around binascii.crc32 that is consistent across python versions"
+    return binascii.crc32(binary_data) & 0xffffffff
+
+def unabbreviate(text, abbr):
+    """
+    returns line lower-cased with standardized abbreviations
+    text: text to work with
+    abbr: dictionary of abbreviations to use
+    """
+    text = text.lower().replace(u'\uffa6', ' ')
+    words = text.split()
+    final = []
+    for word in words:
+        final.append(abbr.get(word, word))
+    return ' '.join(final)
 
 class BiDict(object):
     """
@@ -213,76 +795,11 @@ class Sentinel(object):
     def __str__(yo):
         return "Sentinel: <%s>" % yo.text
 
-building_subs = set([
-    '#','APARTMENT','APT','BLDG','BUILDING','CONDO','FL','FLR','FLOOR','LOT','LOWER','NO','NUM','NUMBER',
-    'RM','ROOM','SLIP','SLP','SPACE','SP','SPC','STE','SUITE','TRLR','UNIT','UPPER',
-    ])
-spelled_out_numbers = set(['ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN'])
-caps_okay = set(['UCLA', 'OHSU', 'IBM', 'LLC', 'USA'])
-lower_okay = set(['dba'])
-
-alpha_num = translator(delete='.,:_#')
-non_alpha_num = translator(delete="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,-")
-any_digits = translator(keep='0123456789')
-has_digits = any_digits
-name_chars = translator(to=' ', keep="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' /")
-name_chars_punc = translator(keep="' /")
-grad_year = translator(keep="'0123456789")
-vowels = translator(keep='aeiouyAEIOUY')
-no_vowels = translator(delete='aeiouyAEIOUY')
-has_lower = translator(keep="abcdefghijklmnopqrstuvwxyz")
-has_upper = translator(keep="ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-has_alpha = translator(keep="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-mixed_case_names = {
-    'aj'        : 'AJ',
-    'bj'        : 'BJ',
-    'cj'        : 'CJ',
-    'deangelis' : 'DeAngelis',
-    'decarlo'   : 'DeCarlo',
-    'decosta'   : 'DeCosta',
-    'decristoforo' : 'DeCristoforo',
-    'deferrari' : 'DeFerrari',
-    'degrandpre': 'DeGrandpre',
-    'degroat'   : 'DeGroat',
-    'delucia'   : 'DeLucia',
-    'denardis'  : 'DeNardis',
-    'denorch'   : 'DeNorch',
-    'depaola'   : 'DePaola',
-    'deprez'    : 'DePrez',
-    'deshields' : 'DeShields',
-    'deshon'    : 'DeShon',
-    'desousa'   : 'deSousa',
-    'devet'     : 'DeVet',
-    'devida'    : 'DeVida',
-    'devore'    : 'DeVore',
-    'difrederico':'DiFrederico',
-    'diponziano': 'DiPonziano',
-    'jd'        : 'JD',
-    'jj'        : 'JJ',
-    'joann'     : 'JoAnn',
-    'joanne'    : 'JoAnne',
-    'jodee'     : 'JoDee',
-    'jp'        : 'JP',
-    'jumaal'    : 'JuMaal',
-    'delany'    : 'DeLany',
-    'demerritt' : 'DeMerritt',
-    'dewaal'    : 'DeWaal',
-    'lamon'     : 'LaMon',
-    'lebarron'  : 'LeBarron',
-    'leeanne'   : 'LeeAnne',
-    'maryjo'    : 'MaryJo',
-    'tachelle'  : 'TaChelle',
-    'tj'        : 'TJ',
-    }
-
 
 def tuples(func):
     def wrapper(*args):
-        print args
         if len(args) == 1 and not isinstance(args[0], String):
             args = args[0]
-        print args
         result = tuple(func(*args))
         if len(result) == 1:
             result = result[0]
@@ -307,7 +824,7 @@ def NameCase(*names):
                 piece = '-'.join(NameCase(piece).split())
             elif alpha_num(piece) in ('i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'):
                 piece = piece.upper()
-            elif piece in ('and', 'de', 'del', 'der', 'el', 'la', 'van', ):
+            elif piece in ('and', 'de', 'del', 'der', 'el', 'la', 'van', 'of'):
                 pass
             elif piece[:2] == 'mc':
                 piece = 'Mc' + piece[2:].title()
@@ -357,16 +874,13 @@ def BsnsCase(*fields):
         return fields
     final = []
     for name in fields:
-        print 0, final
         pieces = name.split()
-        print 1, pieces
         #if len(pieces) <= 1:
         #    final.append(name)
         #    continue
         mixed = []
         last_piece = ''
         for piece in pieces:
-            print 2, mixed
             #if has_lower(piece):
             #    return name
             lowered = piece.lower()
@@ -391,7 +905,6 @@ def BsnsCase(*fields):
                         piece = piece[:-1] + piece[-1].lower()
                 mixed.append(piece)
             last_piece = piece
-        print mixed
         if mixed[0].lower() == mixed[0] and (mixed[0] not in lower_okay and mixed[0][-2:] not in ('st','nd','rd','th')):
             mixed[0] = mixed[0].title()
         final.append(' '.join(mixed))
@@ -458,14 +971,7 @@ def Sift(*fields):
     return results
 
 
-class Sentinel(object):
-    def __init__(yo, text):
-        yo.text = text
-    def __str__(yo):
-        return "Sentinel: <%s>" % yo.text
-
 _memory_sentinel = Sentinel("amnesiac")
-
 
 class Memory(object):
     """
@@ -553,28 +1059,30 @@ class PostalCode(object):
     primarily for US and Canadian postal codes (ignores US +4)
     """
 
-    def __init__(yo, postal):
+    def __init__(yo, postal, country=None):
         alpha2num = {
-                'I' : 1,
-                'O' : 0,
-                'S' : 5,
+                'I' : '1',
+                'O' : '0',
+                'S' : '5',
                 }
         num2alpha = {
-                1   : 'I',
-                0   : 'O',
-                5   : 'S',
+                '1'   : 'I',
+                '0'   : 'O',
+                '5'   : 'S',
                 }
+        postal = postal.strip('-,')
         if len(postal.replace('-', '')) in (5, 9):
             yo.code = postal[:5]
         elif postal[:5].isdigit():
             yo.code = postal[:5]
-        elif has_alpha(postal) and len(postal.replace(' ', '')) == 6:
+        elif (has_alpha(postal) and len(postal.replace(' ', '')) == 6
+        and   (not country or country == 'CANADA')):
             # alpha-num-alpha num-alpha-num
             postal = list(postal.replace(' ', '').upper())
             for i in (0, 2, 4):
-                postal[i] = alpha2num.get(postal[i], postal[i])
-            for i in (1, 3, 5):
                 postal[i] = num2alpha.get(postal[i], postal[i])
+            for i in (1, 3, 5):
+                postal[i] = alpha2num.get(postal[i], postal[i])
             yo.code = "%s %s" % (''.join(postal[:3]), ''.join(postal[3:]))
         else:
             yo.code = postal
@@ -587,5 +1095,29 @@ class PostalCode(object):
         return yo.code == other
     def __ne__(yo, other):
         return not yo.__eq__(other)
+    def __repr__(yo):
+        return repr(yo.code)
     def __str__(yo):
         return yo.code
+
+def fix_phone(text):
+    text = text.strip()
+    data = phone(text)
+    if len(data) not in (7, 10, 11):
+        return text
+    if len(data) == 11:
+        if data[0] != '1':
+            return text
+        data = data[1:]
+    if len(data) == 7:
+        return '%s.%s' % (data[:3], data[3:])
+    return '%s.%s.%s' % (data[:3], data[3:6], data[6:])
+
+def fix_date(text):
+    '''takes mmddyy (with yy in hex (A0 = 2000)) and returns a datetime.date'''
+    text = text.strip()
+    if len(text) != 6:
+        return None
+    print repr(text)
+    yyyy, mm, dd = int(text[4:], 16)-160+2000, int(text[:2]), int(text[2:4])
+    return datetime.date(yyyy, mm, dd)

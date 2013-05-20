@@ -71,11 +71,12 @@ def parse_FIS_Schema(source):
                     fieldvar = rest[0]
             if "(" in fieldvar and not fieldvar.endswith(")"):
                 fieldvar+=")"                    
+            fieldvar = fieldvar.title()
             if "$" in fieldvar:
                 basevar = fieldvar.split("(")[0]
             else:
                 basevar = fieldvar
-            basevar = basevar.title()
+            basevar = basevar
             if not basevar in iolist:
                 iolist.append(basevar)
             fieldsize = int(fieldsize) if fieldsize else 0
@@ -104,15 +105,20 @@ DATACACHE = {}
 
 def fisData (table, keymatch=None, section=None):
     filenum = tables[table]['filenum']
-    key = filenum, keymatch, section
-    if key in DATACACHE:
-        return DATACACHE[key]
     tablename = tables[filenum]['name']
+    key = filenum, keymatch, section
+    datafile = os.sep.join([FIS_DATA,"O"+tablename[:4]])
+    mtime = os.stat(datafile).st_mtime
+    if key in DATACACHE:
+        table, old_mtime = DATACACHE[key]
+        if old_mtime == mtime:
+            return table
+    description = tables[filenum]['desc']
     datamap = tables[filenum]['iolist']
     fieldlist = tables[filenum]['fields']
     rectype = tables[filenum]['key']
-    datafile = os.sep.join([FIS_DATA,"O"+tablename[:4]])
-    table = DATACACHE[key] = BBxFile(datafile, datamap, keymatch=keymatch, section=section, rectype=rectype, fieldlist=fieldlist)
+    table = BBxFile(datafile, datamap, keymatch=keymatch, section=section, rectype=rectype, fieldlist=fieldlist, name=tablename, desc=description)
+    DATACACHE[key] = table, mtime
     return table
 
 tables = parse_FIS_Schema(FIS_SCHEMAS)

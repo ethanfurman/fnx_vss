@@ -51,28 +51,74 @@ class BBxRec(object):
         self.fieldlist = fieldlist
 
     def __getitem__(self, ref):
+        if isinstance(ref, (int, long)):
+            ref, mask = self.fieldlist[ref][3:5]
+            ref = [ref]
+            if mask and ',0)' not in mask:
+                masks = ["%%%s.%sf" % tuple(mask[1:-1].split(','))]
+            else:
+                masks = ['%s']
+            single = True
+        elif isinstance(ref, slice):
+            ref = [r[3] for r in self.fieldlist[ref]]
+            masks = [r[4] for r in self.fieldlist[ref]]
+            for i, mask in enumerate(masks):
+                if mask and ',0)' not in mask:
+                    masks[i] = ["%%%s.%sf" % tuple(mask[1:-1].split(','))]
+                else:
+                    masks[i] = ['%s']
+            single = False
+        else:
+            ref = ref.title()
+            for fld in self.fieldlist:
+                if fld[3] == ref:
+                    mask = fld[4]
+                    break
+            else:
+                raise ValueError('%s is not a valid field' % ref)
+            ref = [ref]
+            if mask and ',0)' not in mask:
+                masks = ["%%%s.%sf" % tuple(mask[1:-1].split(','))]
+            else:
+                masks = ['%s']
+            single = True
+        result = []
+        for r, m in zip(ref, masks):
+            if r in self.datamap:
+                var, sub = r, ''
+            else:
+                var, sub = (r+"(").split("(")[:2]
+            try:
+                varidx = self.datamap.index(var)
+            except ValueError, err:
+                raise ValueError('%s is not a valid field' % var)
+            val = self.rec[varidx]
+            if sub:
+                sub = sub[:-1]
+                first,last = [ int(x) for x in sub.split(",") ]
+                val = val[first-1:first+last-1]
+            if 'f' in m:
+                try:
+                    val = float(val)
+                except ValueError:
+                    m = '<%s>'
+            result.append(m % val)
+        if single:
+            return result[0]
+        return result
+
+    def __setitem__(self, ref, newval):
+        if isinstance(ref, (int, long)):
+            ref = self.fieldlist[ref][3]
         if ref in self.datamap:
             var, sub = ref, ''
         else:
             var, sub = (ref+"(").split("(")[:2]
-        varidx = self.datamap.index(var)
-        if varidx < len(self.rec):
-            val = self.rec[varidx]
-        else:
-            val = None
-        if sub:
-            sub = sub[:-1]
-            first,last = [ int(x) for x in sub.split(",") ]
-            val = val[first-1:first+last-1]
-        return val
-
-    def __setitem__(self, ref, newval):
-        var, sub = (ref+"(").split("(")[:2]
-        varidx = self.datamap.index(var)
-        if varidx < len(self.rec):
-            val = self.rec[varidx]
-        else:
-            val = None
+        try:
+            varidx = self.datamap.index(var)
+        except ValueError as err:
+            raise ValueError('%s is not a valid field' % var)
+        val = self.rec[varidx]
         if sub:
             sub = sub[:-1]
             first,last = [ int(x) for x in sub.split(",") ]
@@ -87,7 +133,10 @@ class BBxRec(object):
     def __str__(self):
         lines = []
         for i, row in enumerate(self.fieldlist):
-            lines.append('%5d | %-12s | %15s | %s' % (i, row[3], self[row[3]], row[1]))
+            if '$' in row[3]:
+                lines.append('%5d | %-12s | %-35s | %s' % (i, row[3], self[row[3]], row[1]))
+            else:
+                lines.append('%5d | %-12s | %35s | %s' % (i, row[3], self[row[3]], row[1]))
         return '\n'.join(lines)
 
 
@@ -118,7 +167,7 @@ def BBVarLength(datamap, fieldlist):
 
 class BBxFile(object):
 
-    def __init__(self, srcefile, datamap, fieldlist, keymatch=None, subset=None, section=None, rectype=None):
+    def __init__(self, srcefile, datamap, fieldlist, keymatch=None, subset=None, section=None, rectype=None, name=None, desc=None):
         records = {}
         datamap = [xx.strip() for xx in datamap]
         leader = trailer = None
@@ -135,7 +184,7 @@ class BBxFile(object):
         fixedLengthFields = set([fld for fld in fieldlist if '$' in fld and field[-1] != '$'])
         for ky, rec in getfile(srcefile).items():
             if (len(ky) != fieldlengths[0]
-            or  len(rec) != len(fieldlengths)
+            or  len(rec) < len(fieldlengths)
             or  any(len(field) != length for field, length, name in
                     zip(rec, fieldlengths, datamap) if name in fixedLengthFields)
             or  rectype and ky[start:stop] != token):
@@ -143,7 +192,6 @@ class BBxFile(object):
             if section is None or ky.startswith(section):
                 if trailer is None or ky.endswith(trailer):
                     records[ky] = BBxRec(rec, datamap, fieldlist)
-            else:
         self.records = records
         self.datamap = datamap
         self.fieldlist = fieldlist
@@ -151,29 +199,42 @@ class BBxFile(object):
         self.subset  = subset
         self.section = section
         self.rectype = rectype
+        self.name = name
+        self.desc= desc
 
-    def get_item_or_single(self, ky):
+    def __contains__(self, ky):
+        return self[ky] is not None
+
+    def __getitem__(self, ky):
         if self.records.has_key(ky):
             return self.records[ky]
         elif self.keymatch:
             if self.records.has_key(self.keymatch % ky):
                 return self.records[self.keymatch % ky]
-
-    def __getitem__(self, ky):
-        rv = self.get_item_or_single(ky)
-        if rv:
-            return rv
         elif self.subset:
             match = self.subset % ky
             rv = [ (xky,xrec) for (xky,xrec) in self.records.items() if xky.startswith(match) ]
             rv.sort()
             return rv
 
-    def __contains__(self, ky):
-        return self.get_item_or_single(ky)
+    def __iter__(self):
+        """
+        iterates through the records (all records kept during __init__, ignores subsequent keymatch settings, etc.)
+        """
+        return iter(self.records.values())
 
     def __len__(self):
         return len(self.records)
+
+    def __repr__(self):
+        pieces = []
+        for attr in ('name desc keymatch subset section rectype'.split()):
+            value = getattr(self, attr)
+            if value is not None:
+                if attr is 'rectype':
+                    value = value[0]
+                pieces.append("%s=%r" % (attr, value))
+        return "BBxFile(%s)" % (', '.join(pieces) + "[%d records]" % len(self.records))
 
     def keys(self):
         return self.records.keys()
@@ -184,6 +245,9 @@ class BBxFile(object):
     def has_key(self, ky):
         #print 'testing for %s ' % ky
         return not not self[ky]
+
+    def values(self):
+        return self.records.values()
 
     def iterpattern(self, pattern=None):
         xx = getSubset(self.items(), pattern)
