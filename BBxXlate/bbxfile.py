@@ -333,7 +333,6 @@ Notes:  The entire file is read into memory.
     elif filetype == 0:         # INDEXED
         for i in range(15, reccount*reclen, reclen):
             keychainrec = string.split(data[i:i+reclen],'\n')[:-1]
-            keychainrec[0] = keychainkeycount
             keychainrec = applyfieldmap(keychainrec, fieldmap)
             keychainkeys[keychainkeycount] = keychainrec
             keychainkeycount = keychainkeycount + 1
