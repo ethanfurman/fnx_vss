@@ -102,7 +102,7 @@ class BBxRec(object):
                     val = float(val)
                 except ValueError:
                     m = '<%s>'
-            result.append(m % val)
+            result.append((m % val).strip())
         if single:
             return result[0]
         return result
@@ -305,7 +305,7 @@ Notes:  The entire file is read into memory.
                     keychainrec = string.split(data[keychainrecblkptr*512+keychainrecbyteptr:keychainrecblkptr*512+keychainrecbyteptr+reclen],'\n')[:-1]
                     # Note:  The trailing [:-1] on the preceeding line is to chop off trailing nulls.  This could lose data in a packed record
                     if keychainrec:
-                        if keychainrec[0] == '': keychainrec[0] = keychainkey
+                        keychainrec[0] = keychainkey
                         keychainrec = applyfieldmap(keychainrec, fieldmap)
                         keychainkeys[keychainkey] = keychainrec
     elif filetype == 2:         # DIRECT
@@ -325,7 +325,7 @@ Notes:  The entire file is read into memory.
             keychainrec = string.split(data[thisdataptr:thisdataptr+reclen],'\n')[:-1]
             # Note:  The trailing [:-1] on the preceeding line is to chop off trailing nulls.  This could lose data in a packed record
             if keychainrec:
-                if keychainrec[0] == '': keychainrec[0] = keychainkey
+                keychainrec[0] = keychainkey
                 keychainrec = applyfieldmap(keychainrec, fieldmap)
                 keychainkeys[keychainkey] = keychainrec
             nextkeyptr = int(asc(data[thiskeyptr+netkeylen:thiskeyptr+netkeylen+keyptrsize]))
@@ -333,6 +333,7 @@ Notes:  The entire file is read into memory.
     elif filetype == 0:         # INDEXED
         for i in range(15, reccount*reclen, reclen):
             keychainrec = string.split(data[i:i+reclen],'\n')[:-1]
+            keychainrec[0] = keychainkeycount
             keychainrec = applyfieldmap(keychainrec, fieldmap)
             keychainkeys[keychainkeycount] = keychainrec
             keychainkeycount = keychainkeycount + 1
