@@ -1,4 +1,5 @@
-from .utils import PropertyDict
+from __future__ import with_statement
+from utils import PropertyDict
 
 class EmbeddedNewlineError(Exception):
     "Embedded newline found in a quoted field"

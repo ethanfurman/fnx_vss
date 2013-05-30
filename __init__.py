@@ -1,6 +1,6 @@
-from .generators import *
-from .iterators import *
-from .utils import *
+from generators import *
+from iterators import *
+from utils import *
 import dbf
 
 def Table(*args, **kwargs):

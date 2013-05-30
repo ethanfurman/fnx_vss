@@ -57,8 +57,9 @@ class ARInvoice(object):
         self._cust_num = rec.cust_num
         self._cust_name = rec.cust_name
         self._gl_acct = rec.gl_acct
-        self._transactions = [rec]
+        self._transactions = []
         self._balance = 0
+        self.add_transaction(rec)
     def add_transaction(self, trans):
         self._transactions.append(trans)
         self._balance += trans.debit - trans.credit
@@ -90,15 +91,20 @@ def ar_open_invoices(filename):
     '''returns invoices with outstanding balances'''
     temp = {}
     for rec in ARAgingIter(filename):
+        if rec.inv_num == '455232':
+            print 'target acquired', rec.cust_name, rec.debit, rec.credit
         if rec.inv_num in temp:
-            invoice = temp[rec.inv_num]
-            invoice.add_transaction(rec)
+            temp[rec.inv_num].add_transaction(rec)
         else:
             invoice = ARInvoice(rec)
             temp[rec.inv_num] = invoice
+        if rec.inv_num == '455232':
+            print temp[rec.inv_num]
     result = {}
     for num, inv in temp.items():
         if inv.balance > 0:
             result[num] = inv
+    print len(result)
     return result
+
         
