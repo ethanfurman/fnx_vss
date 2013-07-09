@@ -1,6 +1,12 @@
 import binascii
 import datetime
 import string
+from dbf import Date, Time
+
+try:
+    next
+except NameError:
+    from dbf import next
 
 String = str, unicode
 Integer = int, long
@@ -9,12 +15,29 @@ one_day = datetime.timedelta(1)
 
 spelled_out_numbers = set(['ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN'])
 
+def all_equal(iterator, test=None):
+    '''if `test is None` do a straight equality test'''
+    it = iter(iterator)
+    try:
+        if test is None:
+            target = next(it)
+        else:
+            target = test(next(it))
+    except StopIteration:
+        return True
+    if test is None:
+        test = lambda x: x == target
+    for item in it:
+        if test(item) != target:
+            return False
+    return True
+
 def bb_text_to_date(text):
     mm, dd, yy = map(int, (text[:2], text[2:4], text[4:]))
     if any([i == 0 for i in (mm, dd, yy)]):
-        return None
+        Date()
     yyyy = yy + 2000
-    return datetime.date(yyyy, mm, dd)
+    return Date(yyyy, mm, dd)
 
 building_subs = set([
     '#','APARTMENT','APT','BLDG','BUILDING','CONDO','FL','FLR','FLOOR','LOT','LOWER','NO','NUM','NUMBER',
@@ -1126,12 +1149,12 @@ def fix_phone(text):
 
 
 def fix_date(text):
-    '''takes mmddyy (with yy in hex (A0 = 2000)) and returns a datetime.date'''
+    '''takes mmddyy (with yy in hex (A0 = 2000)) and returns a Date'''
     text = text.strip()
     if len(text) != 6:
         return None
     yyyy, mm, dd = int(text[4:], 16)-160+2000, int(text[:2]), int(text[2:4])
-    return datetime.date(yyyy, mm, dd)
+    return Date(yyyy, mm, dd)
 
 def text_to_date(text, format='ymd'):
     '''(yy)yymmdd'''
@@ -1150,12 +1173,12 @@ def text_to_date(text, format='ymd'):
             mm, dd, yyyy = int(text[:2]), int(text[2:4]), int(text[4:])
     if dd is None:
         raise ValueError("don't know how to convert %r using %r" % (text, format))
-    return datetime.date(yyyy, mm, dd)
+    return Date(yyyy, mm, dd)
 
 def text_to_time(text):
     if not text.strip():
         return None
-    return datetime.time(int(text[:2]), int(text[2:]))
+    return Time(int(text[:2]), int(text[2:]))
 
 def simplegeneric(func):
     """Make a trivial single-dispatch generic function (from Python3.4 functools)"""

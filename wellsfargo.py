@@ -1,5 +1,4 @@
 import datetime
-#from fenx.BBxXlate.bbxfile import BBxFile
 from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time
 from VSS.BBxXlate.bbxfile import BBxFile
 
@@ -405,69 +404,180 @@ class RMFlatFileIterator(object):
     def reset():
         self._pointer = 0
 
-class RMInvoice(object):
-    def __init__(self, pa_rec, credit_debit):
-        self.payee = pa_rec
-        self.type = credit_debit
-        self.inv = None
-        self.sup_iv = []
+class RmPayment(object):
+    def __init__(self, fh_rec, bh_rec, pr_rec):
+        self.fh = fh_rec
+        self.bh = bh_rec
+        self.pr = pr_rec
+        self.pa = []
+        self.sp = ()
+        self.ad = ()
+        self.al = ()
+        self.ri = ()
+        self._invoices = {}
+        self._total_discount = 0
+        self._duplicate_invoices = {}
     def __getattr__(self, name):
-        for obj in (self.payee, self.inv):
+        search_name = name.lower()
+        if search_name[:3] == 'pa_' and name[-2:].upper() in self.pa:
+            return getattr(self, name.upper())
+        for obj in (self.fh, self.bh, self.pr, self.sp, self.pa, self.ad, self.al, self.ri):
             try:
-                return getattr(obj, name)
+                return getattr(obj, search_name)
             except AttributeError:
                 pass
+        if not self._invoices:
+            raise AttributeError(name)
         result = []
-        for obj in self.sup_iv:
-            result.append(getattr(obj, name))
+        for obj in self._invoices.values():
+            result.append(getattr(obj, search_name))
         return result
+    def __repr__(self):
+        return '<RmPayment: payer-> %s  date-> %s  ck_num-> %s  credit-> %s  debit-> %s total_discount-> %s >' % (self.payer, self.date, self.ck_num, self.credit, self.debit, self.total_discount)
+    @property
+    def file_control(self):
+        return self.fh.fhfn
+    @property
+    def batch_control(self):
+        return self.bh.bhbn
+    @property
+    def ck_num(self):
+        ck_num = self.sp.spf2
+        ck_num = '0' * (6 - len(ck_num)) + ck_num
+        if len(ck_num) > 6 and ck_num[:-6].replace('0','') == '':
+            ck_num = ck_num[-6:]
+        return ck_num
     @property
     def credit(self):
-        if self.type == 'C':
-            return self.inv.ivpd
+        if self.pr.prcd == 'C':
+            return self.pr.prpa
         return 0
+    @property
+    def date(self):
+        return self.pr.pred
     @property
     def debit(self):
-        if self.type == 'D':
-            return self.inv.ivpd
+        if self.pr.prcd == 'D':
+            return self.pr.prpa
         return 0
     @property
-    def name(self):
-        return self.payee.pan1
+    def invoices(self):
+        return self._invoices.copy()
+    @property
+    def payer(self):
+        return self.PA_PR.pan1
+    @property
+    def total_discount(self):
+        return self._total_discount
+    @total_discount.setter
+    def total_discount(self, value):
+        self._total_discount = value
+    def add_record(self, rec):
+        if rec.id in ('FH', 'BH', 'PR', 'SP', 'AD', 'AL', 'RI'):
+            setattr(self, rec.id.lower(), rec)
+        elif rec.id == 'PA':
+            self.pa.append(rec.paec)
+            setattr(self, '%s_%s' % rec[:2], rec)
+        else:
+            raise ValueError('%r: unknown record type: %r' % (self.__class__.__name__, rec.id))
+    def add_invoice(self, inv, replace=False):
+        inv_num = inv.inv_num
+        if inv_num in self._duplicate_invoices and not replace:
+            count = self._duplicate_invoices[inv_num]
+            count += 1
+            self._duplicate_invoices[inv_num] = count
+            dup_num = inv_num + '-dup%d' % count
+            inv.duplicate_number(dup_num)
+            self._invoices[dup_num] = inv
+        elif inv_num in self._invoices and not replace:
+            d1 = inv_num + '-dup1'
+            d2 = inv_num + '-dup2'
+            old_invoice = self._invoices[inv_num]
+            del self._invoices[inv_num]
+            old_invoice.duplicate_number(d1)
+            inv.duplicate_number(d2)
+            self._invoices[d1] = old_invoice
+            self._invoices[d2] = inv
+            self._duplicate_invoices[inv_num] = 2
+        else:
+            self._invoices[inv_num] = inv
+    def remove_invoice(self, inv_num):
+        del self._invoices[inv_num]
+
+
+class RmInvoice(object):
+    def __init__(self, iv_rec=None, inv_num=None, amount=None):
+        if iv_rec is None and (inv_num is None or amount is None):
+            raise TypeError('either iv_rec must be given, or both inv_num and amount must be given')
+        self.iv = iv_rec
+        if iv_rec is not None:
+            self._inv_num = '0' * (6 - len(iv_rec.ivri)) + iv_rec.ivri
+            self._amount = iv_rec.ivpd
+        else:
+            self._inv_num = inv_num
+            self._amount = amount
+        self.sup_iv = []
+        self.ad = ()
+        self.al = ()
+    def __getattr__(self, name):
+        search_name = name.lower()
+        for obj in (self.iv, self.ad, self.al):
+            try:
+                return getattr(obj, search_name)
+            except AttributeError:
+                pass
+        if not self.sup_iv:
+            raise AttributeError(name)
+        result = []
+        for obj in self.sup_iv:
+            result.append(getattr(obj, search_name))
+        return result
+    def __repr__(self):
+        return '<RmInvoice: number->%s  amount->%s>' % (self.inv_num, self.amount)
+    @property
+    def amount(self):
+        return self._amount
     @property
     def inv_num(self):
-        return self.inv.ivri
-    def add_iv(self, iv_rec):
-        if self.inv is not None:
-            raise TypeError('iv record already added')
-        self.inv = iv_rec
-    def add_si(self, si_rec):
-        self.sup_iv.append(si_rec)
+        return self._inv_num
+    def add_record(self, rec):
+        if rec.id == 'SI':
+            self.sup_iv.append(rec)
+        elif rec.id in ('AD', 'AL'):
+            setattr(self, rec.id.lower(), rec)
+        else:
+            raise ValueError("%r: unknown record type: %r" % (self.__class__.__name__, rec.id))
+    def duplicate_number(self, new_number):
+        self._inv_num = new_number
 
 def lockbox_payments(filename):
     in_lockbox = False
-    result = {}
-    payee = None
-    for rec in RMFlatFileIterator(filename):
+    result = []
+    batch_header = None
+    batch_footer = None
+    rmgr = RMFlatFileIterator(filename)
+    for rec in rmgr:
+        if rec.id == 'BH':
+            batch_header = rec
+        elif rec.id == 'BT':
+            batch_footer = rec
+            in_lockbox = False
         if not in_lockbox:
             if rec.id != 'PR' or rec.prpt != 'LBX':
                 continue
             in_lockbox = True
-            payment_rec = rec
+            payment = RmPayment(rmgr.header, batch_header, rec)
+            result.append(payment)
         elif rec.id == 'PR':
-            payment_rec = rec
-        if rec.id == 'PA':
-            payee = rec
+            payment = RmPayment(rmgr.header, batch_header, rec)
+            result.append(payment)
+        if rec.id in ('PA', 'SP'):
+            payment.add_record(rec)
         elif rec.id == 'IV':
-            new_invoice = RMInvoice(payee, payment_rec.prcd)
-            new_invoice.add_iv(rec)
-            result[new_invoice.inv_num] = new_invoice
+            new_invoice = RmInvoice(rec)
+            payment.add_invoice(new_invoice)
         elif rec.id == 'SI':
-            new_invoice.add_si(rec)
-        elif rec.id == 'SP':
-            pass
-        elif rec.id == 'BT':
-            in_lockbox = False
+            new_invoice.add_record(rec)
     return result
 
 
