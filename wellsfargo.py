@@ -1,4 +1,8 @@
 import datetime
+try:
+    from dbf import property
+except ImportError:
+    pass
 from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time
 from VSS.BBxXlate.bbxfile import BBxFile
 
@@ -537,6 +541,9 @@ class RmInvoice(object):
     @property
     def amount(self):
         return self._amount
+    @amount.setter
+    def amount(self, new_value):
+        self._amount = new_value
     @property
     def inv_num(self):
         return self._inv_num
