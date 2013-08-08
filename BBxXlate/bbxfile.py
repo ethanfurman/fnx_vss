@@ -116,7 +116,7 @@ class BBxRec(object):
             var, sub = (ref+"(").split("(")[:2]
         try:
             varidx = self.datamap.index(var)
-        except ValueError as err:
+        except ValueError, err:
             raise ValueError('%s is not a valid field' % var)
         val = self.rec[varidx]
         if sub:

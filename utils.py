@@ -1,11 +1,49 @@
 import binascii
 import datetime
+import smtplib
 import string
+import syslog
+from dbf import Date, Time
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email.Encoders import encode_base64
+
+try:
+    next
+except NameError:
+    from dbf import next
 
 String = str, unicode
 Integer = int, long
 
+one_day = datetime.timedelta(1)
+
 spelled_out_numbers = set(['ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN'])
+
+def all_equal(iterator, test=None):
+    '''if `test is None` do a straight equality test'''
+    it = iter(iterator)
+    try:
+        if test is None:
+            target = next(it)
+        else:
+            target = test(next(it))
+    except StopIteration:
+        return True
+    if test is None:
+        test = lambda x: x == target
+    for item in it:
+        if test(item) != target:
+            return False
+    return True
+
+def bb_text_to_date(text):
+    mm, dd, yy = map(int, (text[:2], text[2:4], text[4:]))
+    if any([i == 0 for i in (mm, dd, yy)]):
+        Date()
+    yyyy = yy + 2000
+    return Date(yyyy, mm, dd)
 
 building_subs = set([
     '#','APARTMENT','APT','BLDG','BUILDING','CONDO','FL','FLR','FLOOR','LOT','LOWER','NO','NUM','NUMBER',
@@ -973,6 +1011,7 @@ def Sift(*fields):
 
 _memory_sentinel = Sentinel("amnesiac")
 
+
 class Memory(object):
     """
     allows attribute and item lookup
@@ -1100,6 +1139,7 @@ class PostalCode(object):
     def __str__(yo):
         return yo.code
 
+
 def fix_phone(text):
     text = text.strip()
     data = phone(text)
@@ -1113,10 +1153,107 @@ def fix_phone(text):
         return '%s.%s' % (data[:3], data[3:])
     return '%s.%s.%s' % (data[:3], data[3:6], data[6:])
 
+
 def fix_date(text):
-    '''takes mmddyy (with yy in hex (A0 = 2000)) and returns a datetime.date'''
+    '''takes mmddyy (with yy in hex (A0 = 2000)) and returns a Date'''
     text = text.strip()
     if len(text) != 6:
         return None
     yyyy, mm, dd = int(text[4:], 16)-160+2000, int(text[:2]), int(text[2:4])
-    return datetime.date(yyyy, mm, dd)
+    return Date(yyyy, mm, dd)
+
+def text_to_date(text, format='ymd'):
+    '''(yy)yymmdd'''
+    if not text.strip():
+        return None
+    dd = mm = yyyy = None
+    if len(text) == 6:
+        if format == 'ymd':
+            yyyy, mm, dd = int(text[:2])+2000, int(text[2:4]), int(text[4:])
+        elif format == 'mdy':
+            mm, dd, yyyy = int(text[:2]), int(text[2:4]), int(text[4:])+2000
+    elif len(text) == 8:
+        if format == 'ymd':
+            yyyy, mm, dd = int(text[:4]), int(text[4:6]), int(text[6:])
+        elif format == 'mdy':
+            mm, dd, yyyy = int(text[:2]), int(text[2:4]), int(text[4:])
+    if dd is None:
+        raise ValueError("don't know how to convert %r using %r" % (text, format))
+    return Date(yyyy, mm, dd)
+
+def text_to_time(text):
+    if not text.strip():
+        return None
+    return Time(int(text[:2]), int(text[2:]))
+
+def simplegeneric(func):
+    """Make a trivial single-dispatch generic function (from Python3.4 functools)"""
+    registry = {}
+    def wrapper(*args, **kw):
+        ob = args[0]
+        try:
+            cls = ob.__class__
+        except AttributeError:
+            cls = type(ob)
+        try:
+            mro = cls.__mro__
+        except AttributeError:
+            try:
+                class cls(cls, object):
+                    pass
+                mro = cls.__mro__[1:]
+            except TypeError:
+                mro = object,   # must be an ExtensionClass or some such  :(
+        for t in mro:
+            if t in registry:
+                return registry[t](*args, **kw)
+        else:
+            return func(*args, **kw)
+    try:
+        wrapper.__name__ = func.__name__
+    except (TypeError, AttributeError):
+        pass    # Python 2.3 doesn't allow functions to be renamed
+
+    def register(typ, func=None):
+        if func is None:
+            return lambda f: register(typ, f)
+        registry[typ] = func
+        return func
+
+    wrapper.__dict__ = func.__dict__
+    wrapper.__doc__ = func.__doc__
+    wrapper.register = register
+    return wrapper
+
+def mail(server, port, sender, receiver, message):
+    """sends email.message to server:port
+
+    receiver is a list of addresses
+    """
+    msg = MIMEText(message.get_payload())
+    for address in receiver:
+        msg['To'] = address
+    msg['From'] = sender
+    for header, value in message.items():
+        if header in ('To','From'):
+            continue
+        msg[header] = value
+    smtp = smtplib.SMTP(server, port)
+    try:
+        send_errs = smtp.sendmail(msg['From'], receiver, msg.as_string())
+    except smtplib.SMTPRecipientsRefused, exc:
+        send_errs = exc.recipients
+    smtp.quit()
+    errs = {}
+    if send_errs:
+        for user in send_errs:
+            server = 'mail.' + user.split('@')[1]
+            smtp = smtplib.SMTP(server, 25)
+            try:
+                smtp.sendmail(msg['From'], [user], msg.as_string())
+            except smtplib.SMTPRecipientsRefused, exc:
+                errs[user] = [send_errs[user], exc.recipients[user]]
+            smtp.quit()
+    for user, errors in errs.items():
+        for code, response in errors:
+            syslog.syslog('%s --> %s: %s' % (user, code, response))
