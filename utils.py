@@ -139,7 +139,7 @@ us_ca_state_abbr = {
     'AR' : 'ARKANSAS' ,
     'AS' : 'AMERICAN SAMOA' ,
     'AZ' : 'ARIZONA' ,
-    'BC' : 'BRITISH COLOMBIA' ,
+    'BC' : 'BRITISH COLUMBIA' ,
     'CA' : 'CALIFORNIA' ,
     'CO' : 'COLORADO' ,
     'CT' : 'CONNECTICUT' ,
@@ -210,7 +210,7 @@ us_ca_state_name = dict([(v, k) for k, v in us_ca_state_abbr.items()])
 
 ca_province_abbr = {
     'AB' : 'ALBERTA' ,
-    'BC' : 'BRITISH COLOMBIA' ,
+    'BC' : 'BRITISH COLUMBIA' ,
     'MB' : 'MANITOBA' ,
     'NB' : 'NEW BRUNSWICK' ,
     'NL' : 'NEWFOUNDLAND' ,

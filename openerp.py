@@ -15,6 +15,7 @@ FILE_PATHS = PropertyDict(
         modules = TMP+'sync_modules',
         db = TMP+'database',
         force_update = TMP+'force_update',
+        reset_photos = TMP+'reset_photos',
         )
 
 # format of employee dbf file
