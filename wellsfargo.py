@@ -9,9 +9,19 @@ from VSS.BBxXlate.bbxfile import BBxFile
 one_day = datetime.timedelta(1)
 
 def Int(text):
-    if not text.strip():
+    '''return `text` converted into pennies ($ is allowed)'''
+    text = text.strip('$ ')
+    if not text:
         return 0
-    return int(text)
+    if '.' not in text:
+        return int(text)
+    if text.count('.') > 1:
+        raise ValueError('too many decimal points: %s' % text)
+    elif len(text) - text.rfind('.') > 3:
+        raise ValueError('precision loss: amounts less than 1 penny: %s' % text)
+    dollars, cents = text.split('.')
+    cents = cents + '0' * (2 - len(cents))
+    return int(dollars + cents)
 
 report_types = {
     'R02'  : 'Outstanding Check Report',
@@ -164,7 +174,115 @@ class OutboundReportIterator(object):
         self._pointer = 0
 
 
+class IFTRecord(tuple):
+    __slots__ = ()
+    fields = [
+            'action',
+            'deposit_date',
+            'lockbox_no',
+            'site_id',
+            'depository_account',
+            'batch',
+            'transaction_number',
+            'record_type',
+            'sequence_number',
+            'check_amount',
+            'serial_number',
+            'check_account_number',
+            'check_date',
+            'check_rtn',
+            'remitter_name',
+            'invoice_number',
+            'invoice_amount',
+            'custom_data',
+            'front_image_file_name',
+            'rear_image_file_name',
+            ]
+    def __new__(cls, text):
+        args = text.split('|')
+        if len(args) == 21 and args[20]:
+            raise TypeError('invalid format in line:  %r' % text)
+        if len(args) == 21:
+            args.pop()
+        if args[0] != 'A':                  # action Add, Change, Delete (first letter only)
+            raise TypeError('invalid action: %r' % args[0])
+        args[1] = text_to_date(args[1])     # deposit date
+        args[5] = Int(args[5])              # batch number
+        args[6] = Int(args[6])              # transaction number
+        args[8] = Int(args[8])              # sequence number
+        args[9] = Int(args[9])              # check amount (in pennies)
+        args[12] = text_to_date(args[12])    # date of check (if given)
+        args[16] = Int(args[16])            # invoice amount (in pennies)
+        return tuple.__new__(cls, tuple(args))
+    def __getattr__(self, name):
+        search_name = name.lower()
+        rec_type = self[0]
+        try:
+            index = self.fields.index(search_name)
+        except IndexError:
+            raise AttributeError(name)
+        return self[index]
+    def __repr__(self):
+        rec_def = self.record_type
+        rec_num = self.serial_number or self.invoice_number
+        rec_amt = self.check_amount or self.invoice_amount
+        if rec_def in ('CHK','INV'):
+            result = '<IFT: %s #%s  %s>' % (rec_def, rec_num, rec_amt)
+        else:
+            front = self.front_image_file_name
+            rear = self.rear_image_file_name
+            if front and rear:
+                result = '<IFT: %s front: %r  rear: %r>' % (rec_def, front, rear)
+            elif front:
+                result = '<IFT: %s front: %r>' % (rec_def, front, )
+            elif rear:
+                result = '<IFT: %s rear: %r>' % (rec_def, rear, )
+            else:
+                result = '<IFT: %s>' % (rec_def, )
+        return result
 
+
+class IFTIterator(object):
+    def __init__(self, filename):
+        with open(filename) as fn:
+            self._data = [l.strip() for l in fn.readlines()]
+        self._pointer = 0
+        self._length = len(self._data)
+    def __iter__(self):
+        return self
+    def __next__(self):
+        '''iterates through the data records'''
+        if self._pointer >= self._length:
+            raise StopIteration
+        current = self._pointer
+        self._pointer += 1
+        return IFTRecord(self._data[current])
+    next = __next__
+    def reset(self, offset=None):
+        if offset is None:
+            self._pointer = 0
+        else:
+            self._pointer += offset
+            if self._pointer > self._length:
+                raise ValueError('cannot go bcak that far: index=%d, offset=%d' % (self._pointer, offset))
+
+
+class IFTBundle(object):
+    def __init__(self, filename):
+        self._image_iter = IFTIterator(filename)
+    def __iter__(self):
+        return self
+    def __next__(self):
+        group = [next(self._image_iter)]
+        for rec in self._image_iter:
+            if rec.transaction_number != group[0].transaction_number:
+                self._image_iter.reset(-1)
+                break
+            group.append(rec)
+        if group:
+            return tuple(group)
+        raise StopIteration
+    next = __next__
 
 
 class RMFFRecord(tuple):
@@ -558,6 +676,8 @@ class RmInvoice(object):
         self._inv_num = new_number
 
 def lockbox_payments(filename):
+    """Return payments from filename"""
+
     in_lockbox = False
     result = []
     batch_header = None

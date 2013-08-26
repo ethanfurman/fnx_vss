@@ -11,7 +11,7 @@ from unittest import TestCase, main as Run
 from dbf import Date
 from VSS.trulite import ARInvoice, ARAgingLine, ar_open_invoices, ar_invoices
 from VSS.utils import cszk
-from VSS.wellsfargo import RmInvoice, RmPayment, RMFFRecord, lockbox_payments
+from VSS.wellsfargo import RmInvoice, RmPayment, RMFFRecord, lockbox_payments, Int
 
 
 cszk_tests = (
@@ -367,6 +367,32 @@ class TestRmPayment(TestCase):
 for i in range(len(rm_payment_tests)):
     setattr(TestRmPayment, 'test_%02d' % i, lambda self, i=i: self.do_test(i))
 
+class TestInt(TestCase):
+
+    errors = (
+            '1.0.91',
+            '9.827',
+            '$ .001',
+            '$73.918.2192',
+            )
+
+    values = (
+            ('81729', 81729),
+            ('81729.', 8172900),
+            ('247.1', 24710),
+            ('59.12', 5912),
+            ('$ 4821', 4821),
+            ('$817.9', 81790),
+            ('$33.99', 3399),
+            )
+
+    def test_error(self):
+        for text in self.errors:
+            self.assertRaises(ValueError, Int, text)
+
+    def test_int(self):
+        for text, value in self.values:
+            self.assertEqual(Int(text), value)
 
 
 if __name__ == '__main__':
