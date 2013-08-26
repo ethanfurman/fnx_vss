@@ -1,7 +1,13 @@
 import binascii
 import datetime
+import smtplib
 import string
+import syslog
 from dbf import Date, Time
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email.Encoders import encode_base64
 
 try:
     next
@@ -133,7 +139,7 @@ us_ca_state_abbr = {
     'AR' : 'ARKANSAS' ,
     'AS' : 'AMERICAN SAMOA' ,
     'AZ' : 'ARIZONA' ,
-    'BC' : 'BRITISH COLOMBIA' ,
+    'BC' : 'BRITISH COLUMBIA' ,
     'CA' : 'CALIFORNIA' ,
     'CO' : 'COLORADO' ,
     'CT' : 'CONNECTICUT' ,
@@ -204,7 +210,7 @@ us_ca_state_name = dict([(v, k) for k, v in us_ca_state_abbr.items()])
 
 ca_province_abbr = {
     'AB' : 'ALBERTA' ,
-    'BC' : 'BRITISH COLOMBIA' ,
+    'BC' : 'BRITISH COLUMBIA' ,
     'MB' : 'MANITOBA' ,
     'NB' : 'NEW BRUNSWICK' ,
     'NL' : 'NEWFOUNDLAND' ,
@@ -1219,3 +1225,35 @@ def simplegeneric(func):
     wrapper.register = register
     return wrapper
 
+def mail(server, port, sender, receiver, message):
+    """sends email.message to server:port
+
+    receiver is a list of addresses
+    """
+    msg = MIMEText(message.get_payload())
+    for address in receiver:
+        msg['To'] = address
+    msg['From'] = sender
+    for header, value in message.items():
+        if header in ('To','From'):
+            continue
+        msg[header] = value
+    smtp = smtplib.SMTP(server, port)
+    try:
+        send_errs = smtp.sendmail(msg['From'], receiver, msg.as_string())
+    except smtplib.SMTPRecipientsRefused, exc:
+        send_errs = exc.recipients
+    smtp.quit()
+    errs = {}
+    if send_errs:
+        for user in send_errs:
+            server = 'mail.' + user.split('@')[1]
+            smtp = smtplib.SMTP(server, 25)
+            try:
+                smtp.sendmail(msg['From'], [user], msg.as_string())
+            except smtplib.SMTPRecipientsRefused, exc:
+                errs[user] = [send_errs[user], exc.recipients[user]]
+            smtp.quit()
+    for user, errors in errs.items():
+        for code, response in errors:
+            syslog.syslog('%s --> %s: %s' % (user, code, response))

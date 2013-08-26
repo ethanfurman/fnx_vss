@@ -1,10 +1,12 @@
+from __future__ import with_statement
 import datetime
 try:
-    from dbf import property
+    from dbf import next, property
 except ImportError:
     pass
-from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time
+from path import Path
 from VSS.BBxXlate.bbxfile import BBxFile
+from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time
 
 one_day = datetime.timedelta(1)
 
@@ -206,11 +208,15 @@ class IFTRecord(tuple):
             args.pop()
         if args[0] != 'A':                  # action Add, Change, Delete (first letter only)
             raise TypeError('invalid action: %r' % args[0])
+        ser_num = args[10]
+        ser_num.lstrip('0')
+        ser_num = '0' * (6 - len(ser_num)) + ser_num
         args[1] = text_to_date(args[1])     # deposit date
         args[5] = Int(args[5])              # batch number
         args[6] = Int(args[6])              # transaction number
         args[8] = Int(args[8])              # sequence number
         args[9] = Int(args[9])              # check amount (in pennies)
+        args[10] = ser_num                  # six-char minimum check number
         args[12] = text_to_date(args[12])    # date of check (if given)
         args[16] = Int(args[16])            # invoice amount (in pennies)
         return tuple.__new__(cls, tuple(args))
@@ -539,6 +545,10 @@ class RmPayment(object):
         self._invoices = {}
         self._total_discount = 0
         self._duplicate_invoices = {}
+        orig_rtng = pr_rec.pror
+        self._orig_rtng = orig_rtng.lstrip('0')
+        orig_acct = pr_rec.proa
+        self._orig_acct = orig_acct.lstrip('0')
     def __getattr__(self, name):
         search_name = name.lower()
         if search_name[:3] == 'pa_' and name[-2:].upper() in self.pa:
@@ -564,11 +574,7 @@ class RmPayment(object):
         return self.bh.bhbn
     @property
     def ck_num(self):
-        ck_num = self.sp.spf2
-        ck_num = '0' * (6 - len(ck_num)) + ck_num
-        if len(ck_num) > 6 and ck_num[:-6].replace('0','') == '':
-            ck_num = ck_num[-6:]
-        return ck_num
+        return self._ck_num
     @property
     def credit(self):
         if self.pr.prcd == 'C':
@@ -589,14 +595,25 @@ class RmPayment(object):
     def payer(self):
         return self.PA_PR.pan1
     @property
+    def orig_acct(self):
+        return self._orig_acct
+    @property
+    def orig_rtng(self):
+        return self._orig_rtng
+    @property
     def total_discount(self):
         return self._total_discount
     @total_discount.setter
     def total_discount(self, value):
         self._total_discount = value
     def add_record(self, rec):
-        if rec.id in ('FH', 'BH', 'PR', 'SP', 'AD', 'AL', 'RI'):
+        if rec.id in ('FH', 'BH', 'AD', 'AL', 'RI'):
             setattr(self, rec.id.lower(), rec)
+        elif rec.id == 'SP':
+            setattr(self, rec.id.lower(), rec)
+            ck_num = rec.spf2.lstrip('0')
+            ck_num = '0' * (6 - len(ck_num)) + ck_num
+            self._ck_num = ck_num
         elif rec.id == 'PA':
             self.pa.append(rec.paec)
             setattr(self, '%s_%s' % rec[:2], rec)

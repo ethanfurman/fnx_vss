@@ -41,14 +41,14 @@ etc., if necessary."""
 import os, sys, shlex, shutil, stat, subprocess, re, dbf, csv
 from collections import defaultdict
 from datetime import date, datetime, time
+from path import Path
 from string import uppercase, lowercase, digits
 from VSS import Table
 from VSS.decorators import LazyAttr, Missing
 from VSS.utils import BiDict, PropertyDict, translator
-from VSS.path import integrate
-integrate(); del integrate
 from VSS.iterators import OpenERPcsv, EmbeddedNewlineError
 csv_line = OpenERPcsv._convert_line; del OpenERPcsv
+
 import xlrd
 from xlrd import open_workbook, xldate_as_tuple
 from xlrd import XL_CELL_TEXT, XL_CELL_NUMBER, XL_CELL_DATE, XL_CELL_BOOLEAN, XL_CELL_ERROR, XL_CELL_BLANK
@@ -1244,7 +1244,6 @@ INSTALL_PY = """\
 
 import os, shutil
 from VSS.conversion import XML_HEADER, XML_FOOTER, TOP_MENU
-from VSS.path import integrate; integrate(); del integrate
 
 OE_NAME = 'Whole Herb Blends Test'
 OE_VERSION = '0.1'
@@ -1272,7 +1271,7 @@ xml_files = ['"%s_view.xml",' % module_id]
 
 for db in dbs:
     src = dir/db
-    for file in os.listdir(src):
+    for file in src.listdir():
         if file.basename == 'create_%s' % db.lower() or file.ext == '.dbf':
             continue
         shutil.copy(src/file, dst/module_id)
