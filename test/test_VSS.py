@@ -11,7 +11,7 @@ from unittest import TestCase, main as Run
 from dbf import Date
 from VSS.trulite import ARInvoice, ARAgingLine, ar_open_invoices, ar_invoices
 from VSS.utils import cszk
-from VSS.wellsfargo import RmInvoice, RmPayment, RMFFRecord, lockbox_payments, Int
+from VSS.wellsfargo import RmInvoice, RmPayment, RMFFRecord, lockbox_payments, Int, FederalHoliday
 
 
 cszk_tests = (
@@ -394,6 +394,39 @@ class TestInt(TestCase):
         for text, value in self.values:
             self.assertEqual(Int(text), value)
 
+
+class TestFederalHoliday(TestCase):
+
+    values = (
+            (FederalHoliday.NewYear,
+                ((2012, Date(2012, 1, 2)), (2013, Date(2013, 1, 1)), (2014, Date(2014, 1, 1)), (2015, Date(2015, 1, 1)), (2016, Date(2016, 1, 1)), (2017, Date(2017, 1, 2)))),
+            (FederalHoliday.MartinLutherKingJr,
+                ((2012, Date(2012, 1, 16)),(2013, Date(2013, 1, 21)),(2014, Date(2014, 1, 20)),(2015, Date(2015, 1, 19)),(2016, Date(2016, 1, 18)),(2017, Date(2017, 1, 16)))),
+            (FederalHoliday.President,
+                ((2012, Date(2012, 2, 20)),(2013, Date(2013, 2, 18)),(2014, Date(2014, 2, 17)),(2015, Date(2015, 2, 16)),(2016, Date(2016, 2, 15)),(2017, Date(2017, 2, 20)))),
+            (FederalHoliday.Memorial,
+                ((2012, Date(2012, 5, 28)),(2013, Date(2013, 5, 27)),(2014, Date(2014, 5, 26)),(2015, Date(2015, 5, 25)),(2016, Date(2016, 5, 30)),(2017, Date(2017, 5, 29)))),
+            (FederalHoliday.Independence,
+                ((2012, Date(2012, 7, 4)),(2013, Date(2013, 7, 4)),(2014, Date(2014, 7, 4)),(2015, Date(2015, 7, 4)),(2016, Date(2016, 7, 4)),(2017, Date(2017, 7, 4)))),
+            (FederalHoliday.Labor,
+                ((2012, Date(2012, 9, 3)),(2013, Date(2013, 9, 2)),(2014, Date(2014, 9, 1)),(2015, Date(2015, 9, 7)),(2016, Date(2016, 9, 5)),(2017, Date(2017, 9, 4)))),
+            (FederalHoliday.Columbus,
+                ((2012, Date(2012, 10, 8)),(2013, Date(2013, 10, 14)),(2014, Date(2014, 10, 13)),(2015, Date(2015, 10, 12)),(2016, Date(2016, 10, 10)),(2017, Date(2017, 10, 9)))),
+            (FederalHoliday.Veterans,
+                ((2012, Date(2012, 11, 12)),(2013, Date(2013, 11, 11)),(2014, Date(2014, 11, 11)),(2015, Date(2015, 11, 11)),(2016, Date(2016, 11, 11)),(2017, Date(2017, 11, 11)))),
+            (FederalHoliday.Thanksgiving,
+                ((2012, Date(2012, 11, 22)),(2013, Date(2013, 11, 28)),(2014, Date(2014, 11, 27)),(2015, Date(2015, 11, 26)),(2016, Date(2016, 11, 24)),(2017, Date(2017, 11, 23)))),
+            (FederalHoliday.Christmas,
+                ((2012, Date(2012, 12, 25)),(2013, Date(2013, 12, 25)),(2014, Date(2014, 12, 25)),(2015, Date(2015, 12, 25)),(2016, Date(2016, 12, 26)),(2017, Date(2017, 12, 25)))),
+            )
+
+    def do_test(self, enum, year, date):
+        self.assertEqual(enum.date(year), date)
+
+    ns = vars()
+    for enum, values in values:
+        for year, date in values:
+            ns['test_%s_%d' % (enum.name, year)] = lambda self, enum=enum, year=year, date=date: self.do_test(enum, year, date)
 
 if __name__ == '__main__':
     Run()

@@ -1,14 +1,15 @@
 from __future__ import with_statement
-import datetime
+from datetime import timedelta
 try:
     from dbf import next, property
 except ImportError:
     pass
 from path import Path
 from VSS.BBxXlate.bbxfile import BBxFile
-from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time
+from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time, xrange, Date, Time
+from VSS import Table, Month, Weekday, days_per_month, AutoEnum
 
-one_day = datetime.timedelta(1)
+one_day = timedelta(1)
 
 def Int(text):
     '''return `text` converted into pennies ($ is allowed)'''
@@ -725,20 +726,130 @@ def lockbox_payments(filename):
     return result
 
 
-'''
-if __name__ == '__main__':
-    APCK = BBxFile(
-        "/mnt/Rsync/vsds2.2/usr/fenx/FxPro/WSG/Data/APCKF0",
-        datamap="ky,ckdt,ckamt,stat,dt1,dt2,dt3,f1,flag,vend,clramt,discount,f2".split(),
-        )
-    Cks = [dict([(key,rec) for key,rec in APCK.items() if rec.rec[10]=="" and "1"<key[0]<"9" ])]
+# ACHStore keeps track of which ACH files have been transmitted, and the name of the next ACH file
+# ACHPayment stores one payment from TRU to a vendor
+# ACHFile takes the payments and makes a WFB achfile for transmission
 
-    last_friday = datetime.date.today()
-    while last_friday.weekday() != 5:
-        last_friday = last_friday - one_day
+class ACHStore(object):
+    "remembers previous ACHFiles, generates new file names"
 
-    discrepencies = {}
-    for ck, rec in Cks.items():
-        ck_date = rec[1].strip()
-        ck_date = int(ck_date[4:], 16)-160+2000, ck_date[:2], ck_date[2:4]
-'''
+    def __init__(self, filename):
+        self.store = Table(filename)
+        with self.store:
+            self.index = self.store.create_index(lambda rec: (rec.filedate, rec.filemod))
+
+    def get_filename(self):
+        today = Date.today()
+        with self.index:
+            rec = self.store[-1]
+            if rec.date == today:
+                mod = chr(ord(rec.filemod) +1)
+                if mod > 'Z':
+                    raise ValueError('already generated 26 files today, wait until tomorrow')
+            else:
+                self.store.append(dict(filedate=today, filemod='A'))
+                mod = 'A'
+        filename = 'ACH_%s_%s' % (today, mod)
+
+
+class ACHPayment(object):
+    """A single payment from TRU to a vendor."""
+
+    def __init__(self,
+            company_id, company_name, description, sec_code, post_date,
+            vender_name, vendor_id, vendor_rtng, vendor_acct,
+            transaction_type, vendor_acct_type, prenote_or_dollar, amount):
+        args = locals()
+        args.remove('self')
+        for attr, value in args.items():
+            setattr(self, attr, value)
+        self.validate_routing(vendor_rtng)
+
+    @staticmethod
+    def validate_routing(rtng):
+        total = 0
+        for digit, weight in zip(rtng, (3, 7, 1, 3, 7, 1, 3, 7)):
+            total += int(digit) * weight
+        chk_digit = 10 % (total % 10)
+        if chk_digit != int(rtng[-1]):
+            raise ValueError('Routing number %s fails check digit calculation' % rtng)
+
+
+class ACHFile(object):
+    """Accepts multiple ACH payments and generates file for tranmission to WFB."""
+
+    file_header = '101 0910000191900918292%(date)s%(time)s%(id_mod)s094101WELLS FARGO            TRULITE WSG LLC                '
+    batch_header = '5200TRULITE WSG LLC %(discretionary)-20s1900918292CCD%(description)-10s%(ref_date)-6s%(eff_date)s   109100001%(batch_number)07d'
+    entry_detail = '6{code}{routing_nbr}{account:<17}{amount:010d}{payee_id:<15}{payee_name:<22}  {addenda}09100001{entry_number:07d}'
+    batch_control = '8CCD{total_entries:06d}{entry_hash:010d}{total_debit:012d}{total_credit:012d}1900918292                         09100001{batch_number:07d}'
+    file_control = '9{total_batches:06d}{total_blocks:06d}{total_entries:08d}{entry_hash_total:010d}{total_debit:012d}{total_credit:012d}                                       '
+
+    def __init__(self, filename, modifier):
+        self.payments = []
+        self.file_header %= dict(date=str(Date.today())[2:], time=Time.now().strftime('%H%M'), id_mod=modifier)
+
+    def add_payment(self, payment):
+        self.payments.append(payment)
+
+    def close(self):
+        payments = sorted(self.payments, key=lambda p: (p.post_date, p.sec_code, p.description))
+        ref_date = Date.today().strftime('%b %d')
+        lines = [self.file_header]
+        last_payment = payments[0]
+        total_batches = 0
+        total_blocks = 0
+        total_file_entries = 0
+        total_entries_hash = 0
+        total_file_debit = 0
+        total_file_credit = 0
+
+        needs_init = True
+        for pymnt in payments:
+            if pymnt.post_date != last_payment.post_date or pymnt.sec_code != last_payment.sec_code or payment.description != last_payment.description:
+                needs_init = True
+
+            if needs_init:
+                batch_total_entries = 0
+                batch_entries_hash = 0
+                batch_total_debit = 0
+                batch_total_credit = 0
+                total_batches += 1
+                lines.append(self.batch_header % dict(discretionary='', description=pymnt.description[:10], ref_date=ref_date))
+
+
+class FederalHoliday(AutoEnum):
+    NewYear = "First day of the year.", 'absolute', Month.JANUARY, 1
+    MartinLutherKingJr = "Birth of Civil Rights leader.", 'relative', Month.JANUARY, Weekday.MONDAY, 3
+    President = "Birth of George Washington", 'relative', Month.FEBRUARY, Weekday.MONDAY, 3
+    Memorial = "Memory of fallen soldiers", 'relative', Month.MAY, Weekday.MONDAY, 5
+    Independence = "Declaration of Independence", 'absolute', Month.JULY, 4
+    Labor = "American Labor Movement", 'relative', Month.SEPTEMBER, Weekday.MONDAY, 1
+    Columbus = "Americas discovered", 'relative', Month.OCTOBER, Weekday.MONDAY, 2
+    Veterans = "Recognition of Armed Forces service", 'relative', Month.NOVEMBER, 11, 1
+    Thanksgiving = "Day of Thanks", 'relative', Month.NOVEMBER, Weekday.THURSDAY, 4
+    Christmas = "Birth of Jesus Christ", 'absolute', Month.DECEMBER, 25
+
+    def __init__(self, doc, type, month, day, occurance=None):
+        self.__doc__ = doc
+        self.type = type
+        self.month = month
+        self.day = day
+        self.occurance = occurance
+
+    def date(self, year):
+        "returns the observed date of the holiday for `year`"
+        if self.type == 'absolute' or isinstance(self.day, int):
+            holiday =  Date(year, self.month, self.day)
+            if Weekday(holiday.isoweekday()) is Weekday.SUNDAY:
+                holiday = holiday.replace(delta_day=1)
+            return holiday
+        days_in_month = days_per_month(year)
+        target_end = self.occurance * 7 + 1
+        if target_end > days_in_month[self.month]:
+            target_end = days_in_month[self.month]
+        target_start = target_end - 7
+        target_week = list(xrange(start=Date(year, self.month, target_start), step=one_day, count=7))
+        for holiday in target_week:
+            if Weekday(holiday.isoweekday()) is self.day:
+                return holiday
+

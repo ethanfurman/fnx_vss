@@ -20,40 +20,39 @@ def Table(*args, **kwargs):
         kwargs['codepage'] = 'utf8'
     return dbf.Table(*args, **kwargs)
 
+def days_per_month(year):
+    return (dbf.days_per_month, dbf.days_per_leap_month)[dbf.is_leapyear(year)]
+
 class AutoEnum(enum.Enum):
-    __last_number__ = -1
-    def __new__(cls, value=None):
-        if value is None:
-            value = cls.__last_number__ + 1
+    __last_number__ = 0
+    def __new__(cls, *args):
+        value = cls.__last_number__ + 1
         cls.__last_number__ = value
         obj = object.__new__(cls)
         obj._value = value
         return obj
     def __init__(self, *args):
-        cls = self.__class__
-        if any(self.value == e.value for e in cls):
-            a = self.name
-            e = cls(self.value).name
-            raise ValueError(
-                    "aliases not allowed:  %r --> %r"
-                    % (a, e))
+        if args:
+            raise TypeError('%s not dealt with -- need custom __init__' % (args,))
     def __index__(self):
-        return self._value
+        return self.value
+    def __int__(self):
+        return self.value
     def __ge__(self, other):
         if self.__class__ is other.__class__:
-            return self._value >= other._value
+            return self.value >= other.value
         return NotImplemented
     def __gt__(self, other):
         if self.__class__ is other.__class__:
-            return self._value > other._value
+            return self.value > other.value
         return NotImplemented
     def __le__(self, other):
         if self.__class__ is other.__class__:
-            return self._value <= other._value
+            return self.value <= other.value
         return NotImplemented
     def __lt__(self, other):
         if self.__class__ is other.__class__:
-            return self._value < other._value
+            return self.value < other.value
         return NotImplemented
     @classmethod
     def export(cls, namespace):
@@ -61,3 +60,27 @@ class AutoEnum(enum.Enum):
             if name == member.name:
                 namespace[name] = member
 
+class Weekday(AutoEnum):
+    __order__ = 'MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY SATURDAY SUNDAY'
+    MONDAY = ()
+    TUESDAY = ()
+    WEDNESDAY = ()
+    THURSDAY = ()
+    FRIDAY = ()
+    SATURDAY = ()
+    SUNDAY = ()
+
+class Month(AutoEnum):
+    __order__ = 'JANUARY FEBRUARY MARCH APRIL MAY JUNE JULY AUGUST SEPTEMBER OCTOBER NOVEMBER DECEMBER'
+    JANUARY = ()
+    FEBRUARY = ()
+    MARCH = ()
+    APRIL = ()
+    MAY = ()
+    JUNE = ()
+    JULY = ()
+    AUGUST = ()
+    SEPTEMBER = ()
+    OCTOBER = ()
+    NOVEMBER = ()
+    DECEMBER = ()

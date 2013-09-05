@@ -1257,3 +1257,117 @@ def mail(server, port, sender, receiver, message):
     for user, errors in errs.items():
         for code, response in errors:
             syslog.syslog('%s --> %s: %s' % (user, code, response))
+
+
+
+from datetime import date, timedelta
+from decimal import Decimal
+
+class xrange():
+    '''
+    accepts arbitrary objects to use to produce sequences
+    '''
+
+    types = {
+            int :    {
+                     'start' : 0,
+                     'step'  : 1,
+                     },
+            float :  {
+                     'start' : 0.0,
+                     'step'  : 1.0,
+                     },
+            date :   {
+                     'start' : None,
+                     'step'  : timedelta(1), # 1 day
+                     },
+            Decimal: {'start' : 0,
+                      'step'  : 1.0,
+                     }
+            }
+    
+    def __init__(yo, start, stop=None, step=None, count=None):
+        if stop is not None and count is not None:
+            raise TypeError("cannot specify both stop and count")
+        if stop is None and count is None:    # check for default start based on type
+            start, stop = None, start
+            for t in yo.types:
+                if isinstance(stop, t):
+                    start = yo.types[t]['start']
+                    break
+            else:
+                raise TypeError("start must be specified for unknown type %r" % stop.__class__)
+            if start is None:
+                raise TypeError("start must be specified for type %r" % stop.__class__)
+        if step is None:
+            step = yo.types[type(stop)]['step']
+
+        yo.start = yo.init_start = start
+        yo.count = yo.init_count = count
+        yo.stop = stop
+        yo.step = step
+        yo.reverse = stop is not None and stop < start
+
+    def __iter__(yo):
+        return yo
+
+    def __next__(yo):
+        if not yo.reverse:
+            if (yo.count is not None and yo.count < 1
+            or  yo.stop is not None and yo.start >= yo.stop):   # all done!
+                raise StopIteration
+        else:
+            if (yo.count is not None and yo.count < 1
+            or  yo.start <= yo.stop):   # all done!
+                raise StopIteration
+        current = yo.start
+        yo.start = yo.start + yo.step
+        if yo.count is not None:
+            yo.count -= 1
+        return current
+    next = __next__
+
+    def __repr__(yo):
+        values = [ '%s=%s' % (k,v) for k,v in (('start',yo.start), ('stop',yo.stop), ('step', yo.step), ('count', yo.count)) if v is not None ]
+        return '<%s(%s)>' % (yo.__class__.__name__, ', '.join(values))
+
+class copy_argspec(object):
+    """
+    copy_argspec is a signature modifying decorator.  Specifically, it copies
+    the signature from `source_func` to the wrapper, and the wrapper will call
+    the original function (which should be using *args, **kwds).
+    """
+    def __init__(self, src_func):
+        self.argspec = inspect.getargspec(src_func)
+        self.src_doc = src_func.__doc__
+        self.src_defaults = src_func.func_defaults
+
+    def __call__(self, tgt_func):
+        tgt_argspec = inspect.getargspec(tgt_func)
+        need_self = False
+        if tgt_argspec[0][0] == 'self':
+            need_self = True
+            
+        name = tgt_func.__name__
+        argspec = self.argspec
+        if argspec[0][0] == 'self':
+            need_self = False
+        if need_self:
+            newargspec = (['self'] + argspec[0],) + argspec[1:]
+        else:
+            newargspec = argspec
+        signature = inspect.formatargspec(formatvalue=lambda val: "", *newargspec)[1:-1]
+        new_func = (
+                'def _wrapper_(%(signature)s):\n' 
+                '    return %(tgt_func)s(%(signature)s)' % 
+                {'signature':signature, 'tgt_func':'tgt_func'}
+                   )
+        evaldict = {'tgt_func' : tgt_func}
+        exec new_func in evaldict
+        wrapped = evaldict['_wrapper_']
+        wrapped.__name__ = name
+        wrapped.__doc__ = self.src_doc
+        wrapped.func_defaults = self.src_defaults
+        return wrapped
+
+
