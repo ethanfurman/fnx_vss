@@ -167,7 +167,7 @@ def BBVarLength(datamap, fieldlist):
 
 class BBxFile(object):
 
-    def __init__(self, srcefile, datamap, fieldlist, keymatch=None, subset=None, section=None, rectype=None, name=None, desc=None):
+    def __init__(self, srcefile, datamap, fieldlist, keymatch=None, subset=None, filter=None, rectype=None, name=None, desc=None):
         records = {}
         datamap = [xx.strip() for xx in datamap]
         leader = trailer = None
@@ -189,15 +189,18 @@ class BBxFile(object):
                     zip(rec, fieldlengths, datamap) if name in fixedLengthFields)
             or  rectype and ky[start:stop] != token):
                 continue    # record is not a match for this table
-            if section is None or ky.startswith(section):
+            rec = BBxRec(rec, datamap, fieldlist)
+            if filter:
+                if filter(rec):
+                    records[ky] = rec
+            elif leader is None or ky.startswith(leader):
                 if trailer is None or ky.endswith(trailer):
-                    records[ky] = BBxRec(rec, datamap, fieldlist)
+                    records[ky] = rec
         self.records = records
         self.datamap = datamap
         self.fieldlist = fieldlist
         self.keymatch  = keymatch
         self.subset  = subset
-        self.section = section
         self.rectype = rectype
         self.name = name
         self.desc= desc
@@ -211,11 +214,7 @@ class BBxFile(object):
         elif self.keymatch:
             if self.records.has_key(self.keymatch % ky):
                 return self.records[self.keymatch % ky]
-        elif self.subset:
-            match = self.subset % ky
-            rv = [ (xky,xrec) for (xky,xrec) in self.records.items() if xky.startswith(match) ]
-            rv.sort()
-            return rv
+        raise KeyError(ky)
 
     def __iter__(self):
         """
@@ -228,13 +227,21 @@ class BBxFile(object):
 
     def __repr__(self):
         pieces = []
-        for attr in ('name desc keymatch subset section rectype'.split()):
+        for attr in ('name desc keymatch subset rectype'.split()):
             value = getattr(self, attr)
             if value is not None:
                 if attr is 'rectype':
                     value = value[0]
                 pieces.append("%s=%r" % (attr, value))
         return "BBxFile(%s)" % (', '.join(pieces) + "[%d records]" % len(self.records))
+
+    def get_subset(self, ky):
+        if not self.subset:
+            raise ValueError('subset not defined')
+        match = self.subset % ky
+        rv = [(key,rec) for key,rec in self.records.items() if key.startswith(match)]
+        rv.sort()
+        return rv
 
     def keys(self):
         return self.records.keys()

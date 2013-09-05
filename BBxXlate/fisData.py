@@ -1,12 +1,9 @@
 #!/usr/local/bin/python
 import sys, getpass, shlex, subprocess, re, os
 from bbxfile import BBxFile
+from fnx.path import Path
 
-FIS_SCHEMAS = "/FIS/Falcon_FIS_SCHEMA"
-FIS_DATA = "/FIS/data"
-
-# enable for text file output to compare against original output
-textfiles = False
+execfile('/etc/openerp/fnx.fis.conf')
 
 def sizefrom(mask):
     if not(mask): return ""
@@ -25,30 +22,47 @@ def slicendice(line, *nums):
     return tuple(results)
 
 def parse_FIS_Schema(source):
-    if textfiles:
-        file_fields = open('fields.txt.latest', 'w')
-        file_iolist = open('iolist.txt.latest', 'w')
-        file_tables = open('tables.txt.latest', 'w')
     iolist = None    
     contents = open(source).readlines()
     FIS_TABLES = {}
+    skip_table = False
     for line in contents:
         line = line.rstrip()
         if not line:
             continue
-        if line.startswith("FC"):
-            if textfiles and iolist is not None:
-               file_iolist.write(str(iolist) + '\n')            
+        if skip_table and line[:1] == ' ':
+            continue
+        elif line[:1] == 'F' and line[1:2] != 'C':
+            skip_table = True
+            continue
+        elif line[:15].strip() == '':
+            continue    # skip commenting lines
+        elif line.startswith(FIS_PROBLEMS):
+            skip_table = True
+        elif line.startswith('FC'):
+            skip_table = False
             name = line[2:9].strip()
-            parts = line[9:].split(" ( ")
+            parts = line[9:].rsplit(" (", 1)
             desc = parts[0].strip()
-            filenum = int(parts[1].split()[0])
-            fields = FIS_TABLES.setdefault(filenum, {'name':name, 'desc':desc, 'filenum':filenum, 'fields':[], 'iolist':[], 'key':None})['fields']
-            if name in FIS_TABLES:
-                del FIS_TABLES[name]    # only allow names if there aren't any duplicates
+            if parts[1].startswith('at '):
+                if name in FIS_TABLES:
+                    # skip duplicate tables
+                    skip_table = True
+                    continue
+                fields = FIS_TABLES.setdefault(name, {'name':name, 'desc':desc, 'filenum':None, 'fields':[], 'iolist':[], 'key':None})['fields']
+                iolist = FIS_TABLES[name]['iolist']
+                table_id = name
+                filenum = ''
             else:
-                FIS_TABLES[name] = FIS_TABLES[filenum]
-            iolist = FIS_TABLES[filenum]['iolist']
+                filenum = int(parts[1].split()[0])
+                fields = FIS_TABLES.setdefault(filenum, {'name':name, 'desc':desc, 'filenum':filenum, 'fields':[], 'iolist':[], 'key':None})['fields']
+                
+                if name in FIS_TABLES:
+                    del FIS_TABLES[name]    # only allow names if there aren't any duplicates
+                else:
+                    FIS_TABLES[name] = FIS_TABLES[filenum]
+                iolist = FIS_TABLES[filenum]['iolist']
+                table_id = filenum
         else:   # should start with a field number...
             fieldnum, fielddesc, fieldsize, rest = slicendice(line, 10, 50, 56)
             rest = rest.split()
@@ -91,33 +105,30 @@ def parse_FIS_Schema(source):
                 if len(token) < length:
                     length = len(token)
                 stop = start + length
-                FIS_TABLES[filenum]['key'] = token, start, stop
-            if textfiles:
-                file_fields.write(str(fields[-1]) + '\n')            
-    if textfiles:
-        file_iolist.write(str(iolist) + '\n')
-        for key, value in sorted(FIS_TABLES.items(), key=lambda kv: kv[1]['filenum']):
-            file_tables.write("%-10s %5s - %-10s  %s\n" % (key, value['filenum'], value['name'], value['desc']))            
+                # or FIS_TABLES[name] . . .
+                FIS_TABLES[table_id]['key'] = token, start, stop
     return FIS_TABLES
 
 
 DATACACHE = {}
 
-def fisData (table, keymatch=None, section=None):
-    filenum = tables[table]['filenum']
-    tablename = tables[filenum]['name']
-    key = filenum, keymatch, section
-    datafile = os.sep.join([FIS_DATA,"O"+tablename[:4]])
+def fisData (table, keymatch=None, subset=None, filter=None):
+    table_id = tables[table]['filenum']
+    if table_id is None:
+        table_id = tables[table]['name']
+    tablename = tables[table_id]['name']
+    key = table_id, keymatch, subset, filter
+    datafile = FIS_DATA/CID+tablename[:4]
     mtime = os.stat(datafile).st_mtime
     if key in DATACACHE:
         table, old_mtime = DATACACHE[key]
         if old_mtime == mtime:
             return table
-    description = tables[filenum]['desc']
-    datamap = tables[filenum]['iolist']
-    fieldlist = tables[filenum]['fields']
-    rectype = tables[filenum]['key']
-    table = BBxFile(datafile, datamap, keymatch=keymatch, section=section, rectype=rectype, fieldlist=fieldlist, name=tablename, desc=description)
+    description = tables[table_id]['desc']
+    datamap = tables[table_id]['iolist']
+    fieldlist = tables[table_id]['fields']
+    rectype = tables[table_id]['key']
+    table = BBxFile(datafile, datamap, keymatch=keymatch, subset=subset, filter=filter, rectype=rectype, fieldlist=fieldlist, name=tablename, desc=description)
     DATACACHE[key] = table, mtime
     return table
 
