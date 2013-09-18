@@ -7,7 +7,7 @@ except ImportError:
 from path import Path
 from VSS.BBxXlate.bbxfile import BBxFile
 from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time, xrange, Date, Time
-from VSS import Table, Month, Weekday, days_per_month, AutoEnum
+from VSS import Table, Month, Weekday, days_per_month, AutoEnum, IntEnum, OrderedDict
 
 one_day = timedelta(1)
 
@@ -218,7 +218,7 @@ class IFTRecord(tuple):
         args[8] = Int(args[8])              # sequence number
         args[9] = Int(args[9])              # check amount (in pennies)
         args[10] = ser_num                  # six-char minimum check number
-        args[12] = text_to_date(args[12])    # date of check (if given)
+        args[12] = text_to_date(args[12])   # date of check (if given)
         args[16] = Int(args[16])            # invoice amount (in pennies)
         return tuple.__new__(cls, tuple(args))
     def __getattr__(self, name):
@@ -543,7 +543,7 @@ class RmPayment(object):
         self.ad = ()
         self.al = ()
         self.ri = ()
-        self._invoices = {}
+        self._invoices = OrderedDict()
         self._total_discount = 0
         self._duplicate_invoices = {}
         orig_rtng = pr_rec.pror
@@ -568,9 +568,6 @@ class RmPayment(object):
     def __repr__(self):
         return '<RmPayment: payer-> %s  date-> %s  ck_num-> %s  credit-> %s  debit-> %s total_discount-> %s >' % (self.payer, self.date, self.ck_num, self.credit, self.debit, self.total_discount)
     @property
-    def file_control(self):
-        return self.fh.fhfn
-    @property
     def batch_control(self):
         return self.bh.bhbn
     @property
@@ -589,6 +586,9 @@ class RmPayment(object):
         if self.pr.prcd == 'D':
             return self.pr.prpa
         return 0
+    @property
+    def file_control(self):
+        return self.fh.fhfn
     @property
     def invoices(self):
         return self._invoices.copy()
@@ -738,30 +738,33 @@ class ACHStore(object):
         with self.store:
             self.index = self.store.create_index(lambda rec: (rec.filedate, rec.filemod))
 
-    def get_filename(self):
+    def get_achfile(self, company_name, company_id, file_id):
         today = Date.today()
         with self.index:
-            rec = self.store[-1]
-            if rec.date == today:
-                mod = chr(ord(rec.filemod) +1)
-                if mod > 'Z':
-                    raise ValueError('already generated 26 files today, wait until tomorrow')
-            else:
-                self.store.append(dict(filedate=today, filemod='A'))
-                mod = 'A'
-        filename = 'ACH_%s_%s' % (today, mod)
+            mod = 'A'
+            if self.store:
+                rec = self.store[-1]
+                if rec.filedate == today:
+                    mod = chr(ord(rec.filemod) +1)
+                    if mod > 'Z':
+                        raise ValueError('already generated 26 files today, wait until tomorrow')
+            self.store.append(dict(filedate=today, filemod=mod))
+        filename = 'ACH_%s_%s' % (today.ymd(), mod)
+        return ACHFile(company_name, company_id, file_id, filename, mod)
 
 
 class ACHPayment(object):
     """A single payment from TRU to a vendor."""
 
     def __init__(self,
-            company_id, company_name, description, sec_code, post_date,
+            description, sec_code, 
             vender_name, vendor_id, vendor_rtng, vendor_acct,
             transaction_type, vendor_acct_type, prenote_or_dollar, amount):
         args = locals()
         args.remove('self')
         for attr, value in args.items():
+            if isinstance(value, (unicode, str)):
+                value = value.upper()
             setattr(self, attr, value)
         self.validate_routing(vendor_rtng)
 
@@ -770,7 +773,7 @@ class ACHPayment(object):
         total = 0
         for digit, weight in zip(rtng, (3, 7, 1, 3, 7, 1, 3, 7)):
             total += int(digit) * weight
-        chk_digit = 10 % (total % 10)
+        chk_digit = (10 - total % 10) % 10
         if chk_digit != int(rtng[-1]):
             raise ValueError('Routing number %s fails check digit calculation' % rtng)
 
@@ -778,46 +781,128 @@ class ACHPayment(object):
 class ACHFile(object):
     """Accepts multiple ACH payments and generates file for tranmission to WFB."""
 
-    file_header = '101 0910000191900918292%(date)s%(time)s%(id_mod)s094101WELLS FARGO            TRULITE WSG LLC                '
-    batch_header = '5200TRULITE WSG LLC %(discretionary)-20s1900918292CCD%(description)-10s%(ref_date)-6s%(eff_date)s   109100001%(batch_number)07d'
-    entry_detail = '6{code}{routing_nbr}{account:<17}{amount:010d}{payee_id:<15}{payee_name:<22}  {addenda}09100001{entry_number:07d}'
-    batch_control = '8CCD{total_entries:06d}{entry_hash:010d}{total_debit:012d}{total_credit:012d}1900918292                         09100001{batch_number:07d}'
-    file_control = '9{total_batches:06d}{total_blocks:06d}{total_entries:08d}{entry_hash_total:010d}{total_debit:012d}{total_credit:012d}                                       '
+    file_header = '101 091000019%(id)s%(date)s%(time)s%(id_mod)s094101WELLS FARGO            %(company)-23s        '
+    batch_header = '5200%(company)-16s%(discretionary)-20s%(company_id)s%(sec)s%(description)-10s%(ref_date)-6s%(eff_date)s   109100001%(batch_number)07d'
+    entry_detail = '6%(code)d%s(routing_nbr)s%(account)-17s%(amount)010d%(payee_id)-15s%(payee_name)-22s  %(addenda)d09100001%(entry_number)07d'
+    batch_control = '8%(sec)s%(entries)06d%(entry_hash)010d%(debit)012d%(credit)012d1900918292                         09100001%(batch_number)07d'
+    file_control = '9%(batches)06d%(blocks)06d%(entries)08d%(entry_hash)010d%(debit)012d%(credit)012d                                       '
 
-    def __init__(self, filename, modifier):
+    def __init__(self, company_name, company_id, file_id, filename, modifier):
+        self.company_name = company_name.upper()
+        self.company_id = company_id.upper()
+        self.file_id = file_id.upper()
+        self.filename = filename
+        self.modifier = modifier.upper()
         self.payments = []
-        self.file_header %= dict(date=str(Date.today())[2:], time=Time.now().strftime('%H%M'), id_mod=modifier)
+        self.lines = [
+                self.file_header % dict(
+                    id=file_id,
+                    date=str(Date.today())[2:], time=Time.now().strftime('%H%M'),
+                    id_mod=modifier, company=self.company_name[:23],
+                    )]
+        self.today = Date.today()
+        self.open = True
+
+    def __repr__(self):
+        return "<%s(%r, %r)>" % (self.__class__.__name__, self.filename, self.modifier)
 
     def add_payment(self, payment):
+        if not self.open():
+            raise ValueError("%r is closed" % self)
         self.payments.append(payment)
 
     def close(self):
-        payments = sorted(self.payments, key=lambda p: (p.post_date, p.sec_code, p.description))
+        """
+        Create the file, write the entries, close the file.
+        """
         ref_date = Date.today().strftime('%b %d')
-        lines = [self.file_header]
-        last_payment = payments[0]
-        total_batches = 0
+        lines = self.lines
+        #last_payment = payments[0]
+        batches = 0
         total_blocks = 0
-        total_file_entries = 0
-        total_entries_hash = 0
-        total_file_debit = 0
-        total_file_credit = 0
+        total_entries = 0
+        total_hash = 0
+        total_debit = 0
+        total_credit = 0
+        eff_date = FederalHoliday.next_business_day(self.today, days=2)
 
-        needs_init = True
-        for pymnt in payments:
-            if pymnt.post_date != last_payment.post_date or pymnt.sec_code != last_payment.sec_code or payment.description != last_payment.description:
-                needs_init = True
+        def pdscd(rec):
+            return rec.sec_code, rec.description
 
-            if needs_init:
-                batch_total_entries = 0
-                batch_entries_hash = 0
-                batch_total_debit = 0
-                batch_total_credit = 0
-                total_batches += 1
-                lines.append(self.batch_header % dict(discretionary='', description=pymnt.description[:10], ref_date=ref_date))
+        payments = sorted(self.payments, key=pdscd)
+        
+        for (sec_code, description), group in groupby(payments, pdscd):
+            batch_entries = 0
+            batch_hash = 0
+            batch_debit = 0
+            batch_credit = 0
+            batches += 1
+            if batches > 10**7:
+                raise ValueError("too many batches for this file, need to split")
+            lines.append(self.batch_header % dict(
+                company=self.company_name[:16], company_id=self.company_id,
+                discretionary='', description=description[:10],
+                ref_date=ref_date, eff_date=eff_date, batch_number=batches, sec=sec_code
+                ))
+            for pymnt in group:
+                total_entries += 1
+                batch_entries += 1
+                batch_hash += int(pymnt.vendor_rtng)
+                if total_entries > 10**8:
+                    raise ValueError("Too many entries for file, need to split")
+                if batch_entries > 10**6:
+                    raise ValueError("Too many entries for batch %d, need to split" % batches)
+                trans_code = pymnt.transaction_type
+                if trans_code in (ACH_ETC.ck_credit, ACH_ETC.ck_prenote_credit, ACH_ETC.sv_credit, ACH_ETC.sv_prenote_credit):
+                    total_credit += pymnt.amount
+                    batch_credit += pymnt.amount
+                    if total_credit > 10**12:
+                        raise ValueError("total credit amount for file too large, need to split")
+                    if batch_credit > 10**12:
+                        raise ValueError("total credit amount for batch %d too large, need to split" % batches)
+                elif trans_code in (ACH_ETC.ck_debit, ACH_ETC.ck_prenote_debit, ACH_ETC.sv_debit, ACH_ETC.sv_prenote_debit):
+                    total_debit += pymnt.amount
+                    batch_debit += pymnt.amount
+                    if total_debit > 10**12:
+                        raise ValueError("total debit amount for file too large, need to split")
+                    if batch_debit > 10**12:
+                        raise ValueError("total debit amount for batch %d too large, need to split" % batches)
+                else:
+                    raise ValueError("Unknown transaction code (%s) for payment %s" % (trans_code, pymnt))
+                lines.append(entry_detail % dict(
+                    code=trans_code, routing_nbr=pymnt.vendor_rtng, account=pymt.vendor_acct[-17:],
+                    amount=pymnt.amount, payee_id=pymnt.vendor_id[:15], payee_name=pymnt.vendor_name[:22],
+                    addenda=0, entry_number=batch_entries,
+                    ))
+            total_hash += batch_hash
+            lines.append(self.batch_control % dict(
+                entries=batch_entries, entry_hash=batch_hash%10**10,
+                debit=batch_debit, credit=batch_credit, batch_number=batches,
+                ))
+        lines.append(self.file_control % dict(
+            batches=batches, blocks=(len(lines)+10)//10,
+            entries=total_entries, entry_hash=total_hash%10**10,
+            debit=total_debit, credit=total_credit,
+            ))
+        with open(self.filename, 'w') as ach_file:
+            ach_file.write('\n'.join(lines) + '\n')
 
+
+class ACH_ETC(IntEnum):
+    """
+    Entry Transaction Codes
+    """
+    ck_credit = 22
+    ck_prenote_credit = 23
+    ck_debit = 27
+    ck_prenote_debit = 28
+    sv_credit = 32
+    sv_prenote_credit = 33
+    sv_debit = 37
+    sv_prenote_debit = 38
 
 class FederalHoliday(AutoEnum):
+    __order__ = 'NewYear MartinLutherKingJr President Memorial Independence Labor Columbus Veterans Thanksgiving Christmas'
     NewYear = "First day of the year.", 'absolute', Month.JANUARY, 1
     MartinLutherKingJr = "Birth of Civil Rights leader.", 'relative', Month.JANUARY, Weekday.MONDAY, 3
     President = "Birth of George Washington", 'relative', Month.FEBRUARY, Weekday.MONDAY, 3
@@ -853,3 +938,29 @@ class FederalHoliday(AutoEnum):
             if Weekday(holiday.isoweekday()) is self.day:
                 return holiday
 
+    @classmethod
+    def next_business_day(cls, date, days=1):
+        """
+        Return the next `days` business day from date.
+        """
+        holidays = cls.year(date.year)
+        years = set([date.year])
+        while days > 0:
+            date = date.replace(delta_day=1)
+            if date.year not in years:
+                holidays.extend(cls.year(date.year))
+                years.add(date.year)
+            if Weekday(date.isoweekday()) in (Weekday.SATURDAY, Weekday.SUNDAY) or date in holidays:
+                continue
+            days -= 1
+        return date
+
+    @classmethod
+    def year(cls, year):
+        """
+        Return a list of the actual FederalHoliday dates for `year`.
+        """
+        holidays = []
+        for fh in cls:
+            holidays.append(fh.date(year))
+        return holidays

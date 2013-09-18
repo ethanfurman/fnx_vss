@@ -60,6 +60,14 @@ class AutoEnum(enum.Enum):
             if name == member.name:
                 namespace[name] = member
 
+IntEnum = enum.IntEnum
+#class IntEnum(enum.IntEnum):
+#    def __new__(cls, value, *args):
+#        return super(IntEnum, cls).__new__(cls, value)
+#    def __init__(self, value, *args):
+#        if args:
+#            raise TypeError('%s not dealt with -- need custom __init__' % (args,))
+
 class Weekday(AutoEnum):
     __order__ = 'MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY SATURDAY SUNDAY'
     MONDAY = ()

@@ -1,5 +1,13 @@
 from VSS.BBxXlate.bbxfile import BBxFile
 from VSS.utils import one_day, text_to_date
+from VSS import AutoEnum
+
+GL_ACCT_REC = '1100-00'
+GL_CASH = '1000-15'
+GL_DISCOUNTS = '4100-00'
+DUMMY_CUSTOMER_ID = '001001'
+DUMMY_GL_ACCT = '1100-00'
+DISCOUNT_CUTOFF = 15
 
 #ARAgingLine = NamedTuple('ARAgingLine', 'cust_num cust_name trans_date desc trans_type inv_num gl_acct debit credit')
 
@@ -61,7 +69,7 @@ class ARInvoice(object):
         self._cust_name = rec.cust_name
         self._gl_acct = rec.gl_acct
         self._date = rec.trans_date
-        self.end_discount_date = rec.trans_date.replace(delta_month=1, day=15)
+        self.end_discount_date = rec.trans_date.replace(delta_month=1, day=DISCOUNT_CUTOFF)
         self._starred = rec.starred
         self._transactions = []
         if '1-INVCE' in rec.trans_type:
@@ -142,4 +150,190 @@ def ar_open_invoices(filename):
             result[num] = inv
     return result
 
-        
+class Inv(object):
+    def __init__(self, inv_num, amount, quality, discount, ar_inv):
+        self.inv_num = inv_num
+        self.amount = amount
+        self.quality = quality
+        self.discount = discount
+        self.ar_inv = ar_inv
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+        return self.inv_num == other.inv_num
+    def __ne__(self, other):
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+        return self.inv_num != other.inv_num
+    def __repr__(self):
+        return 'Inv# %s: %s' % (self.inv_num, self.amount)
+
+class FakeInv(ARInvoice):
+    """
+    Used when a match could not be found.
+    """
+    def __init__(self, cust_num, cust_name, inv_num, amount, trans_date, desc, gl_acct):
+        self._inv_num = self._actual_inv_num = inv_num
+        self._cust_num = cust_num
+        self._cust_name = cust_name
+        self._date = trans_date
+        self.end_discount_date = trans_date.replace(delta_month=1, day=DISCOUNT_CUTOFF)
+        self._starred = False
+        self._transactions = []
+        self._amount = amount
+        self._balance = amount
+        self._desc = desc
+        self._gl_acct = gl_acct
+    def __repr__(self):
+        return ('<FakeInv: cust_id=%r, name=%r, date=%r, inv_num=%r, balance=%r>'
+                % (self.cust_id, self.name, self.date, self.inv_num, self.balance))
+    @property
+    def desc(self):
+        return self._desc
+    @property
+    def transactions(self):
+        return list()
+
+
+class Batch(object):
+    """
+    A collection af `Inv`s that must balance to the creation amount.
+
+    """
+
+    def __init__(self, number, amount, date):
+        self.ck_nbr = number
+        self.ck_amt = amount
+        self.ck_date = date
+        self.transactions = []
+        self.discount_allowed = None
+
+    def __contains__(self, inv):
+        "inv should be either an AR_Invoice or an invoice number; compares against actual_inv_num"
+        if isinstance(inv, ARInvoice):
+            inv = inv.inv_num
+        return inv in [inv.inv_num for inv in self.transactions]
+
+    def __len__(self):
+        return len(self.transactions)
+
+    @property
+    def balance(self):
+        "amount of check - amount owed on all invoices (negative when discounts are taken)"
+        return self.ck_amt - self.total_paid
+
+    @property
+    def is_balanced(self):
+        return self.balance == 0 
+
+    @property
+    def total_owed(self):
+        total = 0
+        for inv in self.transactions:
+            total += inv.tru_inv.balance or inv.tru_inv.amount
+        return total
+
+    @property
+    def total_paid(self):
+        total = 0
+        for inv in self.transactions:
+            total += inv.amount
+        return total
+
+    def add_invoice(self, ar_inv, amount, quality, discount=0, replace=False):
+        self.discount_allowed = max(
+                self.discount_allowed,
+                self.ck_date <= ar_inv.end_discount_date,
+                )
+        inv_num = ar_inv.actual_inv_num
+        if inv_num in self and inv_num != self.ck_nbr:
+            if not replace:
+                raise ValueError("%s already in batch" % inv_num)
+            for invoice in self.transactions:
+                if invoice.inv_num == inv_num:
+                    invoice.amount = amount
+                    invoice.quality = quality
+                    break
+            else:
+                raise AssertionError('Invoice #%s passed _contains__, failed loop' % inv_num)
+        else:
+            self.transactions.append(Inv(inv_num, amount, quality, discount, ar_inv))
+
+    def balance_batch(self, amount=None):
+        if not self.transactions:
+            raise ValueError('cannot balance a batch with no invoices')
+        adjustment = self.ck_amt - self.total_paid
+        if self.is_balanced and amount in (0, None):
+            return
+        if amount is None:
+            # allow positive amounts equal to 1 penny per invoice
+            if adjustment > len(self):
+                raise ValueError("unable to balance batch")
+            amount = sum([inv.discount for inv in self.transactions]) or adjustment
+        if adjustment != amount:
+            raise ValueError('amount %s will not put batch in balance' % amount)
+        #print 6.1, amount
+        if abs(adjustment) <= len(self):
+            # write off pennies
+            desc = 'transcription error'
+            gl_acct = GL_DISCOUNTS
+        elif adjustment < 0:
+            #print 6.2
+            if self.discount_allowed:
+                #print 6.3
+                discount = 100 - int((float(self.ck_amt) / self.total_paid) * 100)
+                desc = '%d%% DISCOUNT TAKEN' % discount
+                gl_acct = GL_DISCOUNTS
+            else:
+                #print 6.4
+                recorded = False
+                for invoice in self.transactions:
+                    # find out if discounts have been recorded
+                    if invoice.discount:
+                        recorded = True
+                        amount = invoice.discount
+                        if amount < adjustment:
+                            amount = adjustment
+                        invoice.amount += amount
+                        adjustment -= amount
+                if not recorded:
+                    discount = 1 - (float(self.ck_amt) / self.total_paid)
+                    if discount < 0.01005:
+                        discount = -0.01005
+                    elif discount < 0.02005:
+                        discount = -0.02005
+                    for invoice in self.transactions:
+                        amount = int(invoice.amount * discount)
+                        if amount < adjustment:
+                            amount = adjustment
+                        invoice.amount += amount
+                        adjustment -= amount
+                return
+        else:
+            #print 6.5
+            desc = 'SERVICE CHARGE PAID'
+            gl_acct = GL_ACCT_REC
+        #print 6.6
+        inv_num = self.ck_nbr
+        template = self.transactions[0].ar_inv
+        invoice = FakeInv(
+                template.cust_id,
+                template.name,
+                inv_num,
+                adjustment,
+                template.date,
+                desc,
+                gl_acct
+                )
+        self.add_invoice(invoice, adjustment, excellent)
+
+
+class Status(AutoEnum):
+    __order__ = 'bad review okay good excellent'
+    excellent = ()
+    good = ()
+    okay = ()
+    review = ()
+    bad = ()
+globals().update(Status.__members__)
+

@@ -9,9 +9,10 @@ from types import MethodType
 from unittest import TestCase, main as Run
 
 from dbf import Date
+from VSS import Table
 from VSS.trulite import ARInvoice, ARAgingLine, ar_open_invoices, ar_invoices
-from VSS.utils import cszk
-from VSS.wellsfargo import RmInvoice, RmPayment, RMFFRecord, lockbox_payments, Int, FederalHoliday
+from VSS.utils import cszk, xrange
+from VSS.wellsfargo import RmInvoice, RmPayment, RMFFRecord, lockbox_payments, Int, FederalHoliday, ACHStore, ACHPayment, ACHFile, Batch
 
 
 cszk_tests = (
@@ -420,13 +421,118 @@ class TestFederalHoliday(TestCase):
                 ((2012, Date(2012, 12, 25)),(2013, Date(2013, 12, 25)),(2014, Date(2014, 12, 25)),(2015, Date(2015, 12, 25)),(2016, Date(2016, 12, 26)),(2017, Date(2017, 12, 25)))),
             )
 
-    def do_test(self, enum, year, date):
+
+    def _test_self_date(self, enum, year, date):
         self.assertEqual(enum.date(year), date)
 
     ns = vars()
-    for enum, values in values:
-        for year, date in values:
-            ns['test_%s_%d' % (enum.name, year)] = lambda self, enum=enum, year=year, date=date: self.do_test(enum, year, date)
+    for enum, dates in values:
+        for year, date in dates:
+            ns['test_%s_%d' % (enum.name, year)] = lambda self, enum=enum, year=year, date=date: self._test_self_date(enum, year, date)
+
+
+    def _test_holidays_by_year(self, year, holidays):
+        enum_holidays = tuple([e.date(year) for e in FederalHoliday])
+        self.assertEqual(enum_holidays, holidays)
+
+    enums = []
+    date_values = []
+    for enum, dates in values:
+        enums.append(enum)
+        target_year = []
+        for year, date in dates:
+            target_year.append(date)
+        date_values.append(target_year)
+    for yearly_holidays in zip(*date_values):
+        year = yearly_holidays[0].year
+        ns['test_%s_holidays' % year] = lambda self, year=year, holidays=yearly_holidays: self._test_holidays_by_year(year, holidays)
+
+    
+    next_business_day_values = (
+            (Date(2013, 12, 30), (Date(2013, 12, 31), Date(2014,  1,  2), Date(2014,  1,  3), Date(2014,  1,  6))),
+            (Date(2008,  3, 15), (Date(2008,  3, 17), Date(2008,  3, 18), Date(2008,  3, 19), Date(2008,  3, 20))),
+            (Date(2008,  3, 16), (Date(2008,  3, 17), Date(2008,  3, 18), Date(2008,  3, 19), Date(2008,  3, 20))),
+            (Date(2010,  5, 21), (Date(2010,  5, 25), Date(2010,  5, 26), Date(2010,  5, 27), Date(2010,  5, 28))),
+            )
+
+    def _test_next_business_day(self, current, forward, next):
+        self.assertEqual(FederalHoliday.next_business_day(current, forward), next)
+
+    for src_date, target_dates in next_business_day_values:
+        for i, tgt_date in enumerate(target_dates):
+            i += 1
+            ns['test_%s-%s-%s_forward_%d' % (src_date.year, src_date.month, src_date.day, i)] = (
+                lambda self, date=src_date, correct=tgt_date, forward=i: self._test_next_business_day(current=date, forward=forward, next=correct)
+                )
+
+class TestACH(TestCase):
+
+    ns = vars()
+
+    def setUp(self):
+        hndl, self.tmpfile = mkstemp()
+        os.close(hndl)
+        self.store = Table(self.tmpfile, 'filedate D; filemod C(1)', dbf_type='db3')
+        self.ACHStore = ACHStore(self.tmpfile)
+        self.today = Date.today()
+        self.file_id = '1900918292'
+        self.company_name = 'TRULITE WSG LLC'
+        self.company_id = self.file_id
+    
+    def tearDown(self):
+        os.remove(self.tmpfile)
+
+    def test_too_many_files(self):
+        with self.store:
+            self.store.append((self.today, 'Z'))
+        self.assertRaises(ValueError, self.ACHStore.get_achfile, self.company_name, self.company_id, self.file_id)
+
+    def test_empty_file(self):
+        filen = self.ACHStore.get_achfile(self.company_name, self.company_id, self.file_id)
+        with self.store:
+            self.assertEqual(self.store[-1], (self.today, 'A'))
+
+    def test_all_filenames(self):
+        for letter in xrange(start='A', count=26, step=lambda ltr: chr(ord(ltr)+1)):
+            filename = self.ACHStore.get_achfile(self.company_name, self.company_id, self.file_id).filename
+            self.assertEqual(filename, 'ACH_%s_%s' % (self.today.ymd(), letter))
+            with self.store:
+                self.assertEqual(self.store[-1], (self.today, letter))
+
+    routing_numbers = (
+            '076401251',
+            '123456120',
+            '987654320',
+            '369246576',
+            '864123592',
+            '192837644',
+            '641699773',
+            )
+
+    def _test_validate_routing(self, rtng):
+        bad_chk_digits = '0123456789'.replace(rtng[-1],'')
+        self.assertEqual(ACHPayment.validate_routing(rtng), None)
+        for bcd in bad_chk_digits:
+            rtng = rtng[:-1] + bcd
+            self.assertRaises(ValueError, ACHPayment.validate_routing, rtng)
+
+    for rn in routing_numbers:
+            ns['test_routing_number_%s' % rn] = (
+                lambda self, rn=rn: self._test_validate_routing(rtng=rn)
+                )
+
+
+    vendor1 = (
+            ('INVOICES', 'CCD', 'GLASS SOURCE', '123456', )
+            )
+    def test_single_vendor_single_payment(self):
+        ach_file = self.ACHStore.get_achfile(self.company_name, self.company_id, self.file_id)
+
+
+            #description, sec_code,
+            #vender_name, vendor_id, vendor_rtng, vendor_acct,
+            #transaction_type, vendor_acct_type, prenote_or_dollar, amount):
+
 
 if __name__ == '__main__':
     Run()
