@@ -8,12 +8,13 @@ from tempfile import mkstemp
 from types import MethodType
 from unittest import TestCase, main as Run
 
-from dbf import Date
+from dbf import Date, Time
 from VSS import Table
-from VSS.trulite import ARInvoice, ARAgingLine, ar_open_invoices, ar_invoices
+from VSS.trulite import ARInvoice, ARAgingLine, ar_open_invoices, ar_invoices, Batch
 from VSS.utils import cszk, xrange
-from VSS.wellsfargo import RmInvoice, RmPayment, RMFFRecord, lockbox_payments, Int, FederalHoliday, ACHStore, ACHPayment, ACHFile, Batch
+from VSS.wellsfargo import RmInvoice, RmPayment, RMFFRecord, lockbox_payments, Int, FederalHoliday, ACHStore, ACHPayment, ACHFile, ACH_ETC, Customer
 
+globals().update(Customer.__members__)
 
 cszk_tests = (
 
@@ -522,16 +523,155 @@ class TestACH(TestCase):
                 )
 
 
-    vendor1 = (
-            ('INVOICES', 'CCD', 'GLASS SOURCE', '123456', )
+    vendors = (
+            ('INVOICES', 'CCD', 'GLASS SOURCE', '123456', '369246576', '8172904027', ACH_ETC.ck_credit, 'domestic', 100),
+            ('INVOICES', 'CCD', 'GLASS SOURCE', '246855', '369246576', '8172904027', ACH_ETC.ck_credit, 'domestic', 37118),
+            ('INVOICES', 'CCD', 'Super Silica Sands', '987654', '123456120', '24584196', ACH_ETC.ck_credit, 'domestic', 299),
+            ('supplies', 'CCD', 'Wax on Wax off', '192837', '641699773', '1642615987224584196', ACH_ETC.ck_credit, 'domestic', 795),
+            ('Supplies', 'CCD', 'ACME Glass and Coffee Grounds', '579135', '369246576', '9154876', ACH_ETC.ck_credit, 'domestic', 25),
             )
     def test_single_vendor_single_payment(self):
+        target = [
+                '101 0910000191900918292YYYYYYTTTTA094101WELLS FARGO            TRULITE WSG LLC                ',
+                '5200TRULITE WSG LLC                     1900918292CCDINVOICES  yyyyyyYYYYYY   1091000010000001',
+                '6223692465768172904027       0000000100123456         GLASS SOURCE            0091000010000001',
+                '8CCD00000100369246570000000000000000000001001900918292                         091000010000001',
+                '9000001000001000000010036924657000000000000000000000100                                       ',
+                ]
+
         ach_file = self.ACHStore.get_achfile(self.company_name, self.company_id, self.file_id)
+        today = ach_file.today
+        time = ach_file.time
+        next_business_day = FederalHoliday.next_business_day(today, 2)
+        target[0] = target[0].replace('YYYYYY', today.strftime('%y%m%d')).replace('TTTT', time.strftime('%H%M'))
+        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
+        payment = ACHPayment(*self.vendors[0])
+        ach_file.add_payment(payment)
+        ach_file.close()
+        with open(ach_file.filename) as file:
+            contents = file.read()
+        lines = contents.split('\n')
+        for should_be, found in zip(target, lines):
+            self.assertEqual(should_be, found)
+
+    def test_single_vendor_multi_payment(self):
+        target = [
+                '101 0910000191900918292YYYYYYTTTTA094101WELLS FARGO            TRULITE WSG LLC                ',
+                '5200TRULITE WSG LLC                     1900918292CCDINVOICES  yyyyyyYYYYYY   1091000010000001',
+                '6223692465768172904027       0000000100123456         GLASS SOURCE            0091000010000001',
+                '6223692465768172904027       0000037118246855         GLASS SOURCE            0091000010000002',
+                '8CCD00000200738493140000000000000000000372181900918292                         091000010000001',
+                '9000001000001000000020073849314000000000000000000037218                                       ',
+                ]
+
+        ach_file = self.ACHStore.get_achfile(self.company_name, self.company_id, self.file_id)
+        today = ach_file.today
+        time = ach_file.time
+        next_business_day = FederalHoliday.next_business_day(today, 2)
+        target[0] = target[0].replace('YYYYYY', today.strftime('%y%m%d')).replace('TTTT', time.strftime('%H%M'))
+        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
+        ach_file.add_payment(ACHPayment(*self.vendors[0]))
+        ach_file.add_payment(ACHPayment(*self.vendors[1]))
+        ach_file.close()
+        with open(ach_file.filename) as file:
+            contents = file.read()
+        lines = contents.split('\n')
+        for should_be, found in zip(target, lines):
+            self.assertEqual(should_be, found)
+
+    def test_multi_vendor_multi_payment(self):
+        target = [
+                '101 0910000191900918292YYYYYYTTTTA094101WELLS FARGO            TRULITE WSG LLC                ',
+                '5200TRULITE WSG LLC                     1900918292CCDINVOICES  yyyyyyYYYYYY   1091000010000001',
+                '6223692465768172904027       0000000100123456         GLASS SOURCE            0091000010000001',
+                '6223692465768172904027       0000037118246855         GLASS SOURCE            0091000010000002',
+                '62212345612024584196         0000000299987654         SUPER SILICA SANDS      0091000010000003',
+                '8CCD00000300861949260000000000000000000375171900918292                         091000010000001',
+                '9000001000001000000030086194926000000000000000000037517                                       ',
+                ]
+
+        ach_file = self.ACHStore.get_achfile(self.company_name, self.company_id, self.file_id)
+        today = ach_file.today
+        time = ach_file.time
+        next_business_day = FederalHoliday.next_business_day(today, 2)
+        target[0] = target[0].replace('YYYYYY', today.strftime('%y%m%d')).replace('TTTT', time.strftime('%H%M'))
+        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
+        ach_file.add_payment(ACHPayment(*self.vendors[0]))
+        ach_file.add_payment(ACHPayment(*self.vendors[1]))
+        ach_file.add_payment(ACHPayment(*self.vendors[2]))
+        ach_file.close()
+        with open(ach_file.filename) as file:
+            contents = file.read()
+        lines = contents.split('\n')
+        for should_be, found in zip(target, lines):
+            self.assertEqual(should_be, found)
+
+    def test_multi_batch(self):
+        target = [
+                '101 0910000191900918292YYYYYYTTTTA094101WELLS FARGO            TRULITE WSG LLC                ',
+                '5200TRULITE WSG LLC                     1900918292CCDINVOICES  yyyyyyYYYYYY   1091000010000001',
+                '6223692465768172904027       0000000100123456         GLASS SOURCE            0091000010000001',
+                '6223692465768172904027       0000037118246855         GLASS SOURCE            0091000010000002',
+                '62212345612024584196         0000000299987654         SUPER SILICA SANDS      0091000010000003',
+                '8CCD00000300861949260000000000000000000375171900918292                         091000010000001',
+                '5200TRULITE WSG LLC                     1900918292CCDSUPPLIES  yyyyyyYYYYYY   1091000010000002',
+                '622641699773426159872245841960000000795192837         WAX ON WAX OFF          0091000010000001',
+                '8CCD00000100641699770000000000000000000007951900918292                         091000010000002',
+                '9000002000001000000040150364903000000000000000000038312                                       ',
+                ]
+
+        ach_file = self.ACHStore.get_achfile(self.company_name, self.company_id, self.file_id)
+        today = ach_file.today
+        time = ach_file.time
+        next_business_day = FederalHoliday.next_business_day(today, 2)
+        target[0] = target[0].replace('YYYYYY', today.strftime('%y%m%d')).replace('TTTT', time.strftime('%H%M'))
+        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
+        target[6] = target[6].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
+        ach_file.add_payment(ACHPayment(*self.vendors[0]))
+        ach_file.add_payment(ACHPayment(*self.vendors[1]))
+        ach_file.add_payment(ACHPayment(*self.vendors[2]))
+        ach_file.add_payment(ACHPayment(*self.vendors[3]))
+        ach_file.close()
+        with open(ach_file.filename) as file:
+            contents = file.read()
+        lines = contents.split('\n')
+        for should_be, found in zip(target, lines):
+            self.assertEqual(should_be, found)
+
+    def test_multi_batch2(self):
+        target = [
+                '101 0910000191900918292YYYYYYTTTTA094101WELLS FARGO            TRULITE WSG LLC                ',
+                '5200TRULITE WSG LLC                     1900918292CCDINVOICES  yyyyyyYYYYYY   1091000010000001',
+                '6223692465768172904027       0000000100123456         GLASS SOURCE            0091000010000001',
+                '6223692465768172904027       0000037118246855         GLASS SOURCE            0091000010000002',
+                '62212345612024584196         0000000299987654         SUPER SILICA SANDS      0091000010000003',
+                '8CCD00000300861949260000000000000000000375171900918292                         091000010000001',
+                '5200TRULITE WSG LLC                     1900918292CCDSUPPLIES  yyyyyyYYYYYY   1091000010000002',
+                '622641699773426159872245841960000000795192837         WAX ON WAX OFF          0091000010000001',
+                '6223692465769154876          0000000025579135         ACME GLASS AND COFFEE   0091000010000002',
+                '8CCD00000201010946340000000000000000000008201900918292                         091000010000002',
+                '9000002000002000000050187289560000000000000000000038337                                       ',
+                ]
 
 
-            #description, sec_code,
-            #vender_name, vendor_id, vendor_rtng, vendor_acct,
-            #transaction_type, vendor_acct_type, prenote_or_dollar, amount):
+        ach_file = self.ACHStore.get_achfile(self.company_name, self.company_id, self.file_id)
+        today = ach_file.today
+        time = ach_file.time
+        next_business_day = FederalHoliday.next_business_day(today, 2)
+        target[0] = target[0].replace('YYYYYY', today.strftime('%y%m%d')).replace('TTTT', time.strftime('%H%M'))
+        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
+        target[6] = target[6].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
+        ach_file.add_payment(ACHPayment(*self.vendors[0]))
+        ach_file.add_payment(ACHPayment(*self.vendors[1]))
+        ach_file.add_payment(ACHPayment(*self.vendors[2]))
+        ach_file.add_payment(ACHPayment(*self.vendors[3]))
+        ach_file.add_payment(ACHPayment(*self.vendors[4]))
+        ach_file.close()
+        with open(ach_file.filename) as file:
+            contents = file.read()
+        lines = contents.split('\n')
+        for should_be, found in zip(target, lines):
+            self.assertEqual(should_be, found)
 
 
 if __name__ == '__main__':

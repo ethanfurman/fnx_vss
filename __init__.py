@@ -32,7 +32,9 @@ class AutoEnum(enum.Enum):
         obj._value = value
         return obj
     def __init__(self, *args):
-        if args:
+        if len(args) == 1 and isinstance(args[0], (str, unicode)):
+            self.__doc__ = args[0]
+        elif args:
             raise TypeError('%s not dealt with -- need custom __init__' % (args,))
     def __index__(self):
         return self.value

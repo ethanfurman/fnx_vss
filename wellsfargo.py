@@ -4,6 +4,7 @@ try:
     from dbf import next, property
 except ImportError:
     pass
+from itertools import groupby
 from path import Path
 from VSS.BBxXlate.bbxfile import BBxFile
 from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time, xrange, Date, Time
@@ -758,10 +759,21 @@ class ACHPayment(object):
 
     def __init__(self,
             description, sec_code, 
-            vender_name, vendor_id, vendor_rtng, vendor_acct,
-            transaction_type, vendor_acct_type, prenote_or_dollar, amount):
+            vendor_name, vendor_inv_num, vendor_rtng, vendor_acct,
+            transaction_code, vendor_acct_type, amount):
+        """
+        description:  10 chars
+        sec_code: CCD or CTX
+        vendor_name: 22 chars
+        vendor_inv_num: 15 chars
+        vendor_rtng: 9 chars
+        vendor_acct: 17 chars
+        transaction_code: ACH_ETC code
+        vendor_acct_type: 'domestic' or 'foreign'
+        amount: 10 digits (pennies)
+        """
         args = locals()
-        args.remove('self')
+        args.pop('self')
         for attr, value in args.items():
             if isinstance(value, (unicode, str)):
                 value = value.upper()
@@ -783,11 +795,13 @@ class ACHFile(object):
 
     file_header = '101 091000019%(id)s%(date)s%(time)s%(id_mod)s094101WELLS FARGO            %(company)-23s        '
     batch_header = '5200%(company)-16s%(discretionary)-20s%(company_id)s%(sec)s%(description)-10s%(ref_date)-6s%(eff_date)s   109100001%(batch_number)07d'
-    entry_detail = '6%(code)d%s(routing_nbr)s%(account)-17s%(amount)010d%(payee_id)-15s%(payee_name)-22s  %(addenda)d09100001%(entry_number)07d'
+    entry_detail = '6%(code)d%(routing_nbr)s%(account)-17s%(amount)010d%(payee_id)-15s%(payee_name)-22s  %(addenda)d09100001%(entry_number)07d'
     batch_control = '8%(sec)s%(entries)06d%(entry_hash)010d%(debit)012d%(credit)012d1900918292                         09100001%(batch_number)07d'
     file_control = '9%(batches)06d%(blocks)06d%(entries)08d%(entry_hash)010d%(debit)012d%(credit)012d                                       '
 
     def __init__(self, company_name, company_id, file_id, filename, modifier):
+        self.today = Date.today()
+        self.time = Time.now()
         self.company_name = company_name.upper()
         self.company_id = company_id.upper()
         self.file_id = file_id.upper()
@@ -797,17 +811,16 @@ class ACHFile(object):
         self.lines = [
                 self.file_header % dict(
                     id=file_id,
-                    date=str(Date.today())[2:], time=Time.now().strftime('%H%M'),
+                    date=self.today.strftime('%y%m%d'), time=self.time.strftime('%H%M'),
                     id_mod=modifier, company=self.company_name[:23],
                     )]
-        self.today = Date.today()
         self.open = True
 
     def __repr__(self):
         return "<%s(%r, %r)>" % (self.__class__.__name__, self.filename, self.modifier)
 
     def add_payment(self, payment):
-        if not self.open():
+        if not self.open:
             raise ValueError("%r is closed" % self)
         self.payments.append(payment)
 
@@ -815,16 +828,15 @@ class ACHFile(object):
         """
         Create the file, write the entries, close the file.
         """
-        ref_date = Date.today().strftime('%b %d')
+        ref_date = self.today.strftime('%b %d').upper()
         lines = self.lines
-        #last_payment = payments[0]
         batches = 0
         total_blocks = 0
         total_entries = 0
         total_hash = 0
         total_debit = 0
         total_credit = 0
-        eff_date = FederalHoliday.next_business_day(self.today, days=2)
+        eff_date = FederalHoliday.next_business_day(self.today, days=2).strftime('%y%m%d')
 
         def pdscd(rec):
             return rec.sec_code, rec.description
@@ -847,12 +859,12 @@ class ACHFile(object):
             for pymnt in group:
                 total_entries += 1
                 batch_entries += 1
-                batch_hash += int(pymnt.vendor_rtng)
+                batch_hash += int(pymnt.vendor_rtng) // 10
                 if total_entries > 10**8:
                     raise ValueError("Too many entries for file, need to split")
                 if batch_entries > 10**6:
                     raise ValueError("Too many entries for batch %d, need to split" % batches)
-                trans_code = pymnt.transaction_type
+                trans_code = pymnt.transaction_code
                 if trans_code in (ACH_ETC.ck_credit, ACH_ETC.ck_prenote_credit, ACH_ETC.sv_credit, ACH_ETC.sv_prenote_credit):
                     total_credit += pymnt.amount
                     batch_credit += pymnt.amount
@@ -869,13 +881,14 @@ class ACHFile(object):
                         raise ValueError("total debit amount for batch %d too large, need to split" % batches)
                 else:
                     raise ValueError("Unknown transaction code (%s) for payment %s" % (trans_code, pymnt))
-                lines.append(entry_detail % dict(
-                    code=trans_code, routing_nbr=pymnt.vendor_rtng, account=pymt.vendor_acct[-17:],
-                    amount=pymnt.amount, payee_id=pymnt.vendor_id[:15], payee_name=pymnt.vendor_name[:22],
+                lines.append(self.entry_detail % dict(
+                    code=trans_code, routing_nbr=pymnt.vendor_rtng, account=pymnt.vendor_acct[-17:],
+                    amount=pymnt.amount, payee_id=pymnt.vendor_inv_num[:15], payee_name=pymnt.vendor_name[:22],
                     addenda=0, entry_number=batch_entries,
                     ))
             total_hash += batch_hash
             lines.append(self.batch_control % dict(
+                sec=sec_code,
                 entries=batch_entries, entry_hash=batch_hash%10**10,
                 debit=batch_debit, credit=batch_credit, batch_number=batches,
                 ))
@@ -887,6 +900,9 @@ class ACHFile(object):
         with open(self.filename, 'w') as ach_file:
             ach_file.write('\n'.join(lines) + '\n')
 
+class Customer(AutoEnum):
+    domestic = "Customer, and customer's bank, are located in the US"
+    foreign = "Customer, and/or customer's bank, are located outside the US"
 
 class ACH_ETC(IntEnum):
     """
