@@ -2,7 +2,12 @@
 Bbx File utilities.
 """
 
-import os, string
+from fnx import path
+import logging
+import os
+import string
+
+_logger = logging.getLogger('BBx')
 
 def asc(strval):                    ##USED in bbxfile
     if len(strval) == 0:
@@ -37,6 +42,10 @@ def applyfieldmap(record, fieldmap):
     return retval
 
 
+def unicode_strip(text):
+    return unicode(text).strip()
+
+
 class BBxRec(object):
     # define datamap as per the iolist in the subclasses
     datamap = "iolist here".split(",")
@@ -54,19 +63,11 @@ class BBxRec(object):
         if isinstance(ref, (int, long)):
             ref, mask = self.fieldlist[ref][3:5]
             ref = [ref]
-            if mask and ',0)' not in mask:
-                masks = ["%%%s.%sf" % tuple(mask[1:-1].split(','))]
-            else:
-                masks = ['%s']
+            masks = [mask]
             single = True
         elif isinstance(ref, slice):
             ref = [r[3] for r in self.fieldlist[ref]]
             masks = [r[4] for r in self.fieldlist[ref]]
-            for i, mask in enumerate(masks):
-                if mask and ',0)' not in mask:
-                    masks[i] = ["%%%s.%sf" % tuple(mask[1:-1].split(','))]
-                else:
-                    masks[i] = ['%s']
             single = False
         else:
             ref = ref.title()
@@ -77,13 +78,16 @@ class BBxRec(object):
             else:
                 raise ValueError('%s is not a valid field' % ref)
             ref = [ref]
-            if mask and ',0)' not in mask:
-                masks = ["%%%s.%sf" % tuple(mask[1:-1].split(','))]
-            else:
-                masks = ['%s']
+            masks = [mask]
             single = True
         result = []
         for r, m in zip(ref, masks):
+            if m and ',0' in m:
+                cls = int
+            elif m:
+                cls = float
+            else:
+                cls = unicode_strip
             if r in self.datamap:
                 var, sub = r, ''
             else:
@@ -97,12 +101,12 @@ class BBxRec(object):
                 sub = sub[:-1]
                 first,last = [ int(x) for x in sub.split(",") ]
                 val = val[first-1:first+last-1]
-            if 'f' in m:
-                try:
-                    val = float(val)
-                except ValueError:
-                    m = '<%s>'
-            result.append((m % val).strip())
+            try:
+                result.append(cls(val))
+            except Exception:
+                _logger.error(repr(self))
+                _logger.exception('unable to convert, data lost')
+                result.append(cls())
         if single:
             return result[0]
         return result
@@ -235,6 +239,12 @@ class BBxFile(object):
                 pieces.append("%s=%r" % (attr, value))
         return "BBxFile(%s)" % (', '.join(pieces) + "[%d records]" % len(self.records))
 
+    def get(self, ky, sentinel=None):
+        try:
+            return self[ky]
+        except KeyError:
+            return sentinel
+
     def get_subset(self, ky):
         if not self.subset:
             raise ValueError('subset not defined')
@@ -261,7 +271,20 @@ class BBxFile(object):
         return iter(xx)
 
 
-def getfile(filename=None, fieldmap=None):
+def getfilename(target):
+    files = path.glob(target.path + target.base[:5] + '*')
+    possibles = []
+    for file in files:
+        if len(file.base) in (4, 5):
+            if file.ext.lower() in ('', '.txt'):
+                possibles.append(file)
+
+    files.sort(key=len, reverse=True)
+    target = files[0]
+    return target
+
+
+def getfile(filename, fieldmap=None):
     """
 Read BBx Mkeyed, Direct or Indexed file and return it as a dictionary.
 
@@ -269,27 +292,27 @@ Format: target = getfile([src_dir]filename [,fieldmap = {0:'field 0 name',3:'fie
 Notes:  The entire file is read into memory.
         Returns None on error opening file.
     """
-    default_file = r'C:\Zope\v2.4\Extensions\WSGSourceData\ICCXF0'
-
-    default_srce_loc, default_filename = os.path.split(default_file)
-    if filename:
-        srce_loc, filename = os.path.split(filename)
-        if srce_loc == '': srce_loc = default_srce_loc
-    else:
-        srce_loc, filename = os.path.split(default_file)
 
     try:
         data = open(filename,'rb').read()
     except:
-        try:
-            data = open(srce_loc + os.sep + filename,'rb').read()
-        except:
-            print "(srce_loc, filename)", (srce_loc, filename)
-            raise Exception("File not found or read/permission error. (%s: %s)" % (filename, srce_loc))
+        raise Exception("File not found or read/permission error: %s") % (filename, )
 
     #hexdump(data)
     #raise "Breaking..."
 
+    # handle case where filename has been converted to a simple tab-delimited text file
+    if filename[-4:].lower() == '.txt':
+        key_map = {}
+        data = data.split('\n')
+        if not data[-1]:
+            data = data[:-1]
+        for line in data:
+            fields = line.split('\t')
+            key_map[fields[0]] = fields
+        return key_map
+
+    # handle normal case of Business Basic file
     blocksize = 512
     reclen = int(asc(data[13:15]))
     reccount = int(asc(data[9:13]))

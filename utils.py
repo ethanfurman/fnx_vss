@@ -1,9 +1,13 @@
 import binascii
 import datetime
+import dbf
+import enum
 import smtplib
 import string
 import syslog
+from datetime import date, timedelta
 from dbf import Date, Time
+from decimal import Decimal
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -12,7 +16,7 @@ from email.Encoders import encode_base64
 String = str, unicode
 Integer = int, long
 
-one_day = datetime.timedelta(1)
+one_day = timedelta(1)
 
 spelled_out_numbers = set(['ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN'])
 
@@ -283,6 +287,90 @@ except:
             "od.viewitems() -> a set-like object providing a view on od's items"
             return ItemsView(self)
 
+def Table(*args, **kwargs):
+    'default to Clipper, Char, Logical, etc'
+    data_types = {
+            'C' : dbf.Char,
+            'L' : dbf.Logical,
+            'D' : dbf.Date,
+            }
+    if 'default_data_types' in kwargs:
+        data_types.update(kwargs['default_data_types'])
+    kwargs['default_data_types'] = data_types
+    kwargs['dbf_type'] = 'clp'
+    if (len(args) > 1 or kwargs.get('field_specs') is not None) \
+    and ('codepage' not in kwargs):
+        kwargs['codepage'] = 'utf8'
+    return dbf.Table(*args, **kwargs)
+
+def days_per_month(year):
+    return (dbf.days_per_month, dbf.days_per_leap_month)[dbf.is_leapyear(year)]
+
+class AutoEnum(enum.Enum):
+    __last_number__ = 0
+    def __new__(cls, *args):
+        value = cls.__last_number__ + 1
+        cls.__last_number__ = value
+        obj = object.__new__(cls)
+        obj._value_ = value
+        return obj
+    def __init__(self, *args):
+        if len(args) == 1 and isinstance(args[0], (str, unicode)):
+            self.__doc__ = args[0]
+        elif args:
+            raise TypeError('%s not dealt with -- need custom __init__' % (args,))
+    def __index__(self):
+        return self.value
+    def __int__(self):
+        return self.value
+    def __ge__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value >= other.value
+        return NotImplemented
+    def __gt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value > other.value
+        return NotImplemented
+    def __le__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value <= other.value
+        return NotImplemented
+    def __lt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value < other.value
+        return NotImplemented
+    @classmethod
+    def export(cls, namespace):
+        for name, member in cls.__members__.items():
+            if name == member.name:
+                namespace[name] = member
+
+IntEnum = enum.IntEnum
+
+class Weekday(AutoEnum):
+    __order__ = 'MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY SATURDAY SUNDAY'
+    MONDAY = ()
+    TUESDAY = ()
+    WEDNESDAY = ()
+    THURSDAY = ()
+    FRIDAY = ()
+    SATURDAY = ()
+    SUNDAY = ()
+
+class Month(AutoEnum):
+    __order__ = 'JANUARY FEBRUARY MARCH APRIL MAY JUNE JULY AUGUST SEPTEMBER OCTOBER NOVEMBER DECEMBER'
+    JANUARY = ()
+    FEBRUARY = ()
+    MARCH = ()
+    APRIL = ()
+    MAY = ()
+    JUNE = ()
+    JULY = ()
+    AUGUST = ()
+    SEPTEMBER = ()
+    OCTOBER = ()
+    NOVEMBER = ()
+    DECEMBER = ()
 
 
 def all_equal(iterator, test=None):
@@ -528,6 +616,7 @@ addr_abbr = {
         'po.'       : 'po',
         'p.o.box'   : 'po box',
         'po.box'    : 'po box',
+        'pobox'     : 'po box',
         'pob'       : 'po box',
         }
 
@@ -781,6 +870,7 @@ country_abbr = {
     "AE":  "UNITED ARAB EMIRATES",
     "UK":  "UNITED KINGDOM",
     "GB":  "UNITED KINGDOM",
+    "ENGLAND":  "UNITED KINGDOM",
     "US":  "UNITED STATES",
     "UM":  "UNITED STATES MINOR OUTLYING ISLANDS",
     "UY":  "URUGUAY",
@@ -818,6 +908,7 @@ def cszk(line1, line2):
       returns street, city, state, zip, country; but state is only
       populated if country is US or CA
     """
+    line1, line2 = Sift(line1.replace('.',' ').replace(',',' '), line2.replace('.',' ').replace(',',' '))
     street = city = state = postal = country = ''
     try:
         pieces, line2 = line2.split(), ''
@@ -825,7 +916,7 @@ def cszk(line1, line2):
         while pieces:
             new_k = pieces.pop().upper()
             if has_digits(new_k):
-                city = k.strip(', ')
+                city = k
                 pieces.append(new_k)
                 break
             k = (new_k + ' ' + k).strip()
@@ -838,19 +929,15 @@ def cszk(line1, line2):
                 break
             else:
                 # check for a state
-                if k.replace('.','') in us_ca_state_abbr:
-                    k = us_ca_state_abbr[k.replace('.','')]
+                if k in us_ca_state_abbr:
+                    k = us_ca_state_abbr[k]
                 if k in us_ca_state_name:
                     state = k
                     break
         else:
             pieces = k.split()
-        if pieces and pieces[-1] == ',':
-            pieces.pop()
         if not pieces:
             pieces, line1 = line1.split(), ''
-        if pieces and pieces[-1] == ',':
-            pieces.pop()
         if has_digits(pieces[-1]) or len(pieces[-1]) == 3:  # zip code!
             if len(pieces) > 1 and (has_digits(pieces[-2]) or len(pieces[-2]) == 3):
                 postal = PostalCode(' '.join(pieces[-2:]), country=country)
@@ -859,24 +946,37 @@ def cszk(line1, line2):
                 postal = PostalCode(pieces.pop(), country=country)
         if not pieces:
             pieces, line1 = line1.split(), ''
-        s = pieces.pop()  # now looking for a state
-        if s[-1] == ')':
-            if s[0] == '(':
-                s = s[1:-1]
-            elif len(pieces) > 1 and pieces[-2][0] == '(':
-                s = pieces.pop()[1:] + ' ' + s[:-1]
-        else: # parens not found, scan for comma
-            for i, p in enumerate(pieces[::-1]):
-                if p.endswith(','):
-                    break
-                s = (p + ' ' + s).strip()
-                pieces.pop()
-        if s.replace('.','') in us_ca_state_abbr:
-            s = us_ca_state_abbr[s.replace('.','')]
-        if s in us_ca_state_name:
-            state = s
+        if not country and pieces[-1] == 'CANADA' and (len(pieces) == 1 or pieces[-2] != 'OF'):
+            country = 'CANADA'
+            pieces.pop()
+        elif not country and pieces[-1] not in us_ca_state_abbr and (
+                pieces[-1] in country_name or pieces[-1] in country_abbr):
+            country = country_abbr.get(pieces[-1], pieces[-1])
+            pieces.pop()
+        if not pieces:
+            pieces, line1 = line1.split(), ''
+        if country not in ('CANADA', ''):
+            city = (' '.join(pieces) + city).strip(' ,')
+            pieces = []
         else:
-            city = (s + ' ' + city).strip(', ')
+            s = pieces.pop()  # now looking for a state
+            while s not in us_ca_state_abbr and s not in us_ca_state_name:
+                if s[-1] == ')':
+                    if s[0] == '(':
+                        s = s[1:-1]
+                        continue
+                elif pieces and pieces[-1][-1:] == ',':
+                    break
+                if pieces:
+                    s = (pieces.pop() + ' ' + s).strip()
+                else:
+                    break
+            if s in us_ca_state_abbr:
+                s = us_ca_state_abbr[s]
+            if s in us_ca_state_name:
+                state = s
+            else:
+                city = (s + ' ' + city).strip(', ')
         # see if state is canadian
         if state in ca_province_name and not country:
             country = 'CANADA'
@@ -899,6 +999,928 @@ def cszk(line1, line2):
             raise
         return street, city, state, postal, country
 
+
+usps_street_suffix_common = {
+	'ALLEE'      :  'ALLEY',
+	'ALLEY'      :  'ALLEY',
+	'ALLY'       :  'ALLEY',
+	'ALY'        :  'ALLEY',
+	'ANEX'       :  'ANNEX',
+	'ANNEX'      :  'ANNEX',
+	'ANNEX'      :  'ANNEX',
+	'ANX'        :  'ANNEX',
+	'ARC'        :  'ARCADE',
+	'ARCADE'     :  'ARCADE',
+	'AV'         :  'AVENUE',
+	'AVE'        :  'AVENUE',
+	'AVEN'       :  'AVENUE',
+	'AVENU'      :  'AVENUE',
+	'AVENUE'     :  'AVENUE',
+	'AVN'        :  'AVENUE',
+	'AVNUE'      :  'AVENUE',
+	'BAYOO'      :  'BAYOO',
+	'BAYOU'      :  'BAYOO',
+	'BCH'        :  'BEACH',
+	'BEACH'      :  'BEACH',
+	'BEND'       :  'BEND',
+	'BND'        :  'BEND',
+	'BLF'        :  'BLUFF',
+	'BLUF'       :  'BLUFF',
+	'BLUFF'      :  'BLUFF',
+	'BLUFFS'     :  'BLUFFS',
+	'BOT'        :  'BOTTOM',
+	'BOTTM'      :  'BOTTOM',
+	'BOTTOM'     :  'BOTTOM',
+	'BTM'        :  'BOTTOM',
+	'BLVD'       :  'BOULEVARD',
+	'BOUL'       :  'BOULEVARD',
+	'BOULEVARD'  :  'BOULEVARD',
+	'BOULV'      :  'BOULEVARD',
+	'BR'         :  'BRANCH',
+	'BRANCH'     :  'BRANCH',
+	'BRNCH'      :  'BRANCH',
+	'BRDGE'      :  'BRIDGE',
+	'BRG'        :  'BRIDGE',
+	'BRIDGE'     :  'BRIDGE',
+	'BRK'        :  'BROOK',
+	'BROOK'      :  'BROOK',
+	'BROOKS'     :  'BROOKS',
+	'BURG'       :  'BURG',
+	'BURGS'      :  'BURGS',
+	'BYP'        :  'BYPASS',
+	'BYPA'       :  'BYPASS',
+	'BYPAS'      :  'BYPASS',
+	'BYPASS'     :  'BYPASS',
+	'BYPS'       :  'BYPASS',
+	'CAMP'       :  'CAMP',
+	'CMP'        :  'CAMP',
+	'CP'         :  'CAMP',
+	'CANYN'      :  'CANYON',
+	'CANYON'     :  'CANYON',
+	'CNYN'       :  'CANYON',
+	'CYN'        :  'CANYON',
+	'CAPE'       :  'CAPE',
+	'CPE'        :  'CAPE',
+	'CAUSEWAY'   :  'CAUSEWAY',
+	'CAUSWAY'    :  'CAUSEWAY',
+	'CSWY'       :  'CAUSEWAY',
+	'CEN'        :  'CENTER',
+	'CENT'       :  'CENTER',
+	'CENTER'     :  'CENTER',
+	'CENTR'      :  'CENTER',
+	'CENTRE'     :  'CENTER',
+	'CNTER'      :  'CENTER',
+	'CNTR'       :  'CENTER',
+	'CTR'        :  'CENTER',
+	'CENTERS'    :  'CENTERS',
+	'CIR'        :  'CIRCLE',
+	'CIRC'       :  'CIRCLE',
+	'CIRCL'      :  'CIRCLE',
+	'CIRCLE'     :  'CIRCLE',
+	'CRCL'       :  'CIRCLE',
+	'CRCLE'      :  'CIRCLE',
+	'CIRCLES'    :  'CIRCLES',
+	'CLF'        :  'CLIFF',
+	'CLIFF'      :  'CLIFF',
+	'CLFS'       :  'CLIFFS',
+	'CLIFFS'     :  'CLIFFS',
+	'CLB'        :  'CLUB',
+	'CLUB'       :  'CLUB',
+	'COMMON'     :  'COMMON',
+	'COR'        :  'CORNER',
+	'CORNER'     :  'CORNER',
+	'CORNERS'    :  'CORNERS',
+	'CORS'       :  'CORNERS',
+	'COURSE'     :  'COURSE',
+	'CRSE'       :  'COURSE',
+	'COURT'      :  'COURT',
+	'CRT'        :  'COURT',
+	'CT'         :  'COURT',
+	'COURTS'     :  'COURTS',
+	'CT'         :  'COURTS',
+	'COVE'       :  'COVE',
+	'CV'         :  'COVE',
+	'COVES'      :  'COVES',
+	'CK'         :  'CREEK',
+	'CR'         :  'CREEK',
+	'CREEK'      :  'CREEK',
+	'CRK'        :  'CREEK',
+	'CRECENT'    :  'CRESCENT',
+	'CRES'       :  'CRESCENT',
+	'CRESCENT'   :  'CRESCENT',
+	'CRESENT'    :  'CRESCENT',
+	'CRSCNT'     :  'CRESCENT',
+	'CRSENT'     :  'CRESCENT',
+	'CRSNT'      :  'CRESCENT',
+	'CREST'      :  'CREST',
+	'CROSSING'   :  'CROSSING',
+	'CRSSING'    :  'CROSSING',
+	'CRSSNG'     :  'CROSSING',
+	'XING'       :  'CROSSING',
+	'CROSSROAD'  :  'CROSSROAD',
+	'CURVE'      :  'CURVE',
+	'DALE'       :  'DALE',
+	'DL'         :  'DALE',
+	'DAM'        :  'DAM',
+	'DM'         :  'DAM',
+	'DIV'        :  'DIVIDE',
+	'DIVIDE'     :  'DIVIDE',
+	'DV'         :  'DIVIDE',
+	'DVD'        :  'DIVIDE',
+	'DR'         :  'DRIVE',
+	'DRIV'       :  'DRIVE',
+	'DRIVE'      :  'DRIVE',
+	'DRV'        :  'DRIVE',
+	'DRIVES'     :  'DRIVES',
+	'EST'        :  'ESTATE',
+	'ESTATE'     :  'ESTATE',
+	'ESTATES'    :  'ESTATES',
+	'ESTS'       :  'ESTATES',
+	'EXP'        :  'EXPRESSWAY',
+	'EXPR'       :  'EXPRESSWAY',
+	'EXPRESS'    :  'EXPRESSWAY',
+	'EXPRESSWAY' :  'EXPRESSWAY',
+	'EXPW'       :  'EXPRESSWAY',
+	'EXPY'       :  'EXPRESSWAY',
+	'EXT'        :  'EXTENSION',
+	'EXTENSION'  :  'EXTENSION',
+	'EXTN'       :  'EXTENSION',
+	'EXTNSN'     :  'EXTENSION',
+	'EXTENSIONS' :  'EXTENSIONS',
+	'EXTS'       :  'EXTENSIONS',
+	'FALL'       :  'FALL',
+	'FALLS'      :  'FALLS',
+	'FLS'        :  'FALLS',
+	'FERRY'      :  'FERRY',
+	'FRRY'       :  'FERRY',
+	'FRY'        :  'FERRY',
+	'FIELD'      :  'FIELD',
+	'FLD'        :  'FIELD',
+	'FIELDS'     :  'FIELDS',
+	'FLDS'       :  'FIELDS',
+	'FLAT'       :  'FLAT',
+	'FLT'        :  'FLAT',
+	'FLATS'      :  'FLATS',
+	'FLTS'       :  'FLATS',
+	'FORD'       :  'FORD',
+	'FRD'        :  'FORD',
+	'FORDS'      :  'FORDS',
+	'FOREST'     :  'FOREST',
+	'FORESTS'    :  'FOREST',
+	'FRST'       :  'FOREST',
+	'FORG'       :  'FORGE',
+	'FORGE'      :  'FORGE',
+	'FRG'        :  'FORGE',
+	'FORGES'     :  'FORGES',
+	'FORK'       :  'FORK',
+	'FRK'        :  'FORK',
+	'FORKS'      :  'FORKS',
+	'FRKS'       :  'FORKS',
+	'FORT'       :  'FORT',
+	'FRT'        :  'FORT',
+	'FT'         :  'FORT',
+	'FREEWAY'    :  'FREEWAY',
+	'FREEWY'     :  'FREEWAY',
+	'FRWAY'      :  'FREEWAY',
+	'FRWY'       :  'FREEWAY',
+	'FWY'        :  'FREEWAY',
+	'GARDEN'     :  'GARDEN',
+	'GARDN'      :  'GARDEN',
+	'GDN'        :  'GARDEN',
+	'GRDEN'      :  'GARDEN',
+	'GRDN'       :  'GARDEN',
+	'GARDENS'    :  'GARDENS',
+	'GDNS'       :  'GARDENS',
+	'GRDNS'      :  'GARDENS',
+	'GATEWAY'    :  'GATEWAY',
+	'GATEWY'     :  'GATEWAY',
+	'GATWAY'     :  'GATEWAY',
+	'GTWAY'      :  'GATEWAY',
+	'GTWY'       :  'GATEWAY',
+	'GLEN'       :  'GLEN',
+	'GLN'        :  'GLEN',
+	'GLENS'      :  'GLENS',
+	'GREEN'      :  'GREEN',
+	'GRN'        :  'GREEN',
+	'GREENS'     :  'GREENS',
+	'GROV'       :  'GROVE',
+	'GROVE'      :  'GROVE',
+	'GRV'        :  'GROVE',
+	'GROVES'     :  'GROVES',
+	'HARB'       :  'HARBOR',
+	'HARBOR'     :  'HARBOR',
+	'HARBR'      :  'HARBOR',
+	'HBR'        :  'HARBOR',
+	'HRBOR'      :  'HARBOR',
+	'HARBORS'    :  'HARBORS',
+	'HAVEN'      :  'HAVEN',
+	'HAVN'       :  'HAVEN',
+	'HVN'        :  'HAVEN',
+	'HEIGHT'     :  'HEIGHTS',
+	'HEIGHTS'    :  'HEIGHTS',
+	'HGTS'       :  'HEIGHTS',
+	'HT'         :  'HEIGHTS',
+	'HTS'        :  'HEIGHTS',
+	'HIGHWAY'    :  'HIGHWAY',
+	'HIGHWY'     :  'HIGHWAY',
+	'HIWAY'      :  'HIGHWAY',
+	'HIWY'       :  'HIGHWAY',
+	'HWAY'       :  'HIGHWAY',
+	'HWY'        :  'HIGHWAY',
+	'HILL'       :  'HILL',
+	'HL'         :  'HILL',
+	'HILLS'      :  'HILLS',
+	'HLS'        :  'HILLS',
+	'HLLW'       :  'HOLLOW',
+	'HOLLOW'     :  'HOLLOW',
+	'HOLLOWS'    :  'HOLLOW',
+	'HOLW'       :  'HOLLOW',
+	'HOLWS'      :  'HOLLOW',
+	'INLET'      :  'INLET',
+	'INLT'       :  'INLET',
+	'IS'         :  'ISLAND',
+	'ISLAND'     :  'ISLAND',
+	'ISLND'      :  'ISLAND',
+	'ISLANDS'    :  'ISLANDS',
+	'ISLNDS'     :  'ISLANDS',
+	'ISS'        :  'ISLANDS',
+	'ISLE'       :  'ISLE',
+	'ISLES'      :  'ISLE',
+	'JCT'        :  'JUNCTION',
+	'JCTION'     :  'JUNCTION',
+	'JCTN'       :  'JUNCTION',
+	'JUNCTION'   :  'JUNCTION',
+	'JUNCTN'     :  'JUNCTION',
+	'JUNCTON'    :  'JUNCTION',
+	'JCTNS'      :  'JUNCTIONS',
+	'JCTS'       :  'JUNCTIONS',
+	'JUNCTIONS'  :  'JUNCTIONS',
+	'KEY'        :  'KEY',
+	'KY'         :  'KEY',
+	'KEYS'       :  'KEYS',
+	'KYS'        :  'KEYS',
+	'KNL'        :  'KNOLL',
+	'KNOL'       :  'KNOLL',
+	'KNOLL'      :  'KNOLL',
+	'KNLS'       :  'KNOLLS',
+	'KNOLLS'     :  'KNOLLS',
+	'LAKE'       :  'LAKE',
+	'LK'         :  'LAKE',
+	'LAKES'      :  'LAKES',
+	'LKS'        :  'LAKES',
+	'LAND'       :  'LAND',
+	'LANDING'    :  'LANDING',
+	'LNDG'       :  'LANDING',
+	'LNDNG'      :  'LANDING',
+	'LA'         :  'LANE',
+	'LANE'       :  'LANE',
+	'LANES'      :  'LANE',
+	'LN'         :  'LANE',
+	'LGT'        :  'LIGHT',
+	'LIGHT'      :  'LIGHT',
+	'LIGHTS'     :  'LIGHTS',
+	'LF'         :  'LOAF',
+	'LOAF'       :  'LOAF',
+	'LCK'        :  'LOCK',
+	'LOCK'       :  'LOCK',
+	'LCKS'       :  'LOCKS',
+	'LOCKS'      :  'LOCKS',
+	'LDG'        :  'LODGE',
+	'LDGE'       :  'LODGE',
+	'LODG'       :  'LODGE',
+	'LODGE'      :  'LODGE',
+	'LOOP'       :  'LOOP',
+	'LOOPS'      :  'LOOP',
+	'MALL'       :  'MALL',
+	'MANOR'      :  'MANOR',
+	'MNR'        :  'MANOR',
+	'MANORS'     :  'MANORS',
+	'MNRS'       :  'MANORS',
+	'MDW'        :  'MEADOW',
+	'MEADOW'     :  'MEADOW',
+	'MDWS'       :  'MEADOWS',
+	'MEADOWS'    :  'MEADOWS',
+	'MEDOWS'     :  'MEADOWS',
+	'MEWS'       :  'MEWS',
+	'MILL'       :  'MILL',
+	'ML'         :  'MILL',
+	'MILLS'      :  'MILLS',
+	'MLS'        :  'MILLS',
+	'MISSION'    :  'MISSION',
+	'MISSN'      :  'MISSION',
+	'MSN'        :  'MISSION',
+	'MSSN'       :  'MISSION',
+	'MOTORWAY'   :  'MOTORWAY',
+	'MNT'        :  'MOUNT',
+	'MOUNT'      :  'MOUNT',
+	'MT'         :  'MOUNT',
+	'MNTAIN'     :  'MOUNTAIN',
+	'MNTN'       :  'MOUNTAIN',
+	'MOUNTAIN'   :  'MOUNTAIN',
+	'MOUNTIN'    :  'MOUNTAIN',
+	'MTIN'       :  'MOUNTAIN',
+	'MTN'        :  'MOUNTAIN',
+	'MNTNS'      :  'MOUNTAINS',
+	'MOUNTAINS'  :  'MOUNTAINS',
+	'NCK'        :  'NECK',
+	'NECK'       :  'NECK',
+	'ORCH'       :  'ORCHARD',
+	'ORCHARD'    :  'ORCHARD',
+	'ORCHRD'     :  'ORCHARD',
+	'OVAL'       :  'OVAL',
+	'OVL'        :  'OVAL',
+	'OVERPASS'   :  'OVERPASS',
+	'PARK'       :  'PARK',
+	'PK'         :  'PARK',
+	'PRK'        :  'PARK',
+	'PARKS'      :  'PARKS',
+	'PARKWAY'    :  'PARKWAY',
+	'PARKWY'     :  'PARKWAY',
+	'PKWAY'      :  'PARKWAY',
+	'PKWY'       :  'PARKWAY',
+	'PKY'        :  'PARKWAY',
+	'PARKWAYS'   :  'PARKWAYS',
+	'PKWYS'      :  'PARKWAYS',
+	'PASS'       :  'PASS',
+	'PASSAGE'    :  'PASSAGE',
+	'PATH'       :  'PATH',
+	'PATHS'      :  'PATH',
+	'PIKE'       :  'PIKE',
+	'PIKES'      :  'PIKE',
+	'PINE'       :  'PINE',
+	'PINES'      :  'PINES',
+	'PNES'       :  'PINES',
+	'PL'         :  'PLACE',
+	'PLACE'      :  'PLACE',
+	'PLAIN'      :  'PLAIN',
+	'PLN'        :  'PLAIN',
+	'PLAINES'    :  'PLAINS',
+	'PLAINS'     :  'PLAINS',
+	'PLNS'       :  'PLAINS',
+	'PLAZA'      :  'PLAZA',
+	'PLZ'        :  'PLAZA',
+	'PLZA'       :  'PLAZA',
+	'POINT'      :  'POINT',
+	'PT'         :  'POINT',
+	'POINTS'     :  'POINTS',
+	'PTS'        :  'POINTS',
+	'PORT'       :  'PORT',
+	'PRT'        :  'PORT',
+	'PORTS'      :  'PORTS',
+	'PRTS'       :  'PORTS',
+	'PR'         :  'PRAIRIE',
+	'PRAIRIE'    :  'PRAIRIE',
+	'PRARIE'     :  'PRAIRIE',
+	'PRR'        :  'PRAIRIE',
+	'RAD'        :  'RADIAL',
+	'RADIAL'     :  'RADIAL',
+	'RADIEL'     :  'RADIAL',
+	'RADL'       :  'RADIAL',
+	'RAMP'       :  'RAMP',
+	'RANCH'      :  'RANCH',
+	'RANCHES'    :  'RANCH',
+	'RNCH'       :  'RANCH',
+	'RNCHS'      :  'RANCH',
+	'RAPID'      :  'RAPID',
+	'RPD'        :  'RAPID',
+	'RAPIDS'     :  'RAPIDS',
+	'RPDS'       :  'RAPIDS',
+	'REST'       :  'REST',
+	'RST'        :  'REST',
+	'RDG'        :  'RIDGE',
+	'RDGE'       :  'RIDGE',
+	'RIDGE'      :  'RIDGE',
+	'RDGS'       :  'RIDGES',
+	'RIDGES'     :  'RIDGES',
+	'RIV'        :  'RIVER',
+	'RIVER'      :  'RIVER',
+	'RIVR'       :  'RIVER',
+	'RVR'        :  'RIVER',
+	'RD'         :  'ROAD',
+	'ROAD'       :  'ROAD',
+	'RDS'        :  'ROADS',
+	'ROADS'      :  'ROADS',
+	'ROUTE'      :  'ROUTE',
+	'ROW'        :  'ROW',
+	'RUE'        :  'RUE',
+	'RUN'        :  'RUN',
+	'SHL'        :  'SHOAL',
+	'SHOAL'      :  'SHOAL',
+	'SHLS'       :  'SHOALS',
+	'SHOALS'     :  'SHOALS',
+	'SHOAR'      :  'SHORE',
+	'SHORE'      :  'SHORE',
+	'SHR'        :  'SHORE',
+	'SHOARS'     :  'SHORES',
+	'SHORES'     :  'SHORES',
+	'SHRS'       :  'SHORES',
+	'SKYWAY'     :  'SKYWAY',
+	'SPG'        :  'SPRING',
+	'SPNG'       :  'SPRING',
+	'SPRING'     :  'SPRING',
+	'SPRNG'      :  'SPRING',
+	'SPGS'       :  'SPRINGS',
+	'SPNGS'      :  'SPRINGS',
+	'SPRINGS'    :  'SPRINGS',
+	'SPRNGS'     :  'SPRINGS',
+	'SPUR'       :  'SPUR',
+	'SPURS'      :  'SPURS',
+	'SQ'         :  'SQUARE',
+	'SQR'        :  'SQUARE',
+	'SQRE'       :  'SQUARE',
+	'SQU'        :  'SQUARE',
+	'SQUARE'     :  'SQUARE',
+	'SQRS'       :  'SQUARES',
+	'SQUARES'    :  'SQUARES',
+	'STA'        :  'STATION',
+	'STATION'    :  'STATION',
+	'STATN'      :  'STATION',
+	'STN'        :  'STATION',
+	'STRA'       :  'STRAVENUE',
+	'STRAV'      :  'STRAVENUE',
+	'STRAVE'     :  'STRAVENUE',
+	'STRAVEN'    :  'STRAVENUE',
+	'STRAVENUE'  :  'STRAVENUE',
+	'STRAVN'     :  'STRAVENUE',
+	'STRVN'      :  'STRAVENUE',
+	'STRVNUE'    :  'STRAVENUE',
+	'STREAM'     :  'STREAM',
+	'STREME'     :  'STREAM',
+	'STRM'       :  'STREAM',
+	'ST'         :  'STREET',
+	'STR'        :  'STREET',
+	'STREET'     :  'STREET',
+	'STRT'       :  'STREET',
+	'STREETS'    :  'STREETS',
+	'SMT'        :  'SUMMIT',
+	'SUMIT'      :  'SUMMIT',
+	'SUMITT'     :  'SUMMIT',
+	'SUMMIT'     :  'SUMMIT',
+	'TER'        :  'TERRACE',
+	'TERR'       :  'TERRACE',
+	'TERRACE'    :  'TERRACE',
+	'THROUGHWAY' :  'THROUGHWAY',
+	'TRACE'      :  'TRACE',
+	'TRACES'     :  'TRACE',
+	'TRCE'       :  'TRACE',
+	'TRACK'      :  'TRACK',
+	'TRACKS'     :  'TRACK',
+	'TRAK'       :  'TRACK',
+	'TRK'        :  'TRACK',
+	'TRKS'       :  'TRACK',
+	'TRAFFICWAY' :  'TRAFFICWAY',
+	'TRFY'       :  'TRAFFICWAY',
+	'TR'         :  'TRAIL',
+	'TRAIL'      :  'TRAIL',
+	'TRAILS'     :  'TRAIL',
+	'TRL'        :  'TRAIL',
+	'TRLS'       :  'TRAIL',
+	'TUNEL'      :  'TUNNEL',
+	'TUNL'       :  'TUNNEL',
+	'TUNLS'      :  'TUNNEL',
+	'TUNNEL'     :  'TUNNEL',
+	'TUNNELS'    :  'TUNNEL',
+	'TUNNL'      :  'TUNNEL',
+	'TPK'        :  'TURNPIKE',
+	'TPKE'       :  'TURNPIKE',
+	'TRNPK'      :  'TURNPIKE',
+	'TRPK'       :  'TURNPIKE',
+	'TURNPIKE'   :  'TURNPIKE',
+	'TURNPK'     :  'TURNPIKE',
+	'UNDERPASS'  :  'UNDERPASS',
+	'UN'         :  'UNION',
+	'UNION'      :  'UNION',
+	'UNIONS'     :  'UNIONS',
+	'VALLEY'     :  'VALLEY',
+	'VALLY'      :  'VALLEY',
+	'VLLY'       :  'VALLEY',
+	'VLY'        :  'VALLEY',
+	'VALLEYS'    :  'VALLEYS',
+	'VLYS'       :  'VALLEYS',
+	'VDCT'       :  'VIADUCT',
+	'VIA'        :  'VIADUCT',
+	'VIADCT'     :  'VIADUCT',
+	'VIADUCT'    :  'VIADUCT',
+	'VIEW'       :  'VIEW',
+	'VW'         :  'VIEW',
+	'VIEWS'      :  'VIEWS',
+	'VWS'        :  'VIEWS',
+	'VILL'       :  'VILLAGE',
+	'VILLAG'     :  'VILLAGE',
+	'VILLAGE'    :  'VILLAGE',
+	'VILLG'      :  'VILLAGE',
+	'VILLIAGE'   :  'VILLAGE',
+	'VLG'        :  'VILLAGE',
+	'VILLAGES'   :  'VILLAGES',
+	'VLGS'       :  'VILLAGES',
+	'VILLE'      :  'VILLE',
+	'VL'         :  'VILLE',
+	'VIS'        :  'VISTA',
+	'VIST'       :  'VISTA',
+	'VISTA'      :  'VISTA',
+	'VST'        :  'VISTA',
+	'VSTA'       :  'VISTA',
+	'WALK'       :  'WALK',
+	'WALKS'      :  'WALKS',
+	'WALL'       :  'WALL',
+	'WAY'        :  'WAY',
+	'WY'         :  'WAY',
+	'WAYS'       :  'WAYS',
+	'WELL'       :  'WELL',
+	'WELLS'      :  'WELLS',
+	'WLS'        :  'WELLS',
+	}
+
+usps_street_suffix_abbr = {
+	'ALLEY'      :  'ALY',
+	'ANNEX'      :  'ANX',
+	'ARCADE'     :  'ARC',
+	'AVENUE'     :  'AVE',
+	'BAYOO'      :  'BYU',
+	'BEACH'      :  'BCH',
+	'BEND'       :  'BND',
+	'BLUFF'      :  'BLF',
+	'BLUFFS'     :  'BLFS',
+	'BOTTOM'     :  'BTM',
+	'BOULEVARD'  :  'BLVD',
+	'BRANCH'     :  'BR',
+	'BRIDGE'     :  'BRG',
+	'BROOK'      :  'BRK',
+	'BROOKS'     :  'BRKS',
+	'BURG'       :  'BG',
+	'BURGS'      :  'BGS',
+	'BYPASS'     :  'BYP',
+	'CAMP'       :  'CP',
+	'CANYON'     :  'CYN',
+	'CAPE'       :  'CPE',
+	'CAUSEWAY'   :  'CSWY',
+	'CENTER'     :  'CTR',
+	'CENTERS'    :  'CTRS',
+	'CIRCLE'     :  'CIR',
+	'CIRCLES'    :  'CIRS',
+	'CLIFF'      :  'CLF',
+	'CLIFFS'     :  'CLFS',
+	'CLUB'       :  'CLB',
+	'COMMON'     :  'CMN',
+	'CORNER'     :  'COR',
+	'CORNERS'    :  'CORS',
+	'COURSE'     :  'CRSE',
+	'COURT'      :  'CT',
+	'COURTS'     :  'CTS',
+	'COVE'       :  'CV',
+	'COVES'      :  'CVS',
+	'CREEK'      :  'CRK',
+	'CRESCENT'   :  'CRES',
+	'CREST'      :  'CRST',
+	'CROSSING'   :  'XING',
+	'CROSSROAD'  :  'XRD',
+	'CURVE'      :  'CURV',
+	'DALE'       :  'DL',
+	'DAM'        :  'DM',
+	'DIVIDE'     :  'DV',
+	'DRIVE'      :  'DR',
+	'DRIVES'     :  'DRS',
+	'ESTATE'     :  'EST',
+	'ESTATES'    :  'ESTS',
+	'EXPRESSWAY' :  'EXPY',
+	'EXTENSION'  :  'EXT',
+	'EXTENSIONS' :  'EXTS',
+	'FALL'       :  'FALL',
+	'FALLS'      :  'FLS',
+	'FERRY'      :  'FRY',
+	'FIELD'      :  'FLD',
+	'FIELDS'     :  'FLDS',
+	'FLAT'       :  'FLT',
+	'FLATS'      :  'FLTS',
+	'FORD'       :  'FRD',
+	'FORDS'      :  'FRDS',
+	'FOREST'     :  'FRST',
+	'FORGE'      :  'FRG',
+	'FORGES'     :  'FRGS',
+	'FORK'       :  'FRK',
+	'FORKS'      :  'FRKS',
+	'FORT'       :  'FT',
+	'FREEWAY'    :  'FWY',
+	'GARDEN'     :  'GDN',
+	'GARDENS'    :  'GDNS',
+	'GATEWAY'    :  'GTWY',
+	'GLEN'       :  'GLN',
+	'GLENS'      :  'GLNS',
+	'GREEN'      :  'GRN',
+	'GREENS'     :  'GRNS',
+	'GROVE'      :  'GRV',
+	'GROVES'     :  'GRVS',
+	'HARBOR'     :  'HBR',
+	'HARBORS'    :  'HBRS',
+	'HAVEN'      :  'HVN',
+	'HEIGHTS'    :  'HTS',
+	'HIGHWAY'    :  'HWY',
+	'HILL'       :  'HL',
+	'HILLS'      :  'HLS',
+	'HOLLOW'     :  'HOLW',
+	'INLET'      :  'INLT',
+	'ISLAND'     :  'IS',
+	'ISLANDS'    :  'ISS',
+	'ISLE'       :  'ISLE',
+	'JUNCTION'   :  'JCT',
+	'JUNCTIONS'  :  'JCTS',
+	'KEY'        :  'KY',
+	'KEYS'       :  'KYS',
+	'KNOLL'      :  'KNL',
+	'KNOLLS'     :  'KNLS',
+	'LAKE'       :  'LK',
+	'LAKES'      :  'LKS',
+	'LAND'       :  'LAND',
+	'LANDING'    :  'LNDG',
+	'LANE'       :  'LN',
+	'LIGHT'      :  'LGT',
+	'LIGHTS'     :  'LGTS',
+	'LOAF'       :  'LF',
+	'LOCK'       :  'LCK',
+	'LOCKS'      :  'LCKS',
+	'LODGE'      :  'LDG',
+	'LOOP'       :  'LOOP',
+	'MALL'       :  'MALL',
+	'MANOR'      :  'MNR',
+	'MANORS'     :  'MNRS',
+	'MEADOW'     :  'MDW',
+	'MEADOWS'    :  'MDWS',
+	'MEWS'       :  'MEWS',
+	'MILL'       :  'ML',
+	'MILLS'      :  'MLS',
+	'MISSION'    :  'MSN',
+	'MOTORWAY'   :  'MTWY',
+	'MOUNT'      :  'MT',
+	'MOUNTAIN'   :  'MTN',
+	'MOUNTAINS'  :  'MTNS',
+	'NECK'       :  'NCK',
+	'ORCHARD'    :  'ORCH',
+	'OVAL'       :  'OVAL',
+	'OVERPASS'   :  'OPAS',
+	'PARK'       :  'PARK',
+	'PARKWAY'    :  'PKWY',
+	'PASS'       :  'PASS',
+	'PASSAGE'    :  'PSGE',
+	'PATH'       :  'PATH',
+	'PIKE'       :  'PIKE',
+	'PINE'       :  'PNE',
+	'PINES'      :  'PNES',
+	'PLACE'      :  'PL',
+	'PLAIN'      :  'PLN',
+	'PLAINS'     :  'PLNS',
+	'PLAZA'      :  'PLZ',
+	'POINT'      :  'PT',
+	'POINTS'     :  'PTS',
+	'PORT'       :  'PRT',
+	'PORTS'      :  'PRTS',
+	'PRAIRIE'    :  'PR',
+	'RADIAL'     :  'RADL',
+	'RAMP'       :  'RAMP',
+	'RANCH'      :  'RNCH',
+	'RAPID'      :  'RPD',
+	'RAPIDS'     :  'RPDS',
+	'REST'       :  'RST',
+	'RIDGE'      :  'RDG',
+	'RIDGES'     :  'RDGS',
+	'RIVER'      :  'RIV',
+	'ROAD'       :  'RD',
+	'ROADS'      :  'RDS',
+	'ROUTE'      :  'RTE',
+	'ROW'        :  'ROW',
+	'RUE'        :  'RUE',
+	'RUN'        :  'RUN',
+	'SHOAL'      :  'SHL',
+	'SHOALS'     :  'SHLS',
+	'SHORE'      :  'SHR',
+	'SHORES'     :  'SHRS',
+	'SKYWAY'     :  'SKWY',
+	'SPRING'     :  'SPG',
+	'SPRINGS'    :  'SPGS',
+	'SPUR'       :  'SPUR',
+	'SQUARE'     :  'SQ',
+	'SQUARES'    :  'SQS',
+	'STATION'    :  'STA',
+	'STRAVENUE'  :  'STRA',
+	'STREAM'     :  'STRM',
+	'STREET'     :  'ST',
+	'STREETS'    :  'STS',
+	'SUMMIT'     :  'SMT',
+	'TERRACE'    :  'TER',
+	'THROUGHWAY' :  'TRWY',
+	'TRACE'      :  'TRCE',
+	'TRACK'      :  'TRAK',
+	'TRAFFICWAY' :  'TRFY',
+	'TRAIL'      :  'TRL',
+	'TUNNEL'     :  'TUNL',
+	'TURNPIKE'   :  'TPKE',
+	'UNDERPASS'  :  'UPAS',
+	'UNION'      :  'UN',
+	'UNIONS'     :  'UNS',
+	'VALLEY'     :  'VLY',
+	'VALLEYS'    :  'VLYS',
+	'VIADUCT'    :  'VIA',
+	'VIEW'       :  'VW',
+	'VIEWS'      :  'VWS',
+	'VILLAGE'    :  'VLG',
+	'VILLAGES'   :  'VLGS',
+	'VILLE'      :  'VL',
+	'VISTA'      :  'VIS',
+	'WALK'       :  'WALK',
+	'WALL'       :  'WALL',
+	'WAY'        :  'WAY',
+	'WAYS'       :  'WAYS',
+	'WELL'       :  'WL',
+	'WELLS'      :  'WLS',
+	}
+
+usps_secondary_designator = {
+    'APARTMENT'  :  'APT',
+    'APT'        :  'APT',
+    'BASEMENT'   :  'BSMT',
+    'BSMT'       :  'BSMT',
+    'BUILDING'   :  'BLDG',
+    'BLDG'       :  'BLDG',
+    'DEPARTMENT' :  'DEPT',
+    'DEPT'       :  'DEPT',
+    'FLOOR'      :  'FLOOR',
+    'FLR'        :  'FLOOR',
+    'FRONT'      :  'FRONT',
+    'FRNT'       :  'FRONT',
+    'HANGER'     :  'HNGR',
+    'HNGR'       :  'HNGR',
+    'KEY'        :  'KEY',
+    'KEY'        :  'KEY',
+    'LOBBY'      :  'LOBBY',
+    'LBBY'       :  'LOBBY',
+    'LOT'        :  'LOT',
+    'LOWER'      :  'LOWER',
+    'LOWR'       :  'LOWER',
+    'OFFICE'     :  'OFC',
+    'OFC'        :  'OFC',
+    'PENTHOUSE'  :  'PH',
+    'PH'         :  'PH',
+    'PIER'       :  'PIER',
+    'REAR'       :  'REAR',
+    'ROOM'       :  'RM',
+    'RM'         :  'RM',
+    'SIDE'       :  'SIDE',
+    'SLIP'       :  'SLIP',
+    'SLIP'       :  'SLIP',
+    'SPACE'      :  'SPC',
+    'SPC'        :  'SPC',
+    'STOP'       :  'STOP',
+    'SUITE'      :  'STE',
+    'STE'        :  'STE',
+    'TRAILER'    :  'TRLR',
+    'TRLR'       :  'TRLR',
+    'UNIT'       :  'UNIT',
+    'UPPER'      :  'UPPER',
+    'UPPR'       :  'UPPER',
+    '#'          :  '#',
+    }
+
+pobox = translator(keep='BOPX')
+
+abbr_ordinal = dict(
+    NORTHEAST='NE', NORTH='N',
+    NORTHWEST='NW', SOUTH='S',
+    SOUTHEAST='SE', EAST='E',
+    SOUTHWEST='SW', WEST='W',
+    )
+full_ordinal = dict([(v, k) for k, v in abbr_ordinal.items()])
+
+all_ordinals = set(full_ordinal.keys() + abbr_ordinal.keys())
+
+class AddressSegment(AutoEnum):
+    misc = "not currently tracked"
+    ordinal = "N S E W etc"
+    secondary = "apt bldg floor etc"
+    street = "st ave blvd etc"
+
+def ordinals(text):
+    # we want, at most, one ordinal abbreviation in a row (no sequential)
+    # if two ordinal type words appear together which one gets abbreviated depends
+    # on where they are: if at the end of the address (or just before a Secondary
+    # Unit Designator (apt, bldng, flr, etc), then the second one as shortened,
+    # otherwise the first one is;
+    # if there is only one ordinal, but less than four components (e.g.
+    # 823 West St), then we do not shorten it.
+    # if two ordinals are separated by more than one non-secondary piece, shorten
+    # both
+
+    pieces = text
+    if isinstance(pieces, String):
+        pieces = pieces.split()
+    AS = AddressSegment
+    tokens = []
+    for i, p in enumerate(pieces):
+        if p in all_ordinals:
+            tokens.append(AS.ordinal)
+        elif p in usps_secondary_designator:
+            tokens.append(AS.secondary)
+        elif p in usps_street_suffix_common:
+            tokens.append(AS.street)
+        elif i >= 2 and p.startswith('#'):
+            tokens.append(AS.secondary)
+        else:
+            tokens.append(AS.misc)
+    # there should be, at most, one AS.street token, and it should be either
+    # the last, or next to last, token in the primary portion (before any
+    # AS.secondary token); if we find a AS.street token anywhere else, change
+    # it to a AS.misc token
+    for i, t in enumerate(tokens):
+        if t is AS.secondary:
+            secondary = i
+            break
+    else:
+        secondary = -1
+    final = len(tokens) - 1
+    if secondary != -1:
+        final = secondary - 1
+    for i, token in enumerate(tokens):
+        if token is AS.secondary:
+            break
+        if token is AS.street:
+            if i == final:
+                continue
+            elif i == final -1 and tokens[final] is AS.ordinal:
+                continue
+            tokens[i] = AS.misc
+    primary = []
+    secondary = []
+    if AS.secondary in tokens:
+        index = tokens.index(AS.secondary)
+        for p in pieces[index:]:
+            secondary.append(
+                    usps_secondary_designator.get(p, 
+                        full_ordinal.get(p, p)))
+        tokens = tokens[:index]
+        pieces = pieces[:index]
+    counted_ordinals = tokens.count(AS.ordinal)
+    if len(tokens) <= 3:
+        for p in pieces:
+            if len(p) != 1:
+                p = full_ordinal.get(p, p)
+            primary.append(p)
+    elif counted_ordinals == 1:
+        for i, p in enumerate(pieces):
+            if tokens[i+1:i+2] != [AS.street]:
+                p = abbr_ordinal.get(p, p)
+            primary.append(p)
+    elif counted_ordinals:
+        ending_ordinal = 0
+        if tokens[-1] is AS.ordinal:
+            ending_ordinal = len(tokens) - 1
+        prev_ordinal = False
+        for i, (piece, token) in enumerate(zip(pieces, tokens)):
+            if token is AS.ordinal:
+                if prev_ordinal is True:
+                    if len(piece) != 1:
+                        piece = full_ordinal.get(piece, piece)
+                    primary.append(piece)
+                    prev_ordinal = False
+                else:
+                    if i + 1 == ending_ordinal:
+                        if len(piece) != 1:
+                            piece = full_ordinal.get(piece, piece)
+                        primary.append(piece)
+                    else:
+                        if tokens[i+1:i+2] != [AS.street]:
+                            piece = abbr_ordinal.get(piece, piece)
+                        primary.append(piece)
+                        prev_ordinal = True
+            else:
+                prev_ordinal = False
+                primary.append(piece)
+    else:
+        primary = pieces
+    pieces, primary = primary, []
+    for piece, token in zip(pieces, tokens):
+        if token is AS.street:
+            piece = usps_street_suffix_abbr[piece]
+        primary.append(piece)
+    return primary + secondary
+
+
+def normalize_address(line):
+    if not line.strip():
+        return line
+    orig_line = line
+    line = ' '.join(line.replace(',',' ').replace('.',' ').replace('-',' ').upper().split())
+    if pobox(line) == 'POBOX':
+        index = line.index('X')
+        trailer = line[index+1:]
+        if trailer and not trailer.isalpha():
+            line = ' '.join(['PO BOX', line[index+1:].strip()])
+            return line
+    pieces = line.split()
+    if not has_digits(pieces[0]) and pieces[0].upper() not in spelled_out_numbers:
+        return orig_line
+    line = []
+    for p in pieces:
+        line.append(usps_street_suffix_common.get(p, p))
+    line = ordinals(line)
+    return ' '.join(line)
 
 
 def crc32(binary_data):
@@ -1066,7 +2088,7 @@ class PropertyDict(object):
     def __setitem__(yo, name, value):
         if name in yo._internal:
             object.__setattr__(yo, name, value)
-        elif name[0] == '_':
+        elif isinstance(name, String) and name[0:1] == '_':
             raise KeyError("illegal attribute name: %s" % name)
         else:
             if name not in yo._values:
@@ -1274,6 +2296,78 @@ def Sift(*fields):
 
 
 _memory_sentinel = Sentinel("amnesiac")
+
+
+class xrange():
+    '''
+    accepts arbitrary objects to use to produce sequences
+    '''
+
+    types = {
+            int :    {
+                     'start' : 0,
+                     'step'  : 1,
+                     },
+            float :  {
+                     'start' : 0.0,
+                     'step'  : 1.0,
+                     },
+            date :   {
+                     'start' : None,
+                     'step'  : one_day,
+                     },
+            Decimal: {'start' : 0,
+                      'step'  : 1.0,
+                     }
+            }
+    
+    def __init__(yo, start, stop=None, step=None, count=None):
+        if stop is not None and count is not None:
+            raise TypeError("cannot specify both stop and count")
+        if stop is None and count is None:    # check for default start based on type
+            start, stop = None, start
+            for t in yo.types:
+                if isinstance(stop, t):
+                    start = yo.types[t]['start']
+                    break
+            else:
+                raise TypeError("start must be specified for unknown type %r" % stop.__class__)
+            if start is None:
+                raise TypeError("start must be specified for type %r" % stop.__class__)
+        if step is None:
+            step = yo.types[type(stop)]['step']
+
+        yo.start = yo.init_start = start
+        yo.count = yo.init_count = count
+        yo.stop = stop
+        yo.step = step
+        yo.reverse = stop is not None and stop < start
+
+    def __iter__(yo):
+        return yo
+
+    def __next__(yo):
+        if not yo.reverse:
+            if (yo.count is not None and yo.count < 1
+            or  yo.stop is not None and yo.start >= yo.stop):   # all done!
+                raise StopIteration
+        else:
+            if (yo.count is not None and yo.count < 1
+            or  yo.start <= yo.stop):   # all done!
+                raise StopIteration
+        current = yo.start
+        if callable(yo.step):   # custom function?
+            yo.start = yo.step(yo.start)
+        else:
+            yo.start = yo.start + yo.step
+        if yo.count is not None:
+            yo.count -= 1
+        return current
+    next = __next__
+
+    def __repr__(yo):
+        values = [ '%s=%s' % (k,v) for k,v in (('start',yo.start), ('stop',yo.stop), ('step', yo.step), ('count', yo.count)) if v is not None ]
+        return '<%s(%s)>' % (yo.__class__.__name__, ', '.join(values))
 
 
 class Memory(object):

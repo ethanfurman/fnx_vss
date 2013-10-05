@@ -11,7 +11,7 @@ from unittest import TestCase, main as Run
 from dbf import Date, Time
 from VSS import Table
 from VSS.trulite import ARInvoice, ARAgingLine, ar_open_invoices, ar_invoices, Batch
-from VSS.utils import cszk, xrange
+from VSS.utils import cszk, normalize_address, xrange
 from VSS.wellsfargo import RmInvoice, RmPayment, RMFFRecord, lockbox_payments, Int, FederalHoliday, ACHStore, ACHPayment, ACHFile, ACH_ETC, Customer
 
 globals().update(Customer.__members__)
@@ -51,6 +51,18 @@ cszk_tests = (
     (('SOME CITY, ONTARIO', 'V6T 9K3 , CANADA'),
      ('', 'SOME CITY', 'ONTARIO', 'V6T 9K3', 'CANADA')),
 
+    (('34 MEKIAS EL RODA ST', 'CAIRO, EGYPT'),
+     ('34 MEKIAS EL RODA ST', 'CAIRO', '', '', 'EGYPT')),
+
+    (('19 ADISON PL', 'VALLEY STREAM, NY 11580'),
+     ('19 ADISON PL', 'VALLEY STREAM', 'NEW YORK', '11580', '')),
+
+    (('19 ADISON PL', 'VALLEY STREAM NY 11580'),
+     ('19 ADISON PL', 'VALLEY STREAM', 'NEW YORK', '11580', '')),
+
+    (('COL. DOCTORES', 'MONTERREY N.L. 64710, MEXICO'),
+     ('COL. DOCTORES', 'MONTERREY N.L.', '', '64710', 'MEXICO')),
+
     )
 
 class TestCSZK(TestCase):
@@ -65,6 +77,60 @@ for i in range(len(cszk_tests)):
     setattr(TestCSZK, 'test_%02d' % i, lambda self, i=i: self.do_test(i))
 
 
+norm_tests = (
+    ('160 EILEEN WAY',                  '160 EILEEN WAY'),
+    ('18930 HWY 145',                   '18930 HIGHWAY 145'),
+    ('P.O. BOX 709',                    'PO BOX 709'),
+    ('P. O. BOX 182',                   'PO BOX 182'),
+    ('P O BOX 555',                     'PO BOX 555'),
+    ('PO BOX 339',                      'PO BOX 339'),
+    ('POBOX 718',                       'PO BOX 718'),
+    ('1097 YATES ST.',                  '1097 YATES ST'),
+    ('15908 98TH AVE.',                 '15908 98TH AVE'),
+    ('141 LANZA AVENUE',                '141 LANZA AVE'),
+    ('85 NE 5TH ST',                    '85 NE 5TH ST'),
+    ('111 89TH AVE SW',                 '111 89TH AVE SW'),
+    ('1827 FIRST SOUTHWEST',            '1827 FIRST SOUTHWEST'),
+    ('1827 FIRST SW',                   '1827 FIRST SOUTHWEST'),
+    ('050 E',                           '050 E'),
+    ('050 EAST',                        '050 EAST'),
+    ('975 WEST ST',                     '975 WEST ST'),
+    ('274 EAST ST SOUTH',               '274 EAST ST S'),
+    ('274 E ST SOUTH',                  '274 E ST S'),
+    ('582 NORTH SOUTH ST',              '582 N SOUTH ST'),
+    ('111 N MAIN S',                    '111 N MAIN S'),
+    ('819 VALLEY NORTH RD',             '819 VALLEY NORTH RD'),
+    ('160 EILEEN WAY # NORTH',          '160 EILEEN WAY # NORTH'),
+    ('160 EILEEN WAY #47 NORTH',        '160 EILEEN WAY #47 NORTH'),
+    ('18930 HWY 145',                   '18930 HIGHWAY 145'),
+    ('1097 YATES ST. FLOOR 5',          '1097 YATES ST FLOOR 5'),
+    ('15908 98TH AVE., UNIT 9',         '15908 98TH AVE UNIT 9'),
+    ('141 LANZA AVENUE LOWER',          '141 LANZA AVE LOWER'),
+    ('85 NE 5TH ST LBBY',               '85 NE 5TH ST LOBBY'),
+    ('111 89TH AVE SW DEPARTMENT 23B',  '111 89TH AVE SW DEPT 23B'),
+    ('1827 FIRST SOUTHWEST SUITE 11',   '1827 FIRST SOUTHWEST STE 11'),
+    ('1827 FIRST SW SUITE 11',          '1827 FIRST SOUTHWEST STE 11'),
+    ('050 E SLIP 192',                  '050 E SLIP 192'),
+    ('050 EAST SPACE 29',               '050 EAST SPC 29'),
+    ('975 WEST ST PIER 9',              '975 WEST ST PIER 9'),
+    ('274 EAST ST SOUTH LOT 1',         '274 EAST ST S LOT 1'),
+    ('274 E ST SOUTH BUILDING 8',       '274 E ST S BLDG 8'),
+    ('582 NORTH SOUTH ST REAR',         '582 N SOUTH ST REAR'),
+    ('111 N MAIN S UPPER',              '111 N MAIN S UPPER'),
+    ('819 VALLEY NORTH RD ROOM 3',      '819 VALLEY NORTH RD RM 3'),
+    )
+
+
+class TestNormalizeAddress(TestCase):
+    """
+    Test the normalize address function.
+    """
+
+    def do_test(self, i):
+        self.assertEqual(normalize_address(norm_tests[i][0]), norm_tests[i][1])
+
+for i in range(len(norm_tests)):
+    setattr(TestNormalizeAddress, 'test_%02d' % i, lambda self, i=i: self.do_test(i))
 
 aging_line_tests = (
     (('005002	FORDERER CORNICE WORKS   	053113	557521:2433.50/VARIAN	1-INVCE	475214	1100-00	2917	0'),
