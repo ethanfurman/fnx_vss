@@ -2,7 +2,7 @@
 Bbx File utilities.
 """
 
-from fnx import path
+from VSS import path
 import logging
 import os
 import string

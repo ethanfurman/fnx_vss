@@ -1,10 +1,8 @@
 #!/usr/local/bin/python
 import sys, getpass, shlex, subprocess, re, os
 from bbxfile import BBxFile, getfilename
-try:
-    from fnx.path import Path
-except ImportError:
-    from path import Path
+
+from VSS.path import Path
 
 execfile('/etc/openerp/fnx.fis.conf')
 
