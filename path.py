@@ -1,10 +1,10 @@
 """\
 Copyright
 =========
-    - Copyright: 2011 Ethan Furman
+    - Copyright: 2011-2013 Ethan Furman
     - Author: Ethan Furman
     - Contact: ethan@stoneleaf.us
-    - Version: 0.01.001 as of 14 Apr 2011
+    - Version: 0.10.001 as of 24 Sep 2013
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -28,10 +28,8 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 """
 
-from glob import glob as globber
 import os
-import platform
-import sys
+from glob import glob as globber
 
 String = (str, unicode)
 
@@ -278,6 +276,20 @@ class Path(unicode):
         return self.__class__(vol + dirs + base + ext)
     __truediv__ = __div__
 
+    def copy(self, dst):
+        'thin wrapper around shutil.copy2'
+        if isinstance(dst, self.__class__):
+            dst = str(dst)
+        src = str(self)
+        shutil.copy2(src, dst)
+
+    def copytree(self, dst, symlinks=False, ignore=None):
+        'thin wrapper around shutil.copytree'
+        if isinstance(dst, self.__class__):
+            dst = str(dst)
+        src = str(src)
+        shutil.copytree(src, dst, symlinks, ignore)
+
     def count(self, sub, start=None, end=None):
         new_sub = sub.replace(self.system_sep, SEP)
         start = start or 0
@@ -311,6 +323,9 @@ class Path(unicode):
     def format_map(self, other):
         raise AttributeError("'Path' object has no attribute 'format_map'")
 
+    def glob(self):
+        return [Path(p) for p in globber(self)]
+
     def index(self, sub, start=None, end=None):
         result = self.find(sub, start, end)
         if result == -1:
@@ -337,6 +352,27 @@ class Path(unicode):
             chars = chars.replace(self.system_sep, SEP)
         return self.__class__((self._path + self._filename).lstrip(chars))
 
+    def mkdir(self, mode=None):
+        if mode is None:
+            os.mkdir(self)
+        else:
+            os.mkdir(self, mode)
+
+    def mkdirs(self, mode=None):
+        path = self.vol
+        segments = self.dir_pieces
+        for dir in segments:
+            path /= dir
+            if not path.exists():
+                self.mkdir(path, mode)
+
+    def move(self, dst):
+        'thin wrapper around shutil.move'
+        if isinstance(dst, self.__class__):
+            dst = str(dst)
+        src = str(self)
+        shutil.move(src, dst)
+
     def replace(self, old, new, count=None):
         old = old.replace(self.system_sep, SEP)
         new = new.replace(self.system_sep, SEP)
@@ -344,6 +380,16 @@ class Path(unicode):
             return self.__class__((self._path + self._filename).replace(old, new, count))
         else:
             return self.__class__((self._path + self._filename).replace(old, new))
+
+    def rmtree(self, ignore_errors=None, onerror=None):
+        'thin wrapper around shutil.rmtree'
+        target = str(self)
+        if ignore_errors is None and onerror is None:
+            shutil.rmtree(target)
+        elif ignore_errors is not None and onerror is None:
+            shutil.rmtree(target, ignore_errors)
+        elif onerror is not None:
+            shutil.rmtree(target, ignore_errors, onerror)
 
     def rstrip(self, chars=None):
         if chars is not None:
@@ -383,3 +429,6 @@ class Path(unicode):
 
 def glob(pattern):
     return [Path(p) for p in globber(pattern)]
+
+def listdir(dir):
+    return os.listdir(dir)
