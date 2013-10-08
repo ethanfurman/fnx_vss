@@ -1214,7 +1214,7 @@ class DateTime(object):
     def time(self):
         if self:
             return Time(self.hour, self.minute, self.second, self.microsecond)
-        return Time()
+        return None
 
     @classmethod
     def utcnow(cls):
@@ -1439,6 +1439,12 @@ class Time(object):
             while hour > 23:
                 hour = hour - 24
         return Time(hour, minute, second, microsecond)
+
+    def time(self):
+        if self:
+            self._time
+        return Time()
+
 Time.max = Time(datetime.time.max)
 Time.min = Time(datetime.time.min)
 Time._null_time = object.__new__(Time)
