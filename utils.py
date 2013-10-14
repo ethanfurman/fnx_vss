@@ -6,12 +6,13 @@ import smtplib
 import string
 import syslog
 from datetime import date, timedelta
-from dbf import Date, Time
 from decimal import Decimal
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email.Encoders import encode_base64
+from VSS import enum
+from VSS.dbf import Date, Time
 
 String = str, unicode
 Integer = int, long
@@ -908,7 +909,11 @@ def cszk(line1, line2):
       returns street, city, state, zip, country; but state is only
       populated if country is US or CA
     """
+    line1 = re.sub(r'\b[A-Z]\.[A-Z]\.[^A-Z]', lambda s: s.group().replace('.',''), line1)
+    line2 = re.sub(r'\b[A-Z]\.[A-Z]\.[^A-Z]', lambda s: s.group().replace('.',''), line2)
     line1, line2 = Sift(line1.replace('.',' ').replace(',',' '), line2.replace('.',' ').replace(',',' '))
+    line1 = ' '.join(line1.split())
+    line2 = ' '.join(line2.split())
     street = city = state = postal = country = ''
     try:
         pieces, line2 = line2.split(), ''
@@ -969,6 +974,8 @@ def cszk(line1, line2):
                     break
                 if pieces:
                     s = (pieces.pop() + ' ' + s).strip()
+                    if len(s) == 3 and s[1] == ' ':
+                        s = s[0] + s[2]
                 else:
                     break
             if s in us_ca_state_abbr:

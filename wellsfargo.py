@@ -1,14 +1,15 @@
 from __future__ import with_statement
 from datetime import timedelta
-try:
-    from dbf import next, property
-except ImportError:
-    pass
 from itertools import groupby
 from path import Path
 from VSS.BBxXlate.bbxfile import BBxFile
 from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time, xrange, Date, Time, OrderedDict
 from VSS import Table, Month, Weekday, days_per_month, AutoEnum, IntEnum, OrderedDict
+
+try:
+    next
+except NameError:
+    from .dbf import next, property
 
 one_day = timedelta(1)
 

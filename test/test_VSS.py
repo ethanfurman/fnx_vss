@@ -9,7 +9,7 @@ from tempfile import mkstemp
 from types import MethodType
 from unittest import TestCase, main as Run
 
-from dbf import Date, Time
+from VSS.dbf import Date, Time
 from VSS import Table
 from VSS.trulite import ARInvoice, ARAgingLine, ar_open_invoices, ar_invoices, Batch
 from VSS.utils import cszk, normalize_address, xrange
@@ -41,7 +41,7 @@ cszk_tests = (
      ('142 G/F WING LOK ST', 'HONG KONG', '', '', 'CHINA')),
 
     (('1408 - C EAST BLVD.', 'CHARLOTTE, N.C. 28203'),
-     ('1408 - C EAST BLVD.', 'CHARLOTTE', 'NORTH CAROLINA', '28203', '')),
+     ('1408 - C EAST BLVD', 'CHARLOTTE', 'NORTH CAROLINA', '28203', '')),
 
     (('', 'NEW YORK, NEW YORK 10019'),
      ('', 'NEW YORK', 'NEW YORK', '10019', '')),
@@ -62,7 +62,7 @@ cszk_tests = (
      ('19 ADISON PL', 'VALLEY STREAM', 'NEW YORK', '11580', '')),
 
     (('COL. DOCTORES', 'MONTERREY N.L. 64710, MEXICO'),
-     ('COL. DOCTORES', 'MONTERREY N.L.', '', '64710', 'MEXICO')),
+     ('COL DOCTORES', 'MONTERREY NL', '', '64710', 'MEXICO')),
 
     )
 
