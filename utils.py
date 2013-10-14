@@ -1,7 +1,8 @@
+from __future__ import absolute_import
+
 import binascii
 import datetime
-import dbf
-import enum
+import re
 import smtplib
 import string
 import syslog
@@ -11,8 +12,9 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email.Encoders import encode_base64
-from VSS import enum
+from VSS import dbf
 from VSS.dbf import Date, Time
+from enum import Enum, IntEnum
 
 String = str, unicode
 Integer = int, long
@@ -307,7 +309,7 @@ def Table(*args, **kwargs):
 def days_per_month(year):
     return (dbf.days_per_month, dbf.days_per_leap_month)[dbf.is_leapyear(year)]
 
-class AutoEnum(enum.Enum):
+class AutoEnum(Enum):
     __last_number__ = 0
     def __new__(cls, *args):
         value = cls.__last_number__ + 1
@@ -345,8 +347,6 @@ class AutoEnum(enum.Enum):
         for name, member in cls.__members__.items():
             if name == member.name:
                 namespace[name] = member
-
-IntEnum = enum.IntEnum
 
 class Weekday(AutoEnum):
     __order__ = 'MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY SATURDAY SUNDAY'

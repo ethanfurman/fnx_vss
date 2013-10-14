@@ -9,8 +9,8 @@ from tempfile import mkstemp
 from types import MethodType
 from unittest import TestCase, main as Run
 
-from VSS.dbf import Date, Time
 from VSS import Table
+from VSS.dbf import Date, Time
 from VSS.trulite import ARInvoice, ARAgingLine, ar_open_invoices, ar_invoices, Batch
 from VSS.utils import cszk, normalize_address, xrange
 from VSS.wellsfargo import RmInvoice, RmPayment, RMFFRecord, lockbox_payments, Int, FederalHoliday, ACHStore, ACHPayment, ACHFile, ACH_ETC, Customer
