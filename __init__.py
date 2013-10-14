@@ -29,7 +29,7 @@ class AutoEnum(enum.Enum):
         value = cls.__last_number__ + 1
         cls.__last_number__ = value
         obj = object.__new__(cls)
-        obj._value = value
+        obj._value_ = value
         return obj
     def __init__(self, *args):
         if len(args) == 1 and isinstance(args[0], (str, unicode)):
@@ -56,11 +56,6 @@ class AutoEnum(enum.Enum):
         if self.__class__ is other.__class__:
             return self.value < other.value
         return NotImplemented
-    @classmethod
-    def export(cls, namespace):
-        for name, member in cls.__members__.items():
-            if name == member.name:
-                namespace[name] = member
 
 IntEnum = enum.IntEnum
 #class IntEnum(enum.IntEnum):
