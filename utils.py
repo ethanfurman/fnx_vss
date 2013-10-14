@@ -310,14 +310,24 @@ def days_per_month(year):
     return (dbf.days_per_month, dbf.days_per_leap_month)[dbf.is_leapyear(year)]
 
 class AutoEnum(Enum):
+    """
+    Automatically numbers enum members starting from 1.
+    Includes support for a custom docstring per member.
+    """
     __last_number__ = 0
     def __new__(cls, *args):
+        """Ignores arguments (will be handled in __init__."""
         value = cls.__last_number__ + 1
         cls.__last_number__ = value
         obj = object.__new__(cls)
         obj._value_ = value
         return obj
     def __init__(self, *args):
+        """Can handle 0 or 1 argument; more requires a custom __init__.
+        0  = auto-number w/o docstring
+        1  = auto-number w/ docstring
+        2+ = needs custom __init__
+        """
         if len(args) == 1 and isinstance(args[0], (str, unicode)):
             self.__doc__ = args[0]
         elif args:
