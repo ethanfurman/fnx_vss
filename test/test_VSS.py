@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import with_statement
 
 import os
 import sys
@@ -590,11 +591,11 @@ class TestACH(TestCase):
 
 
     vendors = (
-            ('INVOICES', 'CCD', 'GLASS SOURCE', '123456', '369246576', '8172904027', ACH_ETC.ck_credit, 'domestic', 100),
-            ('INVOICES', 'CCD', 'GLASS SOURCE', '246855', '369246576', '8172904027', ACH_ETC.ck_credit, 'domestic', 37118),
-            ('INVOICES', 'CCD', 'Super Silica Sands', '987654', '123456120', '24584196', ACH_ETC.ck_credit, 'domestic', 299),
-            ('supplies', 'CCD', 'Wax on Wax off', '192837', '641699773', '1642615987224584196', ACH_ETC.ck_credit, 'domestic', 795),
-            ('Supplies', 'CCD', 'ACME Glass and Coffee Grounds', '579135', '369246576', '9154876', ACH_ETC.ck_credit, 'domestic', 25),
+            ('INVOICES', 'CCD', 'GLASS SOURCE', '123456', '071000039', '8172904027', ACH_ETC.ck_credit, 'domestic', 100),
+            ('INVOICES', 'CCD', 'GLASS SOURCE', '246855', '071000039', '8172904027', ACH_ETC.ck_credit, 'domestic', 37118),
+            ('INVOICES', 'CCD', 'Super Silica Sands', '987654', '071000013', '24584196', ACH_ETC.ck_credit, 'domestic', 299),
+            ('supplies', 'CCD', 'Wax on Wax off', '192837', '043000096', '1642615987224584196', ACH_ETC.ck_credit, 'domestic', 795),
+            ('Supplies', 'CCD', 'ACME Glass and Coffee Grounds', '579135', '125000105', '9154876', ACH_ETC.ck_credit, 'domestic', 25),
             )
     def test_single_vendor_single_payment(self):
         target = [

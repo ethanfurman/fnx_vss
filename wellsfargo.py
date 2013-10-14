@@ -7,7 +7,7 @@ except ImportError:
 from itertools import groupby
 from path import Path
 from VSS.BBxXlate.bbxfile import BBxFile
-from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time, xrange, Date, Time
+from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time, xrange, Date, Time, OrderedDict
 from VSS import Table, Month, Weekday, days_per_month, AutoEnum, IntEnum, OrderedDict
 
 one_day = timedelta(1)
@@ -796,7 +796,7 @@ class ACHFile(object):
     file_header = '101 091000019%(id)s%(date)s%(time)s%(id_mod)s094101WELLS FARGO            %(company)-23s        '
     batch_header = '5200%(company)-16s%(discretionary)-20s%(company_id)s%(sec)s%(description)-10s%(ref_date)-6s%(eff_date)s   109100001%(batch_number)07d'
     entry_detail = '6%(code)d%(routing_nbr)s%(account)-17s%(amount)010d%(payee_id)-15s%(payee_name)-22s  %(addenda)d09100001%(entry_number)07d'
-    batch_control = '8%(sec)s%(entries)06d%(entry_hash)010d%(debit)012d%(credit)012d1900918292                         09100001%(batch_number)07d'
+    batch_control = '8200%(entries)06d%(entry_hash)010d%(debit)012d%(credit)012d1900918292                         09100001%(batch_number)07d'
     file_control = '9%(batches)06d%(blocks)06d%(entries)08d%(entry_hash)010d%(debit)012d%(credit)012d                                       '
 
     def __init__(self, company_name, company_id, file_id, filename, modifier):
