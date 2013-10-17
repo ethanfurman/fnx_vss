@@ -152,7 +152,7 @@ def ar_open_invoices(filename):
 
 class Inv(object):
     def __init__(self, inv_num, amount, quality, discount, ar_inv):
-        self.inv_num = inv_num
+        self.inv_num = self.actual_inv_num = inv_num
         self.amount = amount
         self.quality = quality
         self.discount = discount
@@ -210,9 +210,14 @@ class Batch(object):
 
     def __contains__(self, inv):
         "inv should be either an AR_Invoice or an invoice number; compares against actual_inv_num"
+        if not inv:
+            return False
         if isinstance(inv, ARInvoice):
-            inv = inv.inv_num
-        return inv in [inv.inv_num for inv in self.transactions]
+            inv = inv.actual_inv_num
+        return inv in [inv.actual_inv_num for inv in self.transactions]
+
+    def __repr__(self):
+        return "Batch(number=%r, amount=%r, data=%r, transactions=%r" % (self.ck_nbr, self.ck_amt, self.ck_date, self.transactions)
 
     def __len__(self):
         return len(self.transactions)
