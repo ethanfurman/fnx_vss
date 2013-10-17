@@ -431,4 +431,4 @@ def glob(pattern):
     return [Path(p) for p in globber(pattern)]
 
 def listdir(dir):
-    return os.listdir(dir)
+    return [Path(p) for p in os.listdir(dir)]
