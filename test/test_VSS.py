@@ -12,7 +12,7 @@ from unittest import TestCase, main as Run
 from VSS import Table
 from VSS.dbf import Date, Time
 from VSS.trulite import ARInvoice, ARAgingLine, ar_open_invoices, ar_invoices, Batch
-from VSS.utils import cszk, normalize_address, xrange
+from VSS.utils import cszk, normalize_address, xrange, suppress
 from VSS.wellsfargo import RmInvoice, RmPayment, RMFFRecord, lockbox_payments, Int, FederalHoliday, ACHStore, ACHPayment, ACHFile, ACH_ETC, Customer
 
 globals().update(Customer.__members__)
@@ -740,6 +740,23 @@ class TestACH(TestCase):
         for should_be, found in zip(target, lines):
             self.assertEqual(should_be, found)
 
+class Test_suppress(TestCase):
+
+    def test_no_exception(self):
+        with suppress(ValueError):
+            self.assertEqual(pow(2, 5), 32)
+
+    def test_exact_exception(self):
+        with suppress(TypeError):
+            len(5)
+
+    def test_multiple_exception_args(self):
+        with suppress(ZeroDivisionError, TypeError):
+            len(5)
+
+    def test_exception_hierarchy(self):
+        with suppress(LookupError):
+            'Hello'[50]
 
 if __name__ == '__main__':
     Run()

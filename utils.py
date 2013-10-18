@@ -2672,4 +2672,35 @@ class copy_argspec(object):
         wrapped.func_defaults = self.src_defaults
         return wrapped
 
+class LazyAttr(object):
+    "doesn't create object until actually accessed"
+    def __init__(yo, func=None, doc=None):
+        yo.fget = func
+        yo.__doc__ = doc or func.__doc__
+    def __call__(yo, func):
+        yo.fget = func
+    def __get__(yo, instance, owner):
+        if instance is None:
+            return yo
+        return yo.fget(instance)
 
+class Missing(object):
+    "if object hasn't been created, raise AttributeError"
+    def __init__(yo, func=None, doc=None):
+        yo.fget = func
+        yo.__doc__ = doc or func.__doc__
+    def __call__(yo, func):
+        yo.fget = func
+    def __get__(yo, instance, owner):
+        if instance is None:
+            return yo.fget(instance)
+        raise AttributeError("%s must be added to this %s instance for full functionality" % (yo.fget.__name__, owner.__name__))
+
+class suppress(object):
+    "suppresses first execption and exits the with block"
+    def __init__(self, *exceptions):
+        self.exceptions = exceptions
+    def __enter__(self):
+        pass
+    def __exit__(self, etype, val, tb):
+        return etype is None or issubclass(etype, self.exceptions)
