@@ -279,8 +279,8 @@ def getfilename(target):
             if file.ext.lower() in ('', '.txt'):
                 possibles.append(file)
 
-    files.sort(key=len, reverse=True)
-    target = files[0]
+    possibles.sort(key=len, reverse=True)
+    target = possibles[0]
     return target
 
 

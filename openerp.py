@@ -4,19 +4,9 @@ from __future__ import division, print_function, with_statement
 
 import openerplib
 from .utils import PropertyDict
+from .path import Path
 
-OE = '/home/openerp/.openerp/'
-TMP = '/var/openerp/'
-
-FILE_PATHS = PropertyDict(
-        updates = TMP+'user_updates',
-        failed = TMP+'user_updates_failed',
-        emp_table = TMP+'employees',
-        modules = TMP+'sync_modules',
-        db = TMP+'database',
-        force_update = TMP+'force_update',
-        reset_photos = TMP+'reset_photos',
-        )
+execfile('/etc/openerp/VSS.conf')
 
 # format of employee dbf file
 #   login C(25)
