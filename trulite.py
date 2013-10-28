@@ -207,6 +207,7 @@ class Batch(object):
         self.ck_date = date
         self.transactions = []
         self.discount_allowed = None
+        self.total_owed = 0
 
     def __contains__(self, inv):
         "inv should be either an AR_Invoice or an invoice number; compares against actual_inv_num"
@@ -246,6 +247,7 @@ class Batch(object):
         return total
 
     def add_invoice(self, ar_inv, amount, quality, discount=0, replace=False):
+        self.total_owed += ar_inv.balance or ar_inv.amount
         self.discount_allowed = max(
                 self.discount_allowed,
                 self.ck_date <= ar_inv.end_discount_date,
@@ -284,16 +286,16 @@ class Batch(object):
             gl_acct = GL_DISCOUNTS
         elif adjustment < 0:
             #print 6.2
-            if self.discount_allowed:
+            discount = 100 - int((float(self.total_owed) / self.total_paid) * 100)
+            if self.discount_allowed and discount >= 98:
                 #print 6.3
-                discount = 100 - int((float(self.ck_amt) / self.total_paid) * 100)
                 desc = '%d%% DISCOUNT TAKEN' % discount
                 gl_acct = GL_DISCOUNTS
             else:
                 #print 6.4
                 recorded = False
                 for invoice in self.transactions:
-                    # find out if discounts have been recorded
+                    # if discounts have been recorded, undo it
                     if invoice.discount:
                         recorded = True
                         amount = invoice.discount
@@ -307,6 +309,8 @@ class Batch(object):
                         discount = -0.01005
                     elif discount < 0.02005:
                         discount = -0.02005
+                    else:
+                        discount = -discount
                     for invoice in self.transactions:
                         amount = int(invoice.amount * discount)
                         if amount < adjustment:
