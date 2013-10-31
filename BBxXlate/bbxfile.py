@@ -275,7 +275,7 @@ def getfilename(target):
     files = path.glob(target.path + target.base[:5] + '*')
     possibles = []
     for file in files:
-        if len(file.base) in (4, 5):
+        if len(file.base) in (5, 6):
             if file.ext.lower() in ('', '.txt'):
                 possibles.append(file)
 
