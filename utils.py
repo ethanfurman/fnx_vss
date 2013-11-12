@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import __builtin__
 import binascii
 import datetime
 import re
@@ -13,7 +14,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email.Encoders import encode_base64
 from VSS import dbf
-from VSS.dbf import Date, Time
+from VSS.dbf import DateTime, Date, Time
 from enum import Enum, IntEnum
 
 String = str, unicode
@@ -2705,6 +2706,7 @@ class PostalCode(object):
 
 
 def fix_phone(text):
+    text = str(text) # convert numbers to digits
     text = text.strip()
     data = phone(text)
     if len(data) not in (7, 10, 11):
@@ -2788,6 +2790,21 @@ def simplegeneric(func):
     wrapper.__doc__ = func.__doc__
     wrapper.register = register
     return wrapper
+
+@simplegeneric
+def float(*args, **kwds):
+    return __builtin__.float(*args, **kwds)
+
+@float.register(timedelta)
+def timedelta_as_float(td):
+    seconds = td.seconds
+    hours = seconds // 3600
+    seconds = (seconds - hours * 3600) * (1.0 / 3600)
+    return td.days * 24 + hours + seconds
+
+@float.register(Time)
+def Time_as_float(t):
+    return t.tofloat()
 
 def mail(server, port, sender, receiver, message):
     """sends email.message to server:port

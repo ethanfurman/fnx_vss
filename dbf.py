@@ -30,7 +30,7 @@ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-version = (0, 95, 5)
+version = (0, 95, 8)
 
 __all__ = (
         'Table', 'Record', 'List', 'Index', 'Relation', 'Iter', 'Date', 'DateTime', 'Time',
@@ -40,7 +40,7 @@ __all__ = (
         'FieldSpecError', 'NonUnicodeError', 'NotFoundError',
         'DbfWarning', 'Eof', 'Bof', 'DoNotIndex',
         'Null', 'Char', 'Date', 'DateTime', 'Time', 'Logical', 'Quantum',
-        'NullDate', 'NullDateTime', 'NullTime', 'Vapor',
+        'NullDate', 'NullDateTime', 'NullTime', 'Vapor', 'Period',
         'Process', 'Templates',
         'Truth', 'Falsth', 'Unknown', 'NoneType', 'Decimal', 'IndexLocation',
         'guess_table_type', 'table_type',
@@ -755,6 +755,11 @@ class Date(object):
             return self._date is None
         return NotImplemented
 
+    def __format__(self, spec):
+        if self:
+            return self._date.__format__(spec)
+        return ''
+
     def __getattr__(self, name):
         return self._date.__getattribute__(name)
 
@@ -831,7 +836,7 @@ class Date(object):
         return NotImplemented
 
     def __nonzero__(self):
-        return bool(self._date)
+        return self._date is not None
 
     __radd__ = __add__
 
@@ -983,6 +988,11 @@ class DateTime(object):
             return self._datetime is None
         return NotImplemented
 
+    def __format__(self, spec):
+        if self:
+            return self._datetime.__format__(spec)
+        return ''
+
     def __getattr__(self, name):
         if self:
             attribute = self._datetime.__getattribute__(name)
@@ -1079,7 +1089,7 @@ class DateTime(object):
         return NotImplemented
 
     def __nonzero__(self):
-        return bool(self._datetime)
+        return self._datetime is not None
 
     __radd__ = __add__
 
@@ -1095,7 +1105,7 @@ class DateTime(object):
 
     def __repr__(self):
         if self:
-            return "DateTime(%d, %d, %d, %d, %d, %d, %d)" % (
+            return "DateTime(%5d, %2d, %2d, %2d, %2d, %2d, %2d)" % (
                 self._datetime.timetuple()[:6] + (self._datetime.microsecond, )
                 )
         else:
@@ -1103,7 +1113,9 @@ class DateTime(object):
 
     def __str__(self):
         if self:
-            return self.isoformat()
+            return "%4d-%2d-%2d %2d:%2d:%2d.%2d)" % (
+                self._datetime.timetuple()[:6] + (self._datetime.microsecond, )
+                )
         return ""
 
     def __sub__(self, other):
@@ -1214,7 +1226,7 @@ class DateTime(object):
     def time(self):
         if self:
             return Time(self.hour, self.minute, self.second, self.microsecond)
-        return None
+        return Time()
 
     @classmethod
     def utcnow(cls):
@@ -1272,6 +1284,11 @@ class Time(object):
         if isinstance(other, type(None)):
             return self._time is None
         return NotImplemented
+
+    def __format__(self, spec):
+        if self:
+            return self._time.__format__(spec)
+        return ''
 
     def __getattr__(self, name):
         if self:
@@ -1369,7 +1386,7 @@ class Time(object):
         return NotImplemented
 
     def __nonzero__(self):
-        return bool(self._time)
+        return self._time is not None
 
     __radd__ = __add__
 
@@ -1399,8 +1416,7 @@ class Time(object):
             t = self._time
             t = datetime.datetime(2012, 6, 27, t.hour, t.minute, t.second, t.microsecond)
             o = datetime.datetime(2012, 6, 27, other.hour, other.minute, other.second, other.microsecond)
-            t -= other
-            return Time(t.hour, t.minute, t.second, t.microsecond)
+            return t - o
         elif self and isinstance(other, (datetime.timedelta)):
             t = self._time
             t = datetime.datetime(2012, 6, 27, t.hour, t.minute, t.second, t.microsecond)
@@ -1408,6 +1424,34 @@ class Time(object):
             return Time(t.hour, t.minute, t.second, t.microsecond)
         else:
             return NotImplemented
+
+    @classmethod
+    def fromfloat(cls, num):
+        "2.5 == 2 hours, 30 minutes, 0 seconds, 0 microseconds"
+        if num < 0:
+            raise ValueError("positive value required (got %r)" % num)
+        if num == 0:
+            return Time()
+        print num
+        hours = int(num)
+        print num, hours
+        if hours:
+            num = num % hours
+        minutes = int(num * 60)
+        print num, hours, minutes
+        if minutes:
+            num = num * 60 % minutes
+        else:
+            num = num * 60
+        seconds = int(num * 60)
+        print num, hours, minutes, seconds
+        if seconds:
+            num = num * 60 % seconds
+        else:
+            num = num * 60
+        microseconds = int(num * 1000)
+        print num, hours, minutes, seconds, microseconds
+        return Time(hours, minutes, seconds, microseconds)
 
     @staticmethod
     def now():
@@ -1442,14 +1486,54 @@ class Time(object):
 
     def time(self):
         if self:
-            self._time
-        return Time()
+            return self._time
+        return None
+
+    def tofloat(self):
+        "returns Time as a float"
+        hour = self.hour
+        minute = self.minute * (1.0 / 60)
+        second = self.second * (1.0 / 3600)
+        microsecond = self.microsecond * (1.0 / 3600000)
+        return hour + minute + second + microsecond
 
 Time.max = Time(datetime.time.max)
 Time.min = Time(datetime.time.min)
 Time._null_time = object.__new__(Time)
 Time._null_time._time = None
 NullTime = Time()
+
+
+class Period(object):
+    "for matching various time ranges"
+
+    def __init__(self, year=None, month=None, day=None, hour=None, minute=None, second=None, microsecond=None):
+        params = vars()
+        self._mask = {}
+        for attr in ('year', 'month', 'day', 'hour', 'minute', 'second', 'microsecond'):
+            value = params[attr]
+            if value is not None:
+                self._mask[attr] = value
+
+    def __contains__(self, other):
+        if not self._mask:
+            return True
+        for attr, value in self._mask.items():
+            other_value = getattr(other, attr, None)
+            try:
+                if other_value == value or other_value in value:
+                    continue
+            except TypeError:
+                pass
+            return False
+        return True
+
+    def __repr__(self):
+        items = []
+        for attr in ('year', 'month', 'day', 'hour', 'minute', 'second', 'microsecond'):
+            if attr in self._mask:
+                items.append('%s=%s' % (attr, self._mask[attr]))
+        return "Period(%s)" % ', '.join(items)
 
 
 class Logical(object):
@@ -4380,7 +4464,7 @@ class Table(_Navigation):
         if specs is None:
             specs = self.field_names
         elif isinstance(specs, str):
-            specs = specs.split(sep)
+            specs = specs.strip(sep).split(sep)
         else:
             specs = list(specs)
         specs = [s.strip() for s in specs]
@@ -4532,6 +4616,14 @@ class Table(_Navigation):
         header.extra = self._dbfTableHeaderExtra
         if default_data_types is None:
             default_data_types = dict()
+        elif default_data_types == 'enhanced':
+            default_data_types = {
+                    'C' : dbf.Char,
+                    'L' : dbf.Logical,
+                    'D' : dbf.Date,
+                    'T' : dbf.DateTime,
+                    }
+            
         self._meta._default_data_types = default_data_types
         if field_data_types is None:
             field_data_types = dict()
@@ -7749,7 +7841,7 @@ fake_module('api',
     'Table', 'Record', 'List', 'Index', 'Relation', 'Iter', 'Null', 'Char', 'Date', 'DateTime', 'Time',
     'Logical', 'Quantum', 'CodePage', 'create_template', 'delete', 'field_names', 'gather', 'is_deleted',
     'recno', 'source_table', 'reset', 'scatter', 'undelete',
-    'NullDate', 'NullDateTime', 'NullTime', 'NoneType', 'NullType', 'Decimal', 'Vapor',
+    'NullDate', 'NullDateTime', 'NullTime', 'NoneType', 'NullType', 'Decimal', 'Vapor', 'Period',
     'Truth', 'Falsth', 'Unknown', 'On', 'Off', 'Other',
     'DbfError', 'DataOverflowError', 'BadDataError', 'FieldMissingError',
     'FieldSpecError', 'NonUnicodeError', 'NotFoundError',
@@ -7758,3 +7850,4 @@ fake_module('api',
     ).register()
 
 dbf = fake_module('dbf', *__all__)
+

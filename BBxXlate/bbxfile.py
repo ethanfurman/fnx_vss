@@ -45,6 +45,15 @@ def applyfieldmap(record, fieldmap):
 def unicode_strip(text):
     return unicode(text).strip()
 
+def Int(text=''):
+    if not text.strip():
+        return 0
+    return int(text)
+
+def Float(text=''):
+    if not text.strip():
+        return 0.0
+    return float(text)
 
 class BBxRec(object):
     # define datamap as per the iolist in the subclasses
@@ -83,9 +92,9 @@ class BBxRec(object):
         result = []
         for r, m in zip(ref, masks):
             if m and ',0' in m:
-                cls = int
+                cls = Int
             elif m:
-                cls = float
+                cls = Float
             else:
                 cls = unicode_strip
             if r in self.datamap:
