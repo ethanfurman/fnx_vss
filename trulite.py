@@ -166,7 +166,7 @@ class Inv(object):
             return NotImplemented
         return self.inv_num != other.inv_num
     def __repr__(self):
-        return 'Inv# %s: %s' % (self.inv_num, self.amount)
+        return 'Inv# %s: %10d (%d)' % (self.inv_num, self.amount, self.discount)
 
 class FakeInv(ARInvoice):
     """
@@ -207,7 +207,6 @@ class Batch(object):
         self.ck_date = date
         self.transactions = []
         self.discount_allowed = None
-        self.total_owed = 0
 
     def __contains__(self, inv):
         "inv should be either an AR_Invoice or an invoice number; compares against actual_inv_num"
@@ -218,7 +217,22 @@ class Batch(object):
         return inv in [inv.actual_inv_num for inv in self.transactions]
 
     def __repr__(self):
-        return "Batch(number=%r, amount=%r, data=%r, transactions=%r" % (self.ck_nbr, self.ck_amt, self.ck_date, self.transactions)
+        return "Batch:  check %r for %r on %r, %d transactions" % (self.ck_nbr, self.ck_amt, self.ck_date, len(self.transactions))
+
+    def __str__(self):
+        result = ["Batch:  check %r on %r" % (self.ck_nbr, self.ck_date)]
+        result.append('')
+        result.append("payment: %r" % self.ck_amt)
+        result.append('')
+        calc = 0
+        for tran in self.transactions:
+            calc += tran.amount
+            result.append("transaction: %r" % tran)
+        if not self.transactions:
+            result.append("transaction: None")
+        result.append('=======================================')
+        result.append('                          %10d' % calc)
+        return '\n'.join(result)
 
     def __len__(self):
         return len(self.transactions)
@@ -236,7 +250,7 @@ class Batch(object):
     def total_owed(self):
         total = 0
         for inv in self.transactions:
-            total += inv.tru_inv.balance or inv.tru_inv.amount
+            total += inv.ar_inv.balance or inv.ar_inv.amount
         return total
 
     @property
@@ -247,7 +261,6 @@ class Batch(object):
         return total
 
     def add_invoice(self, ar_inv, amount, quality, discount=0, replace=False):
-        self.total_owed += ar_inv.balance or ar_inv.amount
         self.discount_allowed = max(
                 self.discount_allowed,
                 self.ck_date <= ar_inv.end_discount_date,
@@ -255,44 +268,40 @@ class Batch(object):
         inv_num = ar_inv.actual_inv_num
         if inv_num in self and inv_num != self.ck_nbr:
             if not replace:
-                raise ValueError("%s already in batch" % inv_num)
+                raise ValueError("%s already in batch %r" % (inv_num, self.ck_nbr))
             for invoice in self.transactions:
                 if invoice.inv_num == inv_num:
                     invoice.amount = amount
                     invoice.quality = quality
                     break
             else:
-                raise AssertionError('Invoice #%s passed _contains__, failed loop' % inv_num)
+                raise AssertionError('Invoice #%s passed _contains__, failed loop (batch %r)' % (inv_num, self.ck_nbr))
         else:
             self.transactions.append(Inv(inv_num, amount, quality, discount, ar_inv))
 
     def balance_batch(self, amount=None):
         if not self.transactions:
-            raise ValueError('cannot balance a batch with no invoices')
+            raise ValueError('cannot balance a batch %r -- it has no invoices' % self.ck_nbr)
         adjustment = self.ck_amt - self.total_paid
         if self.is_balanced and amount in (0, None):
             return
         if amount is None:
             # allow positive amounts equal to 1 penny per invoice
             if adjustment > len(self):
-                raise ValueError("unable to balance batch")
+                raise ValueError("unable to balance batch %r" % self.ck_nbr)
             amount = sum([inv.discount for inv in self.transactions]) or adjustment
         if adjustment != amount:
-            raise ValueError('amount %s will not put batch in balance' % amount)
-        #print 6.1, amount
+            raise ValueError('amount %s will not put batch %r in balance' % (amount, self.ck_nbr))
         if abs(adjustment) <= len(self):
             # write off pennies
             desc = 'transcription error'
             gl_acct = GL_DISCOUNTS
         elif adjustment < 0:
-            #print 6.2
             discount = 100 - int((float(self.total_owed) / self.total_paid) * 100)
             if self.discount_allowed and discount >= 98:
-                #print 6.3
                 desc = '%d%% DISCOUNT TAKEN' % discount
                 gl_acct = GL_DISCOUNTS
             else:
-                #print 6.4
                 recorded = False
                 for invoice in self.transactions:
                     # if discounts have been recorded, undo it
@@ -319,10 +328,8 @@ class Batch(object):
                         adjustment -= amount
                 return
         else:
-            #print 6.5
             desc = 'SERVICE CHARGE PAID'
             gl_acct = GL_ACCT_REC
-        #print 6.6
         inv_num = self.ck_nbr
         template = self.transactions[0].ar_inv
         invoice = FakeInv(
