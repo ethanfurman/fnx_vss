@@ -2316,12 +2316,12 @@ class PropertyDict(object):
         return '\n'.join(["%r=%r" % (x, yo._values[x]) for x in yo._order])
     def keys(yo):
         return yo._order[:]
-    __pop_sentinal = object()
-    def pop(yo, name, default=__pop_sentinal):
+    __pop_sentinel = object()
+    def pop(yo, name, default=__pop_sentinel):
         if name in yo._values:
             yo._order.pop(yo._order.index(name))
             return yo._values.pop(name)
-        elif default is not __pop_sentinal:
+        elif default is not yo.__pop_sentinel:
             return default
         else:
             raise KeyError('key not found: %r' % name)
