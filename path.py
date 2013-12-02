@@ -48,12 +48,14 @@ class Path(object):
     ext   = .part1.ext
     """
 
-    def __new__(cls, string=None, sep=None):
+    def __new__(cls, string='./', sep=None):
         if string is None:
             raise ValueError("no path specified")
-        if isinstance(string, cls):
+        elif string == '.':
+            string = './'
+        elif isinstance(string, cls):
             return string
-        if isinstance(string, str):
+        elif isinstance(string, str):
             new_cls = sPath
         else:
             new_cls = uPath
@@ -503,6 +505,11 @@ def startswith(self, prefix, start=None, end=None):
     return (self._path + self._filename).startswith(new_prefix, start, end)
 methods['startswith'] = startswith
 del startswith
+
+def stat(self):
+    return os.stat(self)
+methods['stat'] = stat
+del stat
 
 def strip(self, chars=None):
     if chars is not None:
