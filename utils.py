@@ -577,17 +577,14 @@ class Month(AutoEnum):
 def all_equal(iterator, test=None):
     '''if `test is None` do a straight equality test'''
     it = iter(iterator)
-    try:
-        if test is None:
-            target = next(it)
-        else:
-            target = test(next(it))
-    except StopIteration:
-        return True
     if test is None:
-        test = lambda x: x == target
+        try:
+            target = next(it)
+            test = lambda x: x == target
+        except StopIteration:
+            return True
     for item in it:
-        if test(item) != target:
+        if not test(item):
             return False
     return True
 
