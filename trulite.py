@@ -14,12 +14,20 @@ DISCOUNT_CUTOFF = 15
 class ARAgingLine(tuple):
     __slots__ = ()
     def __new__(cls, text):
-        data = [f.strip() for f in text.split('\t')]
-        data[2] = text_to_date(data[2], 'mdy')
-        data[7] = int(data[7])
-        data[8] = int(data[8])
-        data.append(data[1].startswith('**'))
-        data[1] = data[1].strip('*')
+        try:
+            pieces = text.split('\t', 3)
+            pieces, end_piece = pieces[:3], pieces[3]
+            pieces.extend(end_piece.rsplit('\t', 5))
+            pieces[3] = pieces[3].replace('\t', ' ')
+            data = [f.strip() for f in pieces]
+            data[2] = text_to_date(data[2], 'mdy')
+            data[7] = int(data[7])
+            data[8] = int(data[8])
+            data.append(data[1].startswith('**'))
+            data[1] = data[1].strip('*')
+        except Exception, exc:
+            exc.args = (exc.args[0] + '\noriginal row: %r\n' % text,) + exc.args[1:]
+            raise
         return tuple.__new__(cls, tuple(data))
     @property
     def cust_num(self):
