@@ -14,11 +14,8 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email.Encoders import encode_base64
 from VSS import dbf
-from VSS.dbf import DateTime, Date, Time
+from VSS.dbf import DateTime, Date, Time, Integer, String
 from enum import Enum, IntEnum
-
-String = str, unicode
-Integer = int, long
 
 one_day = timedelta(1)
 
@@ -2738,17 +2735,36 @@ def text_to_date(text, format='ymd'):
     '''(yy)yymmdd'''
     if not text.strip():
         return None
-    dd = mm = yyyy = None
-    if len(text) == 6:
-        if format == 'ymd':
-            yyyy, mm, dd = int(text[:2])+2000, int(text[2:4]), int(text[4:])
-        elif format == 'mdy':
-            mm, dd, yyyy = int(text[:2]), int(text[2:4]), int(text[4:])+2000
-    elif len(text) == 8:
-        if format == 'ymd':
-            yyyy, mm, dd = int(text[:4]), int(text[4:6]), int(text[6:])
-        elif format == 'mdy':
-            mm, dd, yyyy = int(text[:2]), int(text[2:4]), int(text[4:])
+    try:
+        dd = mm = yyyy = None
+        if '-' in text:
+            pieces = text.split('-')
+            if len(pieces) != 3 or not all_equal(pieces, lambda p: p and len(p) in (2, 4)):
+                raise ValueError
+            text = ''.join(pieces)
+        elif '/' in text:
+            pieces = text.split('/')
+            if len(pieces) != 3 or not all_equal(pieces, lambda p: p and len(p) in (2, 4)):
+                raise ValueError
+            text = ''.join(pieces)
+        if len(text) == 6:
+            if format == 'ymd':
+                yyyy, mm, dd = int(text[:2])+2000, int(text[2:4]), int(text[4:])
+            elif format == 'mdy':
+                mm, dd, yyyy = int(text[:2]), int(text[2:4]), int(text[4:])+2000
+        elif len(text) == 8:
+            if format == 'ymd':
+                yyyy, mm, dd = int(text[:4]), int(text[4:6]), int(text[6:])
+            elif format == 'mdy':
+                mm, dd, yyyy = int(text[:2]), int(text[2:4]), int(text[4:])
+    except Exception, exc:
+        if exc.args:
+            arg0 = exc.args[0] + '\n'
+        else:
+            arg0 = ''
+            exc.args = (arg0 + 'date %r must have two digits for day and month, and two or four digits for year' % text, ) + exc.args[1:]
+        raise
+
     if dd is None:
         raise ValueError("don't know how to convert %r using %r" % (text, format))
     return Date(yyyy, mm, dd)
