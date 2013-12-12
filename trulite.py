@@ -1,5 +1,5 @@
 from VSS.BBxXlate.bbxfile import BBxFile
-from VSS.utils import one_day, text_to_date
+from VSS.utils import one_day, text_to_date, String, Integer
 from VSS import AutoEnum
 
 GL_ACCT_REC = '1100-00'
@@ -240,11 +240,18 @@ class Batch(object):
     @property
     def balance(self):
         "amount of check - amount owed on all invoices (negative when discounts are taken)"
-        return self.ck_amt - self.total_paid
+        return self.ck_amt - self.total_paid + self.total_discount
 
     @property
     def is_balanced(self):
         return self.balance == 0 
+
+    @property
+    def total_discount(self):
+        discount = 0
+        for inv in self.transactions:
+            discount += inv.discount
+        return -discount
 
     @property
     def total_owed(self):
@@ -353,3 +360,153 @@ class Status(AutoEnum):
     bad = ()
 globals().update(Status.__members__)
 
+def currency(number):
+    if not isinstance(number, (Integer, String)):
+        raise ValueError('currency only works with integer and string types (received %s %r )' % (type(number), number))
+    if isinstance(number, Integer):
+        number = str(number)
+        number = '0' * (3 - len(number)) + number
+        number = number[:-2] + '.' + number[-2:]
+    elif isinstance(number, String):
+        number = int(number.replace('.',''))
+    return number
+
+
+class CashReceipt(object):
+    class GLEntry(object):
+        def __init__(self, dp, acct, debit, credit):
+            self.dp = int(dp)
+            self.acct = acct
+            self.debit = currency(debit)
+            self.credit = currency(credit)
+        def __repr__(self):
+            dp = str(self.dp)
+            debit = currency(self.debit)
+            credit = currency(self.credit)
+            return '%s(%s)' % (self.__class__.__name__, ', '.join([dp, self.acct, debit, credit]))
+        def __str__(self):
+            debit = currency(self.debit)
+            credit = currency(self.credit)
+            return '%s %s %10s %10s' % (self.dp, self.acct, debit, credit)
+
+    class Invoice(object):
+        def __init__(self, number, date, discount, apply):
+            self.number = number
+            self.date = text_to_date(date, 'mdy')
+            self.discount = currency(discount)
+            self.apply = currency(apply)
+            self.total = self.discount + self.apply
+        def __repr__(self):
+            discount = currency(self.discount)
+            apply = currency(self.apply)
+            date = repr(self.date)
+            return '%s(%s)' % (self.__class__.__name__, ', '.join([self.number, date, discount, apply]))
+        def __str__(self):
+            discount = currency(self.discount)
+            apply = currency(self.apply)
+            date = self.date.strftime('%m-%d-%y')
+            return '%6s %s %9s %10s' % (self.number, self.date, discount, apply)
+
+    class Check(object):
+        def __init__(self, number, date, amount, s):
+            self.number = number
+            self.date = text_to_date(date, 'mdy')
+            self.amount = currency(amount)
+            self.s = s
+        def __repr__(self):
+            amount = currency(self.amount)
+            date = repr(self.date)
+            return '%s(%s)' % (self.__class__.__name__, ', '.join([self.number, date, amount, self.s]))
+        def __str__(self):
+            amount = currency(self.amount)
+            date = self.date.strftime('%m-%d-%y')
+            return '%-6s %s %10s %s' % (self.number, date, amount, self.s)
+
+    class Customer(object):
+        def __init__(self, number, name):
+            self.number = number
+            self.name = name
+        def __repr__(self):
+            return '%s(%s, %s)' % (self.__class__.__name__, self.number, self.name)
+        def __str__(self):
+            return '%-6s %-20s' % (self.number, self.name)
+
+    @staticmethod
+    def line_elements(text):
+        return (
+                text[0:3].strip(),      # sequence number
+                (
+                 text[4:10].strip(),     # customer number
+                 text[11:31].strip(),    # customer name
+                ),
+                (
+                 text[32:40].strip(),    # check number
+                 text[41:49].strip(),    # check date
+                 text[50:60].strip(),    # check amout
+                 text[61:62].strip(),    # check S (?)
+                ),
+                (
+                 text[63:69].strip(),    # invoice number
+                 text[70:78].strip(),    # invoice date
+                 text[79:88].strip(),    # invoice discount
+                 text[89:99].strip(),    # invoice applied amount
+                ),
+                (
+                 text[100:102].strip(),    # gl dp (?)
+                 text[103:110].strip(),   # gl account number
+                 text[111:121].strip(),  # gl debit amount
+                 text[122:132].strip(),  # gl credit amount
+                ),
+                )
+
+    def __init__(self, lines, date):
+        Customer, Check, Invoice, GLEntry = self.Customer, self.Check, self.Invoice, self.GLEntry
+        self.invoices = []
+        self.gl_distribution = []
+        self.date = date
+        seq, cust, chk, inv, gl = self.line_elements(lines[0])
+        self.sequence = int(seq)
+        self.customer = Customer(*cust)
+        self.check = Check(*chk)
+        self.invoices.append(Invoice(*inv))
+        self.gl_distribution.append(GLEntry(*gl))
+        seq, cust, chk, inv, gl = self.line_elements(lines[1])
+        self.check.num2 = chk[0]
+        if any(inv):
+            self.invoices.append(Invoice(*inv))
+        if any(gl):
+            self.gl_distribution.append(GLEntry(*gl))
+        for line in lines[2:]:
+            seq, cust, chk, inv, gl = self.line_elements(line)
+            if any(inv):
+                self.invoices.append(Invoice(*inv))
+            if any(gl):
+                self.gl_distribution.append(GLEntry(*gl))
+
+def receipt_file(filename):
+    receipts = []
+    with open(filename) as src:
+        data = []
+        date = None
+        partial = False
+        for line in src:
+            if line == '\r\n':
+                if data and data[0][0] != ' ':
+                    receipts.append(CashReceipt(data, date))
+                data = []
+            elif line.startswith('\r'):
+                if date is None and 'BATCH:' in line:
+                    date = text_to_date(line[67:75], 'mdy')
+                continue
+            elif line.endswith('\r\x0c\r\n'):
+                line = line[:-4]
+                partial = True
+                data.append(line)
+            elif partial:
+                l1, l2 = data[-1], line
+                line = l1 + l2[len(l1):-2]
+                data[-1] = line
+                partial = False
+            else:
+                data.append(line[:-2])
+    return receipts
