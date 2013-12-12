@@ -12,10 +12,50 @@ from unittest import TestCase, main as Run
 from VSS import Table
 from VSS.dbf import Date, Time
 from VSS.trulite import ARInvoice, ARAgingLine, ar_open_invoices, ar_invoices, Batch
-from VSS.utils import cszk, normalize_address, xrange, suppress
+from VSS.utils import cszk, normalize_address, xrange, suppress, all_equal
 from VSS.wellsfargo import RmInvoice, RmPayment, RMFFRecord, lockbox_payments, Int, FederalHoliday, ACHStore, ACHPayment, ACHFile, ACH_ETC, Customer
 
 globals().update(Customer.__members__)
+
+class Test_all_equal(TestCase):
+
+    def test_simple_equal(self):
+        for items in (
+                (1, 1, 1, 1, 1),
+                (21, 21, 21),
+                [827, 827, 827, 827, 827],
+                [None, None],
+                [],
+                ):
+            self.assertTrue(all_equal(items), '%r not all equal?' % (items, ))
+
+    def test_simple_not_equal(self):
+        for items in (
+                (1, 1, 1, 1, 11),
+                (21, 2, 21),
+                [3, 827, 827, 827, 827],
+                [None, None, False],
+                ):
+            self.assertFalse(all_equal(items), '%r all equal?' % (items, ))
+
+    def test_function_equal(self):
+        for items, func in (
+                ((10, 12, 26, 4, 100), lambda x: x % 2 == 0),
+                (('abc', 'def', 'ghi'), lambda x: len(x) == 3),
+                ([827, 27, 87, 71, 99], lambda x: x % 2 == 1),
+                ([None, None], lambda x: x is None),
+                ([], lambda x: x is True),
+                ):
+            self.assertTrue(all_equal(items, func), '%r not all equal?' % (items, ))
+
+    def test_function_not_equal(self):
+        for items, func in (
+                ((10, 12, 26, 4, 101), lambda x: x % 2 == 0),
+                (('abc', 'defg', 'hij'), lambda x: len(x) == 3),
+                ([82, 27, 87, 71, 99], lambda x: x % 2 == 1),
+                ([None, None, True], lambda x: x is None),
+                ):
+            self.assertFalse(all_equal(items, func), '%r all equal?' % (items, ))
 
 cszk_tests = (
 

@@ -574,17 +574,14 @@ class Month(AutoEnum):
 def all_equal(iterator, test=None):
     '''if `test is None` do a straight equality test'''
     it = iter(iterator)
-    try:
-        if test is None:
-            target = next(it)
-        else:
-            target = test(next(it))
-    except StopIteration:
-        return True
     if test is None:
-        test = lambda x: x == target
+        try:
+            target = next(it)
+            test = lambda x: x == target
+        except StopIteration:
+            return True
     for item in it:
-        if test(item) != target:
+        if not test(item):
             return False
     return True
 
@@ -2313,12 +2310,12 @@ class PropertyDict(object):
         return '\n'.join(["%r=%r" % (x, yo._values[x]) for x in yo._order])
     def keys(yo):
         return yo._order[:]
-    __pop_sentinal = object()
-    def pop(yo, name, default=__pop_sentinal):
+    __pop_sentinel = object()
+    def pop(yo, name, default=__pop_sentinel):
         if name in yo._values:
             yo._order.pop(yo._order.index(name))
             return yo._values.pop(name)
-        elif default is not __pop_sentinal:
+        elif default is not yo.__pop_sentinel:
             return default
         else:
             raise KeyError('key not found: %r' % name)
