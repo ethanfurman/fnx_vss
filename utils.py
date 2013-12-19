@@ -2929,3 +2929,41 @@ class suppress(object):
         pass
     def __exit__(self, etype, val, tb):
         return etype is None or issubclass(etype, self.exceptions)
+
+
+class ACHPayment(object):
+    """A single payment from company to a vendor."""
+
+    def __init__(self,
+            description, sec_code, 
+            vendor_name, vendor_inv_num, vendor_rtng, vendor_acct,
+            transaction_code, vendor_acct_type, amount):
+        """
+        description:  10 chars
+        sec_code: CCD or CTX
+        vendor_name: 22 chars
+        vendor_inv_num: 15 chars
+        vendor_rtng: 9 chars
+        vendor_acct: 17 chars
+        transaction_code: ACH_ETC code
+        vendor_acct_type: 'domestic' or 'foreign'
+        amount: 10 digits (pennies)
+        """
+        args = locals()
+        args.pop('self')
+        for attr, value in args.items():
+            if isinstance(value, (unicode, str)):
+                value = value.upper()
+            setattr(self, attr, value)
+        self.validate_routing(vendor_rtng)
+
+    @staticmethod
+    def validate_routing(rtng):
+        total = 0
+        for digit, weight in zip(rtng, (3, 7, 1, 3, 7, 1, 3, 7)):
+            total += int(digit) * weight
+        chk_digit = (10 - total % 10) % 10
+        if chk_digit != int(rtng[-1]):
+            raise ValueError('Routing number %s fails check digit calculation' % rtng)
+
+

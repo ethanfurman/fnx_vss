@@ -4,7 +4,7 @@ from itertools import groupby
 from VSS import Table, Month, Weekday, days_per_month, AutoEnum, IntEnum, OrderedDict
 from VSS.BBxXlate.bbxfile import BBxFile
 from VSS.path import Path
-from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time, xrange, Date, Time, OrderedDict
+from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time, xrange, Date, Time, OrderedDict, ACHPayment
 
 try:
     next
@@ -755,63 +755,35 @@ class ACHStore(object):
         return ACHFile(company_name, company_id, file_id, filename, mod)
 
 
-class ACHPayment(object):
-    """A single payment from TRU to a vendor."""
-
-    def __init__(self,
-            description, sec_code, 
-            vendor_name, vendor_inv_num, vendor_rtng, vendor_acct,
-            transaction_code, vendor_acct_type, amount):
-        """
-        description:  10 chars
-        sec_code: CCD or CTX
-        vendor_name: 22 chars
-        vendor_inv_num: 15 chars
-        vendor_rtng: 9 chars
-        vendor_acct: 17 chars
-        transaction_code: ACH_ETC code
-        vendor_acct_type: 'domestic' or 'foreign'
-        amount: 10 digits (pennies)
-        """
-        args = locals()
-        args.pop('self')
-        for attr, value in args.items():
-            if isinstance(value, (unicode, str)):
-                value = value.upper()
-            setattr(self, attr, value)
-        self.validate_routing(vendor_rtng)
-
-    @staticmethod
-    def validate_routing(rtng):
-        total = 0
-        for digit, weight in zip(rtng, (3, 7, 1, 3, 7, 1, 3, 7)):
-            total += int(digit) * weight
-        chk_digit = (10 - total % 10) % 10
-        if chk_digit != int(rtng[-1]):
-            raise ValueError('Routing number %s fails check digit calculation' % rtng)
-
-
 class ACHFile(object):
     """Accepts multiple ACH payments and generates file for tranmission to WFB."""
 
-    file_header = '101 091000019%(id)s%(date)s%(time)s%(id_mod)s094101WELLS FARGO            %(company)-23s        '
-    batch_header = '5200%(company)-16s%(discretionary)-20s%(company_id)s%(sec)s%(description)-10s%(ref_date)-6s%(eff_date)s   109100001%(batch_number)07d'
-    entry_detail = '6%(code)d%(routing_nbr)s%(account)-17s%(amount)010d%(payee_id)-15s%(payee_name)-22s  %(addenda)d09100001%(entry_number)07d'
-    batch_control = '8200%(entries)06d%(entry_hash)010d%(debit)012d%(credit)012d1900918292                         09100001%(batch_number)07d'
+    origin_rtng = 91000019
+    origin_id = 9100001
+    origin_bank = 'WELLS FARGO'
+
+    file_header = '101 %(origin_rtng)09d%(file_id)s%(date)s%(time)s%(id_mod)s094101%(origin_bank)-23s%(company)-23s        '
+    batch_header = '5200%(company)-16s%(discretionary)-20s%(company_id)s%(sec)s%(description)-10s%(ref_date)-6s%(eff_date)s   1%(origin_id)08d%(batch_number)07d'
+    entry_detail = '6%(code)d%(routing_nbr)s%(account)-17s%(amount)010d%(payee_id)-15s%(payee_name)-22s  %(addenda)d%(origin_id)08d%(entry_number)07d'
+    batch_control = '8200%(entries)06d%(entry_hash)010d%(debit)012d%(credit)012d%(company_id)s                         %(origin_id)08d%(batch_number)07d'
     file_control = '9%(batches)06d%(blocks)06d%(entries)08d%(entry_hash)010d%(debit)012d%(credit)012d                                       '
 
     def __init__(self, company_name, company_id, file_id, filename, modifier):
+        if len(company_id) > 10 or len(file_id) > 10:
+            raise ValueError('company_id and file_id cannot be longer than 10 characters (%r, %r)' % (company_id, file_id))
         self.today = Date.today()
         self.time = Time.now()
         self.company_name = company_name.upper()
-        self.company_id = company_id.upper()
-        self.file_id = file_id.upper()
+        self.company_id = company_id.upper().zfill(10)
+        self.file_id = file_id.upper().zfill(10)
         self.filename = filename
         self.modifier = modifier.upper()
         self.payments = []
         self.lines = [
                 self.file_header % dict(
-                    id=file_id,
+                    origin_rtng=self.origin_rtng,
+                    origin_bank=self.origin_bank,
+                    file_id=file_id,
                     date=self.today.strftime('%y%m%d'), time=self.time.strftime('%H%M'),
                     id_mod=modifier, company=self.company_name[:23],
                     )]
@@ -853,10 +825,16 @@ class ACHFile(object):
             if batches > 10**7:
                 raise ValueError("too many batches for this file, need to split")
             lines.append(self.batch_header % dict(
-                company=self.company_name[:16], company_id=self.company_id,
-                discretionary='', description=description[:10],
-                ref_date=ref_date, eff_date=eff_date, batch_number=batches, sec=sec_code
-                ))
+                    origin_id=self.origin_id,
+                    company=self.company_name[:16],
+                    company_id=self.company_id,
+                    discretionary='',
+                    description=description[:10],
+                    ref_date=ref_date,
+                    eff_date=eff_date,
+                    batch_number=batches,
+                    sec=sec_code
+                    ))
             for pymnt in group:
                 total_entries += 1
                 batch_entries += 1
@@ -883,21 +861,35 @@ class ACHFile(object):
                 else:
                     raise ValueError("Unknown transaction code (%s) for payment %s" % (trans_code, pymnt))
                 lines.append(self.entry_detail % dict(
-                    code=trans_code, routing_nbr=pymnt.vendor_rtng, account=pymnt.vendor_acct[-17:],
-                    amount=pymnt.amount, payee_id=pymnt.vendor_inv_num[:15], payee_name=pymnt.vendor_name[:22],
-                    addenda=0, entry_number=batch_entries,
-                    ))
+                        origin_id=self.origin_id,
+                        code=trans_code,
+                        routing_nbr=pymnt.vendor_rtng,
+                        account=pymnt.vendor_acct[-17:],
+                        amount=pymnt.amount,
+                        payee_id=pymnt.vendor_inv_num[:15],
+                        payee_name=pymnt.vendor_name[:22],
+                        addenda=0,
+                        entry_number=batch_entries,
+                        ))
             total_hash += batch_hash
             lines.append(self.batch_control % dict(
-                sec=sec_code,
-                entries=batch_entries, entry_hash=batch_hash%10**10,
-                debit=batch_debit, credit=batch_credit, batch_number=batches,
-                ))
+                    origin_id=self.origin_id,
+                    company_id=self.company_id,
+                    sec=sec_code,
+                    entries=batch_entries,
+                    entry_hash=batch_hash%10**10,
+                    debit=batch_debit,
+                    credit=batch_credit,
+                    batch_number=batches,
+                    ))
         lines.append(self.file_control % dict(
-            batches=batches, blocks=(len(lines)+10)//10,
-            entries=total_entries, entry_hash=total_hash%10**10,
-            debit=total_debit, credit=total_credit,
-            ))
+                batches=batches,
+                blocks=(len(lines)+10)//10,
+                entries=total_entries,
+                entry_hash=total_hash%10**10,
+                debit=total_debit,
+                credit=total_credit,
+                ))
         with open(self.filename, 'w') as ach_file:
             ach_file.write('\n'.join(lines) + '\n')
 
