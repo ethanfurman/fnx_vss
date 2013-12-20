@@ -654,7 +654,7 @@ class TestACH(TestCase):
         target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
         payment = ACHPayment(*self.vendors[0])
         ach_file.add_payment(payment)
-        ach_file.close()
+        ach_file.save_at('.')
         with open(ach_file.filename) as file:
             contents = file.read()
         lines = contents.split('\n')
@@ -679,7 +679,7 @@ class TestACH(TestCase):
         target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
         ach_file.add_payment(ACHPayment(*self.vendors[0]))
         ach_file.add_payment(ACHPayment(*self.vendors[1]))
-        ach_file.close()
+        ach_file.save_at('.')
         with open(ach_file.filename) as file:
             contents = file.read()
         lines = contents.split('\n')
@@ -706,7 +706,7 @@ class TestACH(TestCase):
         ach_file.add_payment(ACHPayment(*self.vendors[0]))
         ach_file.add_payment(ACHPayment(*self.vendors[1]))
         ach_file.add_payment(ACHPayment(*self.vendors[2]))
-        ach_file.close()
+        ach_file.save_at('.')
         with open(ach_file.filename) as file:
             contents = file.read()
         lines = contents.split('\n')
@@ -738,7 +738,7 @@ class TestACH(TestCase):
         ach_file.add_payment(ACHPayment(*self.vendors[1]))
         ach_file.add_payment(ACHPayment(*self.vendors[2]))
         ach_file.add_payment(ACHPayment(*self.vendors[3]))
-        ach_file.close()
+        ach_file.save_at('.')
         with open(ach_file.filename) as file:
             contents = file.read()
         lines = contents.split('\n')
@@ -773,7 +773,7 @@ class TestACH(TestCase):
         ach_file.add_payment(ACHPayment(*self.vendors[2]))
         ach_file.add_payment(ACHPayment(*self.vendors[3]))
         ach_file.add_payment(ACHPayment(*self.vendors[4]))
-        ach_file.close()
+        ach_file.save_at('.')
         with open(ach_file.filename) as file:
             contents = file.read()
         lines = contents.split('\n')

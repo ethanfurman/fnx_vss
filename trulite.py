@@ -195,6 +195,8 @@ class FakeInv(ARInvoice):
     def __repr__(self):
         return ('<FakeInv: cust_id=%r, name=%r, date=%r, inv_num=%r, balance=%r>'
                 % (self.cust_id, self.name, self.date, self.inv_num, self.balance))
+    def add_amount(self, amount):
+        self._amount += amount
     @property
     def desc(self):
         return self._desc
@@ -259,7 +261,7 @@ class Batch(object):
         discount = 0
         for inv in self.transactions:
             discount += inv.discount
-        return -discount
+        return discount
 
     @property
     def total_owed(self):
@@ -290,7 +292,7 @@ class Batch(object):
                     invoice.quality = quality
                     break
             else:
-                raise AssertionError('Invoice #%s passed _contains__, failed loop (batch %r)' % (inv_num, self.ck_nbr))
+                raise AssertionError('Invoice #%s passed __contains__, failed loop (batch %r)' % (inv_num, self.ck_nbr))
         else:
             self.transactions.append(Inv(inv_num, amount, quality, discount, ar_inv))
 
@@ -306,6 +308,7 @@ class Batch(object):
                 raise ValueError("unable to balance batch %r" % self.ck_nbr)
             amount = sum([inv.discount for inv in self.transactions]) or adjustment
         if adjustment != amount:
+            import pdb; pdb.set_trace()
             raise ValueError('amount %s will not put batch %r in balance' % (amount, self.ck_nbr))
         if abs(adjustment) <= len(self):
             # write off pennies

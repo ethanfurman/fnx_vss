@@ -797,7 +797,7 @@ class ACHFile(object):
             raise ValueError("%r is closed" % self)
         self.payments.append(payment)
 
-    def close(self):
+    def save_at(self, path):
         """
         Create the file, write the entries, close the file.
         """
