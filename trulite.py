@@ -1,3 +1,5 @@
+from __future__ import with_statement
+
 from VSS.BBxXlate.bbxfile import BBxFile
 from VSS.utils import one_day, text_to_date, String, Integer
 from VSS import AutoEnum
@@ -250,7 +252,7 @@ class Batch(object):
     @property
     def balance(self):
         "amount of check - amount owed on all invoices (negative when discounts are taken)"
-        return self.ck_amt - self.total_paid + self.total_discount
+        return self.ck_amt - self.total_paid - self.total_discount
 
     @property
     def is_balanced(self):
@@ -297,9 +299,14 @@ class Batch(object):
             self.transactions.append(Inv(inv_num, amount, quality, discount, ar_inv))
 
     def balance_batch(self, amount=None):
+        _debug_ = False
+        if self.ck_nbr == '054014':
+            _debug_ = True
         if not self.transactions:
             raise ValueError('cannot balance a batch %r -- it has no invoices' % self.ck_nbr)
         adjustment = self.ck_amt - self.total_paid
+        if _debug_:
+            print '0, Batch.balance_batch --> amount: %r,  adjustment: %r,  balanced: %r (%r)' % (amount, adjustment, self.is_balanced, self.balance)
         if self.is_balanced and amount in (0, None):
             return
         if amount is None:
@@ -307,6 +314,8 @@ class Batch(object):
             if adjustment > len(self):
                 raise ValueError("unable to balance batch %r" % self.ck_nbr)
             amount = sum([inv.discount for inv in self.transactions]) or adjustment
+        if _debug_:
+            print '1, Batch.balance_batch --> amount: %r,  adjustment: %r,  balanced: %r' % (amount, adjustment, self.is_balanced)
         if adjustment != amount:
             import pdb; pdb.set_trace()
             raise ValueError('amount %s will not put batch %r in balance' % (amount, self.ck_nbr))
@@ -315,7 +324,9 @@ class Batch(object):
             desc = 'transcription error'
             gl_acct = GL_DISCOUNTS
         elif adjustment < 0:
-            discount = 100 - int((float(self.total_owed) / self.total_paid) * 100)
+            discount = int(float(self.total_owed) / (self.total_paid - adjustment) * 100)
+            if _debug_:
+                print '2, Batch.balance_batch --> amount: %r,  adjustment: %r,  balanced: %r,  discount allowed: %r, discount: %r' % (amount, adjustment, self.is_balanced, self.discount_allowed, discount)
             if self.discount_allowed and discount >= 98:
                 desc = '%d%% DISCOUNT TAKEN' % discount
                 gl_acct = GL_DISCOUNTS
