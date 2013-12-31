@@ -776,7 +776,7 @@ class ACHFile(object):
         self.company_name = company_name.upper()
         self.company_id = company_id.upper().zfill(10)
         self.file_id = file_id.upper().zfill(10)
-        self.filename = filename
+        self.filename = Path(filename)
         self.modifier = modifier.upper()
         self.payments = []
         self.lines = [
@@ -890,7 +890,7 @@ class ACHFile(object):
                 debit=total_debit,
                 credit=total_credit,
                 ))
-        with open(self.filename, 'w') as ach_file:
+        with open(path/self.filename, 'w') as ach_file:
             ach_file.write('\n'.join(lines) + '\n')
 
 class Customer(AutoEnum):

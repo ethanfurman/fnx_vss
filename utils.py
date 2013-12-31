@@ -2934,6 +2934,8 @@ class suppress(object):
 class ACHPayment(object):
     """A single payment from company to a vendor."""
 
+    _strip = staticmethod(translator(delete=' -'))
+
     def __init__(self,
             description, sec_code, 
             vendor_name, vendor_inv_num, vendor_rtng, vendor_acct,
@@ -2949,13 +2951,23 @@ class ACHPayment(object):
         vendor_acct_type: 'domestic' or 'foreign'
         amount: 10 digits (pennies)
         """
-        args = locals()
-        args.pop('self')
-        for attr, value in args.items():
-            if isinstance(value, (unicode, str)):
-                value = value.upper()
-            setattr(self, attr, value)
-        self.validate_routing(vendor_rtng)
+        self.description = description.upper()
+        self.sec_code = sec_code.upper()
+        self.vendor_name = vendor_name.upper()
+        self.vendor_inv_num = str(vendor_inv_num).upper()
+        self.vendor_rtng = self._strip(vendor_rtng)
+        self.vendor_acct = self._strip(vendor_acct)
+        self.transaction_code = transaction_code
+        self.vendor_acct_type = vendor_acct_type
+        self.amount = amount
+        self.validate_routing(self.vendor_rtng)
+
+    def __repr__(self):
+        return 'ACHPayment(%s)' % (', '.join([
+            repr(v) for v in (
+                self.description, self.sec_code, self.vendor_name, self.vendor_inv_num, self.vendor_rtng, self.vendor_acct,
+                self.transaction_code, self.vendor_acct_type, self.amount,
+                )]))
 
     @staticmethod
     def validate_routing(rtng):
@@ -2965,5 +2977,4 @@ class ACHPayment(object):
         chk_digit = (10 - total % 10) % 10
         if chk_digit != int(rtng[-1]):
             raise ValueError('Routing number %s fails check digit calculation' % rtng)
-
 
