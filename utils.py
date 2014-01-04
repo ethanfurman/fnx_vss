@@ -2825,22 +2825,16 @@ def timedelta_as_float(td):
 def Time_as_float(t):
     return t.tofloat()
 
-def mail(server, port, sender, receiver, message):
+def mail(server, port, message):
     """sends email.message to server:port
 
     receiver is a list of addresses
     """
-    msg = MIMEText(message.get_payload())
-    for address in receiver:
-        msg['To'] = address
-    msg['From'] = sender
-    for header, value in message.items():
-        if header in ('To','From'):
-            continue
-        msg[header] = value
+    receiver = message.get_all('To', []) + message.get_all('Cc', []) + message.get_all('Bcc', [])
+    sender = message['From']
     smtp = smtplib.SMTP(server, port)
     try:
-        send_errs = smtp.sendmail(msg['From'], receiver, msg.as_string())
+        send_errs = smtp.sendmail(message['From'], receiver, message.as_string())
     except smtplib.SMTPRecipientsRefused, exc:
         send_errs = exc.recipients
     smtp.quit()
@@ -2850,7 +2844,7 @@ def mail(server, port, sender, receiver, message):
             server = 'mail.' + user.split('@')[1]
             smtp = smtplib.SMTP(server, 25)
             try:
-                smtp.sendmail(msg['From'], [user], msg.as_string())
+                smtp.sendmail(message['From'], [user], message.as_string())
             except smtplib.SMTPRecipientsRefused, exc:
                 errs[user] = [send_errs[user], exc.recipients[user]]
             smtp.quit()
