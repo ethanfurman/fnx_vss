@@ -6,6 +6,7 @@ import datetime
 import re
 import smtplib
 import string
+import sys
 import syslog
 from datetime import date, timedelta
 from decimal import Decimal
@@ -21,10 +22,12 @@ one_day = timedelta(1)
 
 spelled_out_numbers = set(['ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN'])
 
+
 try:
     next
 except NameError:
     from dbf import next
+
 
 try:
     from collections import OrderedDict
@@ -288,6 +291,7 @@ except ImportError:
             "od.viewitems() -> a set-like object providing a view on od's items"
             return ItemsView(self)
 
+
 try:
     from collections import Counter
 except ImportError:
@@ -493,15 +497,19 @@ def Table(*args, **kwargs):
         kwargs['codepage'] = 'utf8'
     return dbf.Table(*args, **kwargs)
 
+
 def days_per_month(year):
     return (dbf.days_per_month, dbf.days_per_leap_month)[dbf.is_leapyear(year)]
+
 
 class AutoEnum(Enum):
     """
     Automatically numbers enum members starting from 1.
     Includes support for a custom docstring per member.
     """
+
     __last_number__ = 0
+
     def __new__(cls, *args):
         """Ignores arguments (will be handled in __init__."""
         value = cls.__last_number__ + 1
@@ -509,6 +517,7 @@ class AutoEnum(Enum):
         obj = object.__new__(cls)
         obj._value_ = value
         return obj
+
     def __init__(self, *args):
         """Can handle 0 or 1 argument; more requires a custom __init__.
         0  = auto-number w/o docstring
@@ -519,31 +528,39 @@ class AutoEnum(Enum):
             self.__doc__ = args[0]
         elif args:
             raise TypeError('%s not dealt with -- need custom __init__' % (args,))
+
     def __index__(self):
         return self.value
+
     def __int__(self):
         return self.value
+
     def __ge__(self, other):
         if self.__class__ is other.__class__:
             return self.value >= other.value
         return NotImplemented
+
     def __gt__(self, other):
         if self.__class__ is other.__class__:
             return self.value > other.value
         return NotImplemented
+
     def __le__(self, other):
         if self.__class__ is other.__class__:
             return self.value <= other.value
         return NotImplemented
+
     def __lt__(self, other):
         if self.__class__ is other.__class__:
             return self.value < other.value
         return NotImplemented
+
     @classmethod
     def export(cls, namespace):
         for name, member in cls.__members__.items():
             if name == member.name:
                 namespace[name] = member
+
 
 class Weekday(AutoEnum):
     __order__ = 'MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY SATURDAY SUNDAY'
@@ -554,6 +571,7 @@ class Weekday(AutoEnum):
     FRIDAY = ()
     SATURDAY = ()
     SUNDAY = ()
+
 
 class Month(AutoEnum):
     __order__ = 'JANUARY FEBRUARY MARCH APRIL MAY JUNE JULY AUGUST SEPTEMBER OCTOBER NOVEMBER DECEMBER'
@@ -585,6 +603,7 @@ def all_equal(iterator, test=None):
             return False
     return True
 
+
 def bb_text_to_date(text):
     mm, dd, yy = map(int, (text[:2], text[2:4], text[4:]))
     if any([i == 0 for i in (mm, dd, yy)]):
@@ -592,12 +611,14 @@ def bb_text_to_date(text):
     yyyy = yy + 2000
     return Date(yyyy, mm, dd)
 
+
 building_subs = set([
     '#','APARTMENT','APT','BLDG','BUILDING','CONDO','FL','FLR','FLOOR','LOT','LOWER','NO','NUM','NUMBER',
     'RM','ROOM','SLIP','SLP','SPACE','SP','SPC','STE','SUITE','TRLR','UNIT','UPPER',
     ])
 caps_okay = set(['UCLA', 'OHSU', 'IBM', 'LLC', 'USA', 'NASA'])
 lower_okay = set(['dba', 'c/o', 'attn'])
+
 
 def translator(frm='', to='', delete='', keep=None):
     if len(to) == 1:
@@ -1082,6 +1103,7 @@ country_abbr = {
     "ZW":  "ZIMBABWE",
     }
 country_name = dict([(v, k) for k, v in country_abbr.items()])
+
 
 def cszk(line1, line2):
     """
@@ -1992,11 +2014,13 @@ full_ordinal = dict([(v, k) for k, v in abbr_ordinal.items()])
 
 all_ordinals = set(full_ordinal.keys() + abbr_ordinal.keys())
 
+
 class AddressSegment(AutoEnum):
     misc = "not currently tracked"
     ordinal = "N S E W etc"
     secondary = "apt bldg floor etc"
     street = "st ave blvd etc"
+
 
 def ordinals(text):
     # we want, at most, one ordinal abbreviation in a row (no sequential)
@@ -2128,6 +2152,7 @@ def crc32(binary_data):
     "wrapper around binascii.crc32 that is consistent across python versions"
     return binascii.crc32(binary_data) & 0xffffffff
 
+
 def unabbreviate(text, abbr):
     """
     returns line lower-cased with standardized abbreviations
@@ -2141,10 +2166,12 @@ def unabbreviate(text, abbr):
         final.append(abbr.get(word, word))
     return ' '.join(final)
 
+
 class BiDict(object):
     """
     key <=> value (value must also be hashable)
     """
+
     def __init__(yo, *args, **kwargs):
         _dict = yo._dict = dict()
         original_keys = yo._primary_keys = list()
@@ -2162,8 +2189,10 @@ class BiDict(object):
             if value != key and value in _dict:
                 raise ValueError("%s:%s violates one-to-one mapping" % (key, value))
             _dict[value] = key
+
     def __contains__(yo, key):
         return key in yo._dict
+
     def __delitem__(yo, key):
         _dict = yo._dict
         value = _dict[key]
@@ -2172,14 +2201,16 @@ class BiDict(object):
             del _dict[key]
         target = (key, value)[value in yo._primary_keys]
         yo._primary_keys.pop(yo._primary_keys.index(target))
-    #def __getattr__(yo, key):
-    #    return getattr(yo._dict, key)
+
     def __getitem__(yo, key):
         return yo._dict.__getitem__(key)
+
     def __iter__(yo):
         return iter(yo._primary_keys)
+
     def __len__(yo):
         return len(yo._primary_keys)
+
     def __setitem__(yo, key, value):
         _dict = yo._dict
         original_keys = yo._primary_keys
@@ -2199,25 +2230,32 @@ class BiDict(object):
         _dict[key] = value
         _dict[value] = key
         original_keys.append(key)
+
     def __repr__(yo):
         result = []
         for key in yo._primary_keys:
             result.append(repr((key, yo._dict[key])))
         return "BiDict(%s)" % ', '.join(result)
+
     def keys(yo):
         return yo._primary_keys[:]
+
     def items(yo):
         return [(k, yo._dict[k]) for k in yo._primary_keys]
+
     def values(yo):
         return [yo._dict[key] for key in yo._primary_keys]
+
 
 class PropertyDict(object):
     """
     allows dictionary lookup using . notation
     allows a default similar to defaultdict
     """
+
     _internal = ['_illegal', '_values', '_default', '_order']
     _default = None
+
     def __init__(yo, *args, **kwargs):
         if 'default' in kwargs:
             yo._default = kwargs.pop('default')
@@ -2247,8 +2285,10 @@ class PropertyDict(object):
                 raise ValueError("%s is a reserved word" % attr)
             _values[attr] = value
             _order.append(attr)
+
     def __contains__(yo, key):
         return key in yo._values
+
     def __delitem__(yo, name):
         if name[0] == '_':
             raise KeyError("illegal key name: %s" % name)
@@ -2256,6 +2296,7 @@ class PropertyDict(object):
             raise KeyError("%s: no such key" % name)
         yo._values.pop(name)
         yo._order.pop(yo._order.index(name))
+
     def __delattr__(yo, name):
         if name[0] == '_':
             raise AttributeError("illegal key name: %s" % name)
@@ -2263,6 +2304,17 @@ class PropertyDict(object):
             raise AttributeError("%s: no such key" % name)
         yo._values.pop(name)
         yo._order.pop(yo._order.index(name))
+
+    def __eq__(yo, other):
+        if isinstance(other, PropertyDict):
+            other = other._values
+        elif not isinstance(other, dict):
+            return NotImplemented
+        return other == yo._values
+
+    def __ne__(yo, other):
+        return not yo == other
+
     def __getitem__(yo, name):
         if name in yo._values:
             return yo._values[name]
@@ -2271,6 +2323,7 @@ class PropertyDict(object):
             result = yo._values[name] = yo._default()
             return result
         raise KeyError("object has no key %s" % name)
+
     def __getattr__(yo, name):
         if name in yo._values:
             return yo._values[name]
@@ -2282,10 +2335,18 @@ class PropertyDict(object):
             result = yo._values[name] = yo._default()
             return result
         raise AttributeError("object has no attribute %s" % name)
+
     def __iter__(yo):
+        if len(yo._values) != len(yo._order):
+            _order = set(yo._order)
+            for key in yo._values:
+                if key not in _order:
+                    yo._order.append(key)
         return iter(yo._order)
+
     def __len__(yo):
         return len(yo._values)
+
     def __setitem__(yo, name, value):
         if name in yo._internal:
             object.__setattr__(yo, name, value)
@@ -2295,6 +2356,7 @@ class PropertyDict(object):
             if name not in yo._values:
                 yo._order.append(name)
             yo._values[name] = value
+
     def __setattr__(yo, name, value):
         if name in yo._internal:
             object.__setattr__(yo, name, value)
@@ -2304,12 +2366,18 @@ class PropertyDict(object):
             if name not in yo._values:
                 yo._order.append(name)
             yo._values[name] = value
+
     def __repr__(yo):
-        return "PropertyDict((%s,))" % ', '.join(["(%r, %r)" % (x, yo._values[x]) for x in yo._order])
+        if not yo:
+            return "PropertyDict()"
+        return "PropertyDict((%s,))" % ', '.join(["(%r, %r)" % (x, yo._values[x]) for x in yo])
+
     def __str__(yo):
-        return '\n'.join(["%r=%r" % (x, yo._values[x]) for x in yo._order])
+        return '\n'.join(["%r=%r" % (x, yo._values[x]) for x in yo])
+
     def keys(yo):
         return yo._order[:]
+
     __pop_sentinel = object()
     def pop(yo, name, default=__pop_sentinel):
         if name in yo._values:
@@ -2319,6 +2387,7 @@ class PropertyDict(object):
             return default
         else:
             raise KeyError('key not found: %r' % name)
+
 
 class Sentinel(object):
     def __init__(yo, text):
@@ -2583,7 +2652,9 @@ class Memory(object):
     allows a default similar to defaultdict
     remembers insertion order (alphabetic if not possible)
     """
+
     _default = None
+
     def __init__(yo, cell=_memory_sentinel, **kwargs):
         if 'default' in kwargs:
             yo._default = kwargs.pop('default')
@@ -2595,18 +2666,22 @@ class Memory(object):
         for attr, value in sorted(kwargs.items()):
             _values[attr] = value
             _order.append(attr)
+
     def __contains__(yo, key):
         return key in yo._values
+
     def __delitem__(yo, name):
         if name not in yo._values:
             raise KeyError("%s: no such key" % name)
         yo._values.pop(name)
         yo._order.pop(yo._order.index(name))
+
     def __delattr__(yo, name):
         if name not in yo._values:
             raise AttributeError("%s: no such key" % name)
         yo._values.pop(name)
         yo._order.pop(yo._order.index(name))
+
     def __getitem__(yo, name):
         if name in yo._values:
             return yo._values[name]
@@ -2615,6 +2690,7 @@ class Memory(object):
             result = yo._values[name] = yo._default()
             return result
         raise KeyError("object has no key %s" % name)
+
     def __getattr__(yo, name):
         if name in yo._values:
             return yo._values[name]
@@ -2623,14 +2699,18 @@ class Memory(object):
             result = yo._values[name] = yo._default()
             return result
         raise AttributeError("object has no attribute %s" % name)
+
     def __iter__(yo):
         return iter(yo._order)
+
     def __len__(yo):
         return len(yo._values)
+
     def __setitem__(yo, name, value):
         if name not in yo._values:
             yo._order.append(name)
         yo._values[name] = value
+
     def __setattr__(yo, name, value):
         if name in ('_values','_order'):
             object.__setattr__(yo, name, value)
@@ -2638,12 +2718,16 @@ class Memory(object):
             if name not in yo._values:
                 yo._order.append(name)
             yo._values[name] = value
+
     def __repr__(yo):
         return "Memory(%s)" % ', '.join(["%r=%r" % (x, yo._values[x]) for x in yo._order])
+
     def __str__(yo):
         return "I am remembering...\n" + '\n\t'.join(["%r=%r" % (x, yo._values[x]) for x in yo._order])
+
     def keys(yo):
         return yo._order[:]
+
     def set(yo, cell=_memory_sentinel, **kwargs):
         _values = yo._values
         _order = yo._order
@@ -2697,10 +2781,13 @@ class PostalCode(object):
         if isinstance(other, yo.__class__):
             other = other.code
         return yo.code == other
+
     def __ne__(yo, other):
         return not yo.__eq__(other)
+
     def __repr__(yo):
         return repr(yo.code)
+
     def __str__(yo):
         return yo.code
 
@@ -2727,6 +2814,7 @@ def fix_date(text):
         return None
     yyyy, mm, dd = int(text[4:], 16)-160+2000, int(text[:2]), int(text[2:4])
     return Date(yyyy, mm, dd)
+
 
 def text_to_date(text, format='ymd'):
     '''(yy)yymmdd'''
@@ -2766,10 +2854,12 @@ def text_to_date(text, format='ymd'):
         raise ValueError("don't know how to convert %r using %r" % (text, format))
     return Date(yyyy, mm, dd)
 
+
 def text_to_time(text):
     if not text.strip():
         return None
     return Time(int(text[:2]), int(text[2:]))
+
 
 def simplegeneric(func):
     """Make a trivial single-dispatch generic function (from Python3.4 functools)"""
@@ -2810,9 +2900,11 @@ def simplegeneric(func):
     wrapper.register = register
     return wrapper
 
+
 @simplegeneric
 def float(*args, **kwds):
     return __builtin__.float(*args, **kwds)
+
 
 @float.register(timedelta)
 def timedelta_as_float(td):
@@ -2821,9 +2913,11 @@ def timedelta_as_float(td):
     seconds = (seconds - hours * 3600) * (1.0 / 3600)
     return td.days * 24 + hours + seconds
 
+
 @float.register(Time)
 def Time_as_float(t):
     return t.tofloat()
+
 
 def mail(server, port, message):
     """sends email.message to server:port
@@ -2851,6 +2945,7 @@ def mail(server, port, message):
     for user, errors in errs.items():
         for code, response in errors:
             syslog.syslog('%s --> %s: %s' % (user, code, response))
+
 
 class copy_argspec(object):
     """
@@ -2891,6 +2986,7 @@ class copy_argspec(object):
         wrapped.func_defaults = self.src_defaults
         return wrapped
 
+
 class LazyAttr(object):
     "doesn't create object until actually accessed"
     def __init__(yo, func=None, doc=None):
@@ -2903,6 +2999,7 @@ class LazyAttr(object):
             return yo
         return yo.fget(instance)
 
+
 class Missing(object):
     "if object hasn't been created, raise AttributeError"
     def __init__(yo, func=None, doc=None):
@@ -2914,6 +3011,7 @@ class Missing(object):
         if instance is None:
             return yo.fget(instance)
         raise AttributeError("%s must be added to this %s instance for full functionality" % (yo.fget.__name__, owner.__name__))
+
 
 class suppress(object):
     "suppresses first execption and exits the with block"
@@ -2972,3 +3070,39 @@ class ACHPayment(object):
         if chk_digit != int(rtng[-1]):
             raise ValueError('Routing number %s fails check digit calculation' % rtng)
 
+
+class ProgressBar(object):
+    def __init__(yo, finalcount, block_char='.', message=None):
+        yo.current_count = 0
+        yo.finalcount = finalcount
+        yo.blockcount = 0
+        yo.block = block_char
+        yo.f = sys.stdout
+        if not yo.finalcount:
+            return
+        if message is not None:
+            yo.f.write('\n\n%s\n' % message)
+        yo.f.write('\n-------------------- % Progress ---------------- 1\n')
+        yo.f.write('    1    2    3    4    5    6    7    8    9    0\n')
+        yo.f.write('    0    0    0    0    0    0    0    0    0    0\n')
+    def progress(yo, count):
+        yo.current_count = count
+        count = min(count, yo.finalcount)
+        if yo.finalcount:
+            percentcomplete = int(round(100.0*count/yo.finalcount))
+            #if percentcomplete < 1:
+            #    percentcomplete = 1
+        else:
+            percentcomplete = 100
+        blockcount = int(percentcomplete//2)
+        if blockcount <= yo.blockcount:
+            return
+        for i in range(yo.blockcount, blockcount):
+            yo.f.write(yo.block)
+        yo.f.flush()
+        yo.blockcount = blockcount
+        if percentcomplete == 100:
+            yo.f.write('\n')
+    def tick(yo):
+        yo.current_count += 1
+        yo.progress(yo.current_count)
