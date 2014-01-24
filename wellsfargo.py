@@ -4,7 +4,8 @@ from itertools import groupby
 from VSS import Table, Month, Weekday, days_per_month, AutoEnum, IntEnum, OrderedDict
 from VSS.BBxXlate.bbxfile import BBxFile
 from VSS.path import Path
-from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time, xrange, Date, Time, OrderedDict, ACHPayment
+from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time, xrange, Date, Time, OrderedDict
+from VSS.finance import ACHPayment
 
 try:
     next
