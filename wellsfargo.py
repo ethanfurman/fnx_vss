@@ -802,6 +802,7 @@ class ACHFile(object):
         """
         Create the file, write the entries, close the file.
         """
+        path = Path(path)
         ref_date = self.today.strftime('%b %d').upper()
         lines = self.lines
         batches = 0
