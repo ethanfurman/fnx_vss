@@ -2921,15 +2921,14 @@ def Time_as_float(t):
 
 
 def mail(server, port, message):
-    """sends email.message to server:port
-    """
+    """sends email.message to server:port """
     if isinstance(message, String):
         message = email.message_from_string(message)
-    receiver = message.get_all('To', []) + message.get_all('Cc', []) + message.get_all('Bcc', [])
-    sender = message['From']
+    receiver = message.get_all('To') + message.get_all('Cc') + message.get_all('Bcc')
+    sender = msg['From']
     smtp = smtplib.SMTP(server, port)
     try:
-        send_errs = smtp.sendmail(message['From'], receiver, message.as_string())
+        send_errs = smtp.sendmail(sender, receiver, message.as_string())
     except smtplib.SMTPRecipientsRefused, exc:
         send_errs = exc.recipients
     smtp.quit()
@@ -2939,7 +2938,7 @@ def mail(server, port, message):
             server = 'mail.' + user.split('@')[1]
             smtp = smtplib.SMTP(server, 25)
             try:
-                smtp.sendmail(message['From'], [user], message.as_string())
+                smtp.sendmail(sender, [user], msg.as_string())
             except smtplib.SMTPRecipientsRefused, exc:
                 errs[user] = [send_errs[user], exc.recipients[user]]
             smtp.quit()
