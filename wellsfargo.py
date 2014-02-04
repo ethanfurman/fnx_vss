@@ -733,15 +733,19 @@ def lockbox_payments(filename):
 # ACHPayment stores one payment from TRU to a vendor
 # ACHFile takes the payments and makes a WFB achfile for transmission
 
+class ACHError(Exception):
+    "generic ACH error"
+
+
 class ACHStore(object):
     "remembers previous ACHFiles, generates new file names"
 
-    def __init__(self, filename):
-        self.store = Table(filename)
+    def __init__(self, table_name):
+        self.store = Table(table_name)
         with self.store:
             self.index = self.store.create_index(lambda rec: (rec.filedate, rec.filemod))
 
-    def get_achfile(self, company_name, company_id, file_id):
+    def get_file_and_mod(self):
         today = Date.today()
         with self.index:
             mod = 'A'
@@ -753,40 +757,37 @@ class ACHStore(object):
                         raise ValueError('already generated 26 files today, wait until tomorrow')
             self.store.append(dict(filedate=today, filemod=mod))
         filename = 'ACH_%s_%s' % (today.ymd(), mod)
-        return ACHFile(company_name, company_id, file_id, filename, mod)
+        return filename, mod
 
 
 class ACHFile(object):
     """Accepts multiple ACH payments and generates file for tranmission to WFB."""
 
-    origin_rtng = 91000019
-    origin_id = 9100001
-    origin_bank = 'WELLS FARGO'
-
-    file_header = '101 %(origin_rtng)09d%(file_id)s%(date)s%(time)s%(id_mod)s094101%(origin_bank)-23s%(company)-23s        '
-    batch_header = '5200%(company)-16s%(discretionary)-20s%(company_id)s%(sec)s%(description)-10s%(ref_date)-6s%(eff_date)s   1%(origin_id)08d%(batch_number)07d'
-    entry_detail = '6%(code)d%(routing_nbr)s%(account)-17s%(amount)010d%(payee_id)-15s%(payee_name)-22s  %(addenda)d%(origin_id)08d%(entry_number)07d'
-    batch_control = '8200%(entries)06d%(entry_hash)010d%(debit)012d%(credit)012d%(company_id)s                         %(origin_id)08d%(batch_number)07d'
+    file_header = '101 %(immed_dest_rtng)09d%(immed_origin)s%(date)s%(time)s%(id_mod)s094101%(immed_dest_name)-23s%(company)-23s        '
+    batch_header = '5200%(company)-16s%(discretionary)-20s%(company_id)s%(sec)s%(description)-10s%(ref_date)-6s%(eff_date)s   1%(origin_dfi)08d%(batch_number)07d'
+    entry_detail = '6%(code)d%(routing_nbr)s%(account)-17s%(amount)010d%(payee_id)-15s%(payee_name)-22s  %(addenda)d%(origin_dfi)08d%(entry_number)07d'
+    batch_control = '8200%(entries)06d%(entry_hash)010d%(debit)012d%(credit)012d%(company_id)s                         %(origin_dfi)08d%(batch_number)07d'
     file_control = '9%(batches)06d%(blocks)06d%(entries)08d%(entry_hash)010d%(debit)012d%(credit)012d                                       '
 
-    def __init__(self, company_name, company_id, file_id, filename, modifier):
-        if len(company_id) > 10 or len(file_id) > 10:
-            raise ValueError('company_id and file_id cannot be longer than 10 characters (%r, %r)' % (company_id, file_id))
+    def __init__(self, oe_server, ach_store, ach_account=None):
+        if ach_account is not None:
+            raise ValueError('specifying an ach_account is not implemented')
+        self.oe_server = oe_server
+        self._get_bank_ach_info()
+        self._get_partner_ach_info()
+        fn, mod = ach_store.get_file_and_mod()
+        self.filename = Path(fn)
+        self.modifier = mod
         self.today = Date.today()
         self.time = Time.now()
-        self.company_name = company_name.upper()
-        self.company_id = company_id.upper().zfill(10)
-        self.file_id = file_id.upper().zfill(10)
-        self.filename = Path(filename)
-        self.modifier = modifier.upper()
         self.payments = []
         self.lines = [
                 self.file_header % dict(
-                    origin_rtng=self.origin_rtng,
-                    origin_bank=self.origin_bank,
-                    file_id=file_id,
+                    immed_dest_rtng=self.immed_dest_rtng,
+                    immed_dest_name=self.immed_dest_name,
+                    immed_origin=immed_origin,
                     date=self.today.strftime('%y%m%d'), time=self.time.strftime('%H%M'),
-                    id_mod=modifier, company=self.company_name[:23],
+                    id_mod=modifier, company=self.immed_origin_name[:23],
                     )]
         self.open = True
 
@@ -798,6 +799,24 @@ class ACHFile(object):
             raise ValueError("%r is closed" % self)
         self.payments.append(payment)
 
+    def _get_bank_ach_info(self):
+        "gets bank data from OpenERP"
+        res_partner_bank = self.oe_server.get_model('res.partner.bank')
+        try:
+            ach_account = res_partner_bank.search_read(
+                    fields=['ach_bank_name', 'ach_bank_number', 'ach_bank_id', 'ach_company_name', 'ach_company_number', 'ach_company_name_short', 'ach_company_id'],
+                    domain=[('ach_default','=',True)],
+                    )[0]
+        except IndexError:
+            raise ACHError('Default ACH account not set up.')
+        self.immed_dest_name = ach_bank_name
+        self.immed_dest = ach_bank_number
+        self.origin_dfi = ach_bank_id
+        self.immed_origin_name = ach_company_name
+        self.immed_origin = ach_company_number
+        self.company_name = ach_company_name_short
+        self.company_id = ach_company_id
+        
     def save_at(self, path):
         """
         Create the file, write the entries, close the file.
@@ -827,7 +846,7 @@ class ACHFile(object):
             if batches > 10**7:
                 raise ValueError("too many batches for this file, need to split")
             lines.append(self.batch_header % dict(
-                    origin_id=self.origin_id,
+                    origin_dfi=self.origin_dfi,
                     company=self.company_name[:16],
                     company_id=self.company_id,
                     discretionary='',
@@ -863,7 +882,7 @@ class ACHFile(object):
                 else:
                     raise ValueError("Unknown transaction code (%s) for payment %s" % (trans_code, pymnt))
                 lines.append(self.entry_detail % dict(
-                        origin_id=self.origin_id,
+                        origin_dfi=self.origin_dfi,
                         code=trans_code,
                         routing_nbr=pymnt.vendor_rtng,
                         account=pymnt.vendor_acct[-17:],
@@ -875,7 +894,7 @@ class ACHFile(object):
                         ))
             total_hash += batch_hash
             lines.append(self.batch_control % dict(
-                    origin_id=self.origin_id,
+                    origin_dfi=self.origin_dfi,
                     company_id=self.company_id,
                     sec=sec_code,
                     entries=batch_entries,
