@@ -15,9 +15,10 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email.Encoders import encode_base64
 from email import email
+from enum import Enum, IntEnum
+from scription import mail
 from VSS import dbf
 from VSS.dbf import DateTime, Date, Time, Integer, String
-from enum import Enum, IntEnum
 
 one_day = timedelta(1)
 
@@ -2918,33 +2919,6 @@ def timedelta_as_float(td):
 @float.register(Time)
 def Time_as_float(t):
     return t.tofloat()
-
-
-def mail(server, port, message):
-    """sends email.message to server:port """
-    if isinstance(message, String):
-        message = email.message_from_string(message)
-    receiver = message.get_all('To') + message.get_all('Cc') + message.get_all('Bcc')
-    sender = msg['From']
-    smtp = smtplib.SMTP(server, port)
-    try:
-        send_errs = smtp.sendmail(sender, receiver, message.as_string())
-    except smtplib.SMTPRecipientsRefused, exc:
-        send_errs = exc.recipients
-    smtp.quit()
-    errs = {}
-    if send_errs:
-        for user in send_errs:
-            server = 'mail.' + user.split('@')[1]
-            smtp = smtplib.SMTP(server, 25)
-            try:
-                smtp.sendmail(sender, [user], msg.as_string())
-            except smtplib.SMTPRecipientsRefused, exc:
-                errs[user] = [send_errs[user], exc.recipients[user]]
-            smtp.quit()
-    for user, errors in errs.items():
-        for code, response in errors:
-            syslog.syslog('%s --> %s: %s' % (user, code, response))
 
 
 class copy_argspec(object):
