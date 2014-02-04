@@ -207,6 +207,19 @@ class FakeInv(ARInvoice):
         return list()
 
 
+class BatchError(Exception):
+    "Base exception for Batch errors."
+
+class DuplicateEntryError(BatchError):
+    "Signals a batch is out of balance."
+
+class EmptyBatchError(BatchError):
+    "Signals a batch is out of balance."
+
+class OutOfBalanceError(BatchError):
+    "Signals a batch is out of balance."
+
+
 class Batch(object):
     """
     A collection af `Inv`s that must balance to the creation amount.
@@ -287,7 +300,7 @@ class Batch(object):
         inv_num = ar_inv.actual_inv_num
         if inv_num in self and inv_num != self.ck_nbr:
             if not replace:
-                raise ValueError("%s already in batch %r" % (inv_num, self.ck_nbr))
+                raise DuplicateEntryError("%s already in batch %r" % (inv_num, self.ck_nbr))
             for invoice in self.transactions:
                 if invoice.inv_num == inv_num:
                     invoice.amount = amount
@@ -300,25 +313,34 @@ class Batch(object):
 
     def balance_batch(self, amount=None):
         _debug_ = False
-        if self.ck_nbr == '054014':
+        if self.ck_nbr == '063051':
             _debug_ = True
         if not self.transactions:
-            raise ValueError('cannot balance a batch %r -- it has no invoices' % self.ck_nbr)
-        adjustment = self.ck_amt - self.total_paid
+            raise EmptyBatchError('cannot balance batch %r -- it has no invoices' % self.ck_nbr)
         if _debug_:
-            print '0, Batch.balance_batch --> amount: %r,  adjustment: %r,  balanced: %r (%r)' % (amount, adjustment, self.is_balanced, self.balance)
+            print '0, Batch.balance_batch --> amount: %r, balanced: %r (%r)' % (amount, self.is_balanced, self.balance)
         if self.is_balanced and amount in (0, None):
             return
+        adjustment = self.balance
         if amount is None:
-            # allow positive amounts equal to 1 penny per invoice
-            if adjustment > len(self):
-                raise ValueError("unable to balance batch %r" % self.ck_nbr)
-            amount = sum([inv.discount for inv in self.transactions]) or adjustment
-        if _debug_:
-            print '1, Batch.balance_batch --> amount: %r,  adjustment: %r,  balanced: %r' % (amount, adjustment, self.is_balanced)
-        if adjustment != amount:
-            import pdb; pdb.set_trace()
-            raise ValueError('amount %s will not put batch %r in balance' % (amount, self.ck_nbr))
+            # batch is out of balance; allow write-offs equal to 1 penny per invoice
+            if not -len(self) <= adjustment <= len(self):
+                print self
+                raise OutOfBalanceError("unable to balance batch %r" % self.ck_nbr)
+            #!amount = sum([inv.discount for inv in self.transactions]) or adjustment
+        else:
+            if adjustment != amount:
+                #import pdb; pdb.set_trace()
+                print '\n%s  %s' % (adjustment, amount)
+                print self
+                raise OutOfBalanceError('amount %s will not put batch %r in balance' % (amount, self.ck_nbr))
+            elif amount < 0:
+                # case 1: no discounts reflected in invoices, but check does show it:  amount will be negative
+                # case 2: some invoices not being paid: amount will be negative
+                # case 3: service charge being paid: amount will be positive (misses this branch, as non-error)
+                if float(-amount) / self.total_paid > 0.021:
+                    # too big for (1), must be (2)
+                    raise OutOfBalanceError('Amount %d too big to balance; unpaid invoices?' % amount)
         if abs(adjustment) <= len(self):
             # write off pennies
             desc = 'transcription error'
