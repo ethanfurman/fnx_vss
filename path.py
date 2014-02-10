@@ -48,14 +48,12 @@ class Path(object):
     ext   = .part1.ext
     """
 
-    def __new__(cls, string='./', sep=None):
+    def __new__(cls, string=None, sep=None):
         if string is None:
             raise ValueError("no path specified")
-        elif string == '.':
-            string = './'
-        elif isinstance(string, cls):
+        if isinstance(string, cls):
             return string
-        elif isinstance(string, str):
+        if isinstance(string, str):
             new_cls = sPath
         else:
             new_cls = uPath
@@ -113,6 +111,10 @@ def __new__(cls, string='', sep=None):
         string = string.replace(sep, SEP)
     elif system_sep != SEP:
         string = string.replace(system_sep, SEP)
+    if string == '.':
+        string = './'
+    elif string == '..':
+        string = '../'
     string = string.rstrip('.')
     sep = SEP
     if string[:2] == sep+sep:           # usually '//'
@@ -529,8 +531,8 @@ del strip_ext
 def walk(self, topdown=True, onerror=None, followlinks=False):
     p = self.__class__
     for dirpath, dirnames, filenames in os.walk(self, topdown, onerror, followlinks):
-        dirpath = p(dirpath)/''
-        dirnames = [p(dn)/'' for dn in dirnames]
+        dirpath = p(dirpath)
+        dirnames = [p(dn) for dn in dirnames]
         filenames = [p(fn) for fn in filenames]
         yield dirpath, dirnames, filenames
 methods['walk'] = walk
@@ -544,3 +546,4 @@ def glob(pattern):
 
 def listdir(dir):
     return [Path(p) for p in os.listdir(dir)]
+
