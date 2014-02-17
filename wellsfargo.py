@@ -4,7 +4,7 @@ from itertools import groupby
 from VSS import Table, Month, Weekday, days_per_month, AutoEnum, IntEnum, OrderedDict
 from VSS.BBxXlate.bbxfile import BBxFile
 from VSS.path import Path
-from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time, xrange, Date, Time, OrderedDict
+from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time, xrange, Date, Time, OrderedDict, PropertyDict
 from VSS.finance import ACHPayment
 
 try:
@@ -774,7 +774,6 @@ class ACHFile(object):
             raise ValueError('specifying an ach_account is not implemented')
         self.oe_server = oe_server
         self._get_bank_ach_info()
-        self._get_partner_ach_info()
         fn, mod = ach_store.get_file_and_mod()
         self.filename = Path(fn)
         self.modifier = mod
@@ -783,11 +782,11 @@ class ACHFile(object):
         self.payments = []
         self.lines = [
                 self.file_header % dict(
-                    immed_dest_rtng=self.immed_dest_rtng,
+                    immed_dest_rtng=self.immed_dest,
                     immed_dest_name=self.immed_dest_name,
-                    immed_origin=immed_origin,
+                    immed_origin=self.immed_origin,
                     date=self.today.strftime('%y%m%d'), time=self.time.strftime('%H%M'),
-                    id_mod=modifier, company=self.immed_origin_name[:23],
+                    id_mod=mod, company=self.immed_origin_name[:23],
                     )]
         self.open = True
 
@@ -803,19 +802,19 @@ class ACHFile(object):
         "gets bank data from OpenERP"
         res_partner_bank = self.oe_server.get_model('res.partner.bank')
         try:
-            ach_account = res_partner_bank.search_read(
+            ach_account = PropertyDict(res_partner_bank.search_read(
                     fields=['ach_bank_name', 'ach_bank_number', 'ach_bank_id', 'ach_company_name', 'ach_company_number', 'ach_company_name_short', 'ach_company_id'],
                     domain=[('ach_default','=',True)],
-                    )[0]
+                    )[0])
         except IndexError:
             raise ACHError('Default ACH account not set up.')
-        self.immed_dest_name = ach_bank_name
-        self.immed_dest = ach_bank_number
-        self.origin_dfi = ach_bank_id
-        self.immed_origin_name = ach_company_name
-        self.immed_origin = ach_company_number
-        self.company_name = ach_company_name_short
-        self.company_id = ach_company_id
+        self.immed_dest_name = ach_account.ach_bank_name
+        self.immed_dest = int(ach_account.ach_bank_number)
+        self.origin_dfi = int(ach_account.ach_bank_id)
+        self.immed_origin_name = ach_account.ach_company_name
+        self.immed_origin = ach_account.ach_company_number
+        self.company_name = ach_account.ach_company_name_short
+        self.company_id = ach_account.ach_company_id
         
     def save_at(self, path):
         """
