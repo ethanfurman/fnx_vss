@@ -1,4 +1,9 @@
-from VSS.utils import translator, one_day, xrange
+from __future__ import with_statement
+
+from itertools import groupby
+from VSS.path import Path
+from VSS.utils import translator, one_day, xrange, AutoEnum, IntEnum, Month, Weekday, Table, PropertyDict, Date, Time
+from VSS.utils import days_per_month
 
 # ACHStore keeps track of which ACH files have been transmitted, and the name of the next ACH file
 # ACHPayment stores one payment from TRU to a vendor
@@ -41,12 +46,12 @@ class ACHFile(object):
     batch_control = '8200%(entries)06d%(entry_hash)010d%(debit)012d%(credit)012d%(company_id)s                         %(origin_dfi)08d%(batch_number)07d'
     file_control = '9%(batches)06d%(blocks)06d%(entries)08d%(entry_hash)010d%(debit)012d%(credit)012d                                       '
 
+
     def __init__(self, oe_server, ach_store, ach_account=None):
         if ach_account is not None:
             raise ValueError('specifying an ach_account is not implemented')
         self.oe_server = oe_server
         self._get_bank_ach_info()
-        self._get_partner_ach_info()
         fn, mod = ach_store.get_file_and_mod()
         self.filename = Path(fn)
         self.modifier = mod
@@ -55,11 +60,11 @@ class ACHFile(object):
         self.payments = []
         self.lines = [
                 self.file_header % dict(
-                    immed_dest_rtng=self.immed_dest_rtng,
+                    immed_dest_rtng=self.immed_dest,
                     immed_dest_name=self.immed_dest_name,
-                    immed_origin=immed_origin,
+                    immed_origin=self.immed_origin,
                     date=self.today.strftime('%y%m%d'), time=self.time.strftime('%H%M'),
-                    id_mod=modifier, company=self.immed_origin_name[:23],
+                    id_mod=mod, company=self.immed_origin_name[:23],
                     )]
         self.open = True
 
