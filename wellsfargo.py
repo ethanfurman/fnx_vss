@@ -5,7 +5,7 @@ from VSS import Table, Month, Weekday, days_per_month, AutoEnum, IntEnum, Ordere
 from VSS.BBxXlate.bbxfile import BBxFile
 from VSS.path import Path
 from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time, xrange, Date, Time, OrderedDict, PropertyDict
-from VSS.finance import ACHPayment, ACHStore, ACH_ETC, ACH_Error, Customer
+from VSS.finance import ACHPayment, ACHStore, ACH_ETC, ACHError, Customer
 
 try:
     next
