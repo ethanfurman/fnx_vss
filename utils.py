@@ -564,6 +564,35 @@ class AutoEnum(Enum):
                 namespace[name] = member
 
 
+class IndexEnum(Enum):
+
+    def __index__(self):
+        return self.value
+
+    def __int__(self):
+        return self.value
+
+    def __ge__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value >= other.value
+        return NotImplemented
+
+    def __gt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value > other.value
+        return NotImplemented
+
+    def __le__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value <= other.value
+        return NotImplemented
+
+    def __lt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value < other.value
+        return NotImplemented
+
+
 class Weekday(AutoEnum):
     __order__ = 'MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY SATURDAY SUNDAY'
     MONDAY = ()
@@ -2809,12 +2838,15 @@ def fix_phone(text):
     return '%s.%s.%s' % (data[:3], data[3:6], data[6:])
 
 
-def fix_date(text):
+def fix_date(text, format='mdy'):
     '''takes mmddyy (with yy in hex (A0 = 2000)) and returns a Date'''
     text = text.strip()
     if len(text) != 6:
         return None
-    yyyy, mm, dd = int(text[4:], 16)-160+2000, int(text[:2]), int(text[2:4])
+    if format == 'mdy':
+        yyyy, mm, dd = int(text[4:], 16)-160+2000, int(text[:2]), int(text[2:4])
+    elif format == 'ymd':
+        yyyy, mm, dd = int(text[:2], 16)-160+2000, int(text[2:4]), int(text[4:])
     return Date(yyyy, mm, dd)
 
 
