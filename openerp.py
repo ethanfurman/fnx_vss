@@ -52,6 +52,21 @@ def host_site(hostname, database, login='admin', password='admin'):
     result.groups = [PropertyDict(d) for d in groups]
     return result
 
+def get_records(model, domain=[], fields=None, max_qty=None):
+    """get records from model
+
+    domain <- OpenERP domain for selecting records
+    fields <- fields to retrieve (otherwise all)
+    max_qty <- raises ValueError if more than max_qty records retrieved
+
+    returns a list of all records found
+    """
+    result = model.search_read(domain=domain, fields=fields)
+    if max_qty is not None and len(result) > max_qty:
+        raise ValueError('no more than %s records expected, but received %s' % (max_qty, len(results)))
+    return [PropertyDict(r) for r in result]
+
+
 def update_from_nightly():
     "routine to install nightly updates"
     # rename existing openerp out of the way
