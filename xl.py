@@ -1,6 +1,8 @@
 from functools import partial
 import xlrd
 
+__all__ = ('xlrd', 'open_workbook')
+
 def _get_sheet(self, index_or_name):
     if isinstance(index_or_name, (int, long)):
         return self.sheet_by_index(index_or_name)
