@@ -3,8 +3,8 @@
 from __future__ import division, print_function, with_statement
 
 import openerplib
-from .utils import PropertyDict
-from .path import Path
+from VSS.time_machine import PropertyDict
+from VSS.path import Path
 
 execfile('/etc/openerp/VSS.conf')
 
@@ -52,7 +52,7 @@ def host_site(hostname, database, login='admin', password='admin'):
     result.groups = [PropertyDict(d) for d in groups]
     return result
 
-def get_records(model, domain=[], fields=None, max_qty=None):
+def get_records(OE, model, domain=[], fields=None, max_qty=None):
     """get records from model
 
     domain <- OpenERP domain for selecting records
@@ -61,9 +61,12 @@ def get_records(model, domain=[], fields=None, max_qty=None):
 
     returns a list of all records found
     """
+    model = OE.conn.get_model(model)
     result = model.search_read(domain=domain, fields=fields)
     if max_qty is not None and len(result) > max_qty:
         raise ValueError('no more than %s records expected, but received %s' % (max_qty, len(results)))
+    if max_qty == 1 and len(result) == 1:
+        return PropertyDict(result[0])
     return [PropertyDict(r) for r in result]
 
 
