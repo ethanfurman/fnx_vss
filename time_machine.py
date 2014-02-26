@@ -1,4 +1,9 @@
-from VSS.utils import Sentinel
+class Sentinel(object):
+    def __init__(yo, text):
+        yo.text = text
+    def __str__(yo):
+        return "Sentinel: <%s>" % yo.text
+
 
 try:
     next
@@ -270,6 +275,134 @@ except ImportError:
 
 
 try:
+    from collections import TransformDict
+except ImportError:
+    class TransformDict(dict):
+        '''Dictionary that calls a transformation function when looking
+        up keys, but preserves the original keys.
+    
+        >>> d = TransformDict(str.lower)
+        >>> d['Foo'] = 5
+        >>> d['foo'] == d['FOO'] == d['Foo'] == 5
+        True
+        >>> set(d.keys())
+        {'Foo'}
+        '''
+    
+        __slots__ = ('_transform', '_original', '_data')
+    
+        def __init__(self, transform, init_dict=None, **kwargs):
+            '''Create a new TransformDict with the given *transform* function.
+            *init_dict* and *kwargs* are optional initializers, as in the
+            dict constructor.
+            '''
+            if not callable(transform):
+                raise TypeError("expected a callable, got %r" % transform.__class__)
+            self._transform = transform
+            # transformed => original
+            self._original = {}
+            self._data = {}
+            if init_dict:
+                self.update(init_dict)
+            if kwargs:
+                self.update(kwargs)
+    
+        def getitem(self, key):
+            'D.getitem(key) -> (stored key, value)'
+            transformed = self._transform(key)
+            original = self._original[transformed]
+            value = self._data[transformed]
+            return original, value
+    
+        @property
+        def transform_func(self):
+            "This TransformDict's transformation function"
+            return self._transform
+    
+        # Minimum set of methods required for MutableMapping
+    
+        def __len__(self):
+            return len(self._data)
+    
+        def __iter__(self):
+            return iter(self._original.values())
+    
+        def __getitem__(self, key):
+            return self._data[self._transform(key)]
+    
+        def __setitem__(self, key, value):
+            transformed = self._transform(key)
+            self._data[transformed] = value
+            self._original.setdefault(transformed, key)
+    
+        def __delitem__(self, key):
+            transformed = self._transform(key)
+            del self._data[transformed]
+            del self._original[transformed]
+    
+        # Methods overriden to mitigate the performance overhead.
+    
+        def clear(self):
+            'D.clear() -> None.  Remove all items from D.'
+            self._data.clear()
+            self._original.clear()
+    
+        def __contains__(self, key):
+            return self._transform(key) in self._data
+    
+        def get(self, key, default=None):
+            'D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None.'
+            return self._data.get(self._transform(key), default)
+    
+        __sentinel = Sentinel('raise KeyError if no default specified')
+        def pop(self, key, default=__sentinel):
+            '''D.pop(k[,d]) -> v, remove specified key and return the corresponding value.
+              If key is not found, d is returned if given, otherwise KeyError is raised.
+            '''
+            transformed = self._transform(key)
+            if default is self.__sentinel:
+                del self._original[transformed]
+                return self._data.pop(transformed)
+            else:
+                self._original.pop(transformed, None)
+                return self._data.pop(transformed, default)
+    
+        def popitem(self):
+            '''D.popitem() -> (k, v), remove and return some (key, value) pair
+               as a 2-tuple; but raise KeyError if D is empty.
+            '''
+            transformed, value = self._data.popitem()
+            return self._original.pop(transformed), value
+    
+        # Other methods
+    
+        def copy(self):
+            'D.copy() -> a shallow copy of D'
+            other = self.__class__(self._transform)
+            other._original = self._original.copy()
+            other._data = self._data.copy()
+            return other
+    
+        __copy__ = copy
+    
+        def __getstate__(self):
+            return (self._transform, self._data, self._original)
+    
+        def __setstate__(self, state):
+            self._transform, self._data, self._original = state
+    
+        def __repr__(self):
+            try:
+                equiv = dict(self)
+            except TypeError:
+                # Some keys are unhashable, fall back on .items()
+                equiv = list(self.items())
+            return '%s(%r, %s)' % (self.__class__.__name__,
+                                   self._transform, repr(equiv))
+    
+    
+
+try:
     from collections import Counter
 except ImportError:
     from operator import itemgetter
@@ -537,7 +670,6 @@ class BiDict(object):
     def values(yo):
         return [yo._dict[key] for key in yo._primary_keys]
 
-
 class PropertyDict(object):
     """
     allows dictionary lookup using . notation
@@ -553,29 +685,31 @@ class PropertyDict(object):
         yo._values = _values = kwargs.copy()
         yo._order = _order = []
         yo._illegal = _illegal = tuple([attr for attr in dir(_values) if attr[0] != '_'])
-        args = list(args)
-        if len(args) == 1 and isinstance(args[0], tuple) and isinstance(args[0][0], tuple) and len(args[0][0]) == 2:
-            for k, v in args[0]:
-                if k in _illegal:
-                    raise ValueError("%s is a reserved word" % k)
-                _values[k] = v
-                _order.append(k)
+        if yo._default is None:
+            default_factory = lambda : False
         else:
-            for attr in args:
-                if attr in _illegal:
-                    raise ValueError("%s is a reserved word" % attr)
-                elif isinstance(attr, dict):
-                    attr.update(kwargs)
-                    kwargs = attr
-                    continue
-                value = False
-                _values[attr] = value
-                _order.append(attr)
-        for attr, value in sorted(kwargs.items()):
-            if attr in _illegal:
-                raise ValueError("%s is a reserved word" % attr)
-            _values[attr] = value
-            _order.append(attr)
+            default_factory = yo._default
+        for arg in args:
+            # first, see if it's a lone string
+            if isinstance(arg, basestring):
+                arg = [(arg, default_factory())]
+            # next, see if it's a mapping
+            try:
+                arg = sorted(arg.items())
+            except (AttributeError, ):
+                pass
+            # now iterate over it
+            for item in arg:
+                if isinstance(item, basestring):
+                    key, value = item, default_factory()
+                else:
+                    key, value = item
+                if not isinstance(key, basestring):
+                    raise ValueError('keys must be strings, but %r is %r' % (key, type(key)))
+                if key in _illegal:
+                    raise ValueError('%s is a reserved word' % key)
+                _values[key] = value
+                _order.append(key)
 
     def __contains__(yo, key):
         return key in yo._values
@@ -661,7 +795,7 @@ class PropertyDict(object):
     def __repr__(yo):
         if not yo:
             return "PropertyDict()"
-        return "PropertyDict((%s,))" % ', '.join(["(%r, %r)" % (x, yo._values[x]) for x in yo])
+        return "PropertyDict([%s])" % ', '.join(["(%r, %r)" % (x, yo._values[x]) for x in yo])
 
     def __str__(yo):
         return '\n'.join(["%r=%r" % (x, yo._values[x]) for x in yo])

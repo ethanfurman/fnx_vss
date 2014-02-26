@@ -16,10 +16,11 @@ from email.mime.base import MIMEBase
 from email.Encoders import encode_base64
 from email import email
 from enum import Enum, IntEnum
+from math import floor
 from scription import mail
 from VSS import dbf
 from VSS.dbf import DateTime, Date, Time, Integer, String
-from VSS.time_machine import *
+from VSS.time_machine import Sentinel, simplegeneric
 
 one_day = timedelta(1)
 
@@ -243,13 +244,6 @@ def unabbreviate(text, abbr):
     return ' '.join(final)
 
 
-class Sentinel(object):
-    def __init__(yo, text):
-        yo.text = text
-    def __str__(yo):
-        return "Sentinel: <%s>" % yo.text
-
-
 def tuples(func):
     def wrapper(*args):
         if len(args) == 1 and not isinstance(args[0], String):
@@ -425,7 +419,6 @@ def Sift(*fields):
     return results
 
 
-_memory_sentinel = Sentinel("amnesiac")
 
 
 class xrange(object):
@@ -499,6 +492,7 @@ class xrange(object):
         values = [ '%s=%s' % (k,v) for k,v in (('start',yo.start), ('stop',yo.stop), ('step', yo.step), ('count', yo.count)) if v is not None ]
         return '<%s(%s)>' % (yo.__class__.__name__, ', '.join(values))
 
+_memory_sentinel = Sentinel("amnesiac")
 
 class Memory(object):
     """
@@ -630,12 +624,12 @@ def text_to_date(text, format='ymd'):
     try:
         dd = mm = yyyy = None
         if '-' in text:
-            pieces = text.split('-')
+            pieces = [p.zfill(2) for p in text.split('-')]
             if len(pieces) != 3 or not all_equal(pieces, lambda p: p and len(p) in (2, 4)):
                 raise ValueError
             text = ''.join(pieces)
         elif '/' in text:
-            pieces = text.split('/')
+            pieces = [p.zfill(2) for p in text.split('/')]
             if len(pieces) != 3 or not all_equal(pieces, lambda p: p and len(p) in (2, 4)):
                 raise ValueError
             text = ''.join(pieces)
@@ -769,10 +763,10 @@ class ProgressBar(object):
     def progress(yo, count):
         yo.current_count = count
         count = min(count, yo.finalcount)
-        if yo.finalcount:
-            percentcomplete = int(floor(100.0*count/yo.finalcount))
-        else:
+        if yo.finalcount == count or not yo.finalcount:
             percentcomplete = 100
+        else:
+            percentcomplete = int(floor(100.0*count/yo.finalcount))
         blockcount = int(percentcomplete//2)
         if blockcount <= yo.blockcount:
             return

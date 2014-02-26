@@ -2,8 +2,8 @@ from __future__ import with_statement
 
 from itertools import groupby
 from VSS.path import Path
-from VSS.utils import translator, one_day, xrange, AutoEnum, IntEnum, Month, Weekday, Table, PropertyDict, Date, Time
-from VSS.utils import days_per_month
+from VSS.time_machine import PropertyDict
+from VSS.utils import translator, one_day, xrange, AutoEnum, IntEnum, Month, Weekday, Table, Date, Time, days_per_month
 
 # ACHStore keeps track of which ACH files have been transmitted, and the name of the next ACH file
 # ACHPayment stores one payment from TRU to a vendor
