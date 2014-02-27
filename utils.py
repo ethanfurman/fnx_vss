@@ -146,6 +146,9 @@ class Weekday(AutoEnum):
     FRIDAY = ()
     SATURDAY = ()
     SUNDAY = ()
+    @classmethod
+    def from_date(cls, date):
+        return cls(date.isoweekday())
 
 
 class Month(AutoEnum):
@@ -162,7 +165,9 @@ class Month(AutoEnum):
     OCTOBER = ()
     NOVEMBER = ()
     DECEMBER = ()
-
+    @classmethod
+    def from_date(cls, date):
+        return cls(date.month)
 
 def all_equal(iterator, test=None):
     '''if `test is None` do a straight equality test'''
