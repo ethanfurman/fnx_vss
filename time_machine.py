@@ -709,7 +709,8 @@ class PropertyDict(object):
                 if key in _illegal:
                     raise ValueError('%s is a reserved word' % key)
                 _values[key] = value
-                _order.append(key)
+                if key not in _order:
+                    _order.append(key)
 
     def __contains__(yo, key):
         return key in yo._values
