@@ -680,9 +680,11 @@ class PropertyDict(object):
     _default = None
 
     def __init__(yo, *args, **kwargs):
+        "kwargs is evaluated last"
         if 'default' in kwargs:
             yo._default = kwargs.pop('default')
-        yo._values = _values = kwargs.copy()
+        needs_sorted = False
+        yo._values = _values = {}
         yo._order = _order = []
         yo._illegal = _illegal = tuple([attr for attr in dir(_values) if attr[0] != '_'])
         if yo._default is None:
@@ -695,7 +697,9 @@ class PropertyDict(object):
                 arg = [(arg, default_factory())]
             # next, see if it's a mapping
             try:
-                arg = sorted(arg.items())
+                arg = arg.items()
+                if not needs_sorted:
+                    needs_sorted = isinstance(arg, OrderedDict)
             except (AttributeError, ):
                 pass
             # now iterate over it
@@ -711,6 +715,12 @@ class PropertyDict(object):
                 _values[key] = value
                 if key not in _order:
                     _order.append(key)
+        if kwargs:
+            needs_sorted = True
+            _values.update(kwargs)
+            _order.extend([k for k in kwargs.keys() if k not in _order])
+        if needs_sorted:
+            _order.sort()
 
     def __contains__(yo, key):
         return key in yo._values
