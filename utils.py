@@ -216,18 +216,6 @@ def translator(frm='', to='', delete='', keep=None):
             return s.translate(bytes_trans, delete)
     return translate
 
-alpha_num = translator(delete='.,:_#')
-non_alpha_num = translator(delete="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,-")
-any_digits = translator(keep='0123456789')
-has_digits = any_digits
-name_chars = translator(to=' ', keep="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' /")
-name_chars_punc = translator(keep="' /")
-grad_year = translator(keep="'0123456789")
-vowels = translator(keep='aeiouyAEIOUY')
-no_vowels = translator(delete='aeiouyAEIOUY')
-has_lower = translator(keep="abcdefghijklmnopqrstuvwxyz")
-has_upper = translator(keep="ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-has_alpha = translator(keep="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 phone = translator(delete=' -().')
 
 def crc32(binary_data):

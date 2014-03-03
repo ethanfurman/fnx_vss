@@ -7,6 +7,19 @@ building_subs = set([
 caps_okay = set(['UCLA', 'OHSU', 'IBM', 'LLC', 'USA', 'NASA'])
 lower_okay = set(['dba', 'c/o', 'attn'])
 
+alpha_num = translator(delete='.,:_#')
+non_alpha_num = translator(delete="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,-")
+any_digits = translator(keep='0123456789')
+has_digits = any_digits
+name_chars = translator(to=' ', keep="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' /")
+name_chars_punc = translator(keep="' /")
+grad_year = translator(keep="'0123456789")
+vowels = translator(keep='aeiouyAEIOUY')
+no_vowels = translator(delete='aeiouyAEIOUY')
+has_lower = translator(keep="abcdefghijklmnopqrstuvwxyz")
+has_upper = translator(keep="ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+has_alpha = translator(keep="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
 
 mixed_case_names = {
     'aj'        : 'AJ',
