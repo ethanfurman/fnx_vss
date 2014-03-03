@@ -2,6 +2,7 @@
 Bbx File utilities.
 """
 
+from stat import ST_MTIME
 from VSS import path
 import logging
 import os
@@ -287,9 +288,8 @@ def getfilename(target):
         if len(file.base) in (5, 6):
             if file.ext.lower() in ('', '.txt'):
                 possibles.append(file)
-
-    possibles.sort(key=len, reverse=True)
-    target = possibles[0]
+    possibles.sort(key=lambda fn: fn.stat()[ST_MTIME])
+    target = possibles.pop()
     return target
 
 
