@@ -1,5 +1,6 @@
 from __future__ import with_statement
 
+from VSS.address import any_digits
 from VSS.BBxXlate.bbxfile import BBxFile
 from VSS.utils import one_day, text_to_date, String, Integer
 from VSS import AutoEnum
@@ -423,6 +424,14 @@ class CashReceipt(object):
             self.acct = acct
             self.debit = currency(debit)
             self.credit = currency(credit)
+        def __eq__(self, other):
+            if not isinstance(other, self.__class__):
+                return NotImplemented
+            return self.dp == other.dp and self.acct == other.acct and self.debit == other.debit and self.credit == other.credit
+        def __ne__(self, other):
+            if not isinstance(other, self.__class__):
+                return NotImplemented
+            return self.dp != other.dp or self.acct != other.acct or self.debit != other.debit or self.credit != other.credit
         def __repr__(self):
             dp = str(self.dp)
             debit = currency(self.debit)
@@ -434,12 +443,23 @@ class CashReceipt(object):
             return '%s %s %10s %10s' % (self.dp, self.acct, debit, credit)
 
     class Invoice(object):
-        def __init__(self, number, date, discount, apply):
+        def __init__(self, number, date, discount, apply, batch_date):
             self.number = number
-            self.date = text_to_date(date, 'mdy')
+            try:
+                self.date = text_to_date(date, 'mdy')
+            except ValueError:
+                self.date = batch_date
             self.discount = currency(discount)
             self.apply = currency(apply)
             self.total = self.discount + self.apply
+        def __eq__(self, other):
+            if not isinstance(other, self.__class__):
+                return NotImplemented
+            return self.number == other.number and self.date == other.date and self.discount == other.discount and self.apply == other.apply
+        def __ne__(self, other):
+            if not isinstance(other, self.__class__):
+                return NotImplemented
+            return self.number != other.number or self.date != other.date or self.discount != other.discount or self.apply != other.apply
         def __repr__(self):
             discount = currency(self.discount)
             apply = currency(self.apply)
@@ -452,11 +472,22 @@ class CashReceipt(object):
             return '%6s %s %9s %10s' % (self.number, self.date, discount, apply)
 
     class Check(object):
-        def __init__(self, number, date, amount, s):
+        def __init__(self, number, date, amount, s, batch_date):
             self.number = number
-            self.date = text_to_date(date, 'mdy')
+            try:
+                self.date = text_to_date(date, 'mdy')
+            except ValueError:
+                self.date = batch_date
             self.amount = currency(amount)
             self.s = s
+        def __eq__(self, other):
+            if not isinstance(other, self.__class__):
+                return NotImplemented
+            return self.number == other.number and self.date == other.date and self.amount == other.amount
+        def __ne__(self, other):
+            if not isinstance(other, self.__class__):
+                return NotImplemented
+            return self.number != other.number or self.date != other.date or self.amount != other.amount
         def __repr__(self):
             amount = currency(self.amount)
             date = repr(self.date)
@@ -470,6 +501,14 @@ class CashReceipt(object):
         def __init__(self, number, name):
             self.number = number
             self.name = name
+        def __eq__(self, other):
+            if not isinstance(other, self.__class__):
+                return NotImplemented
+            return self.number == other.number and self.name == other.name
+        def __ne__(self, other):
+            if not isinstance(other, self.__class__):
+                return NotImplemented
+            return self.number != other.number or self.name != other.name
         def __repr__(self):
             return '%s(%s, %s)' % (self.__class__.__name__, self.number, self.name)
         def __str__(self):
@@ -511,23 +550,25 @@ class CashReceipt(object):
         seq, cust, chk, inv, gl = self.line_elements(lines[0])
         self.sequence = int(seq)
         self.customer = Customer(*cust)
-        self.check = Check(*chk)
-        self.invoices.append(Invoice(*inv))
-        self.gl_distribution.append(GLEntry(*gl))
+        self.check = Check(*chk, batch_date=date)
+        if any(inv):
+            self.invoices.append(Invoice(*inv, batch_date=date))
+        if any(gl):
+            self.gl_distribution.append(GLEntry(*gl))
         seq, cust, chk, inv, gl = self.line_elements(lines[1])
         self.check.num2 = chk[0]
         if any(inv):
-            self.invoices.append(Invoice(*inv))
+            self.invoices.append(Invoice(*inv, batch_date=date))
         if any(gl):
             self.gl_distribution.append(GLEntry(*gl))
         for line in lines[2:]:
             seq, cust, chk, inv, gl = self.line_elements(line)
             if any(inv):
-                self.invoices.append(Invoice(*inv))
+                self.invoices.append(Invoice(*inv, batch_date=date))
             if any(gl):
                 self.gl_distribution.append(GLEntry(*gl))
 
-def receipt_file(filename):
+def ar_receipts(filename):
     receipts = []
     with open(filename) as src:
         data = []
@@ -536,11 +577,20 @@ def receipt_file(filename):
         for line in src:
             if line == '\r\n':
                 if data and data[0][0] != ' ':
-                    receipts.append(CashReceipt(data, date))
+                    receipt = CashReceipt(data, date)
+                    if any_digits(receipt.check.number):
+                        receipts.append(receipt)
                 data = []
             elif line.startswith('\r'):
                 if date is None and 'BATCH:' in line:
-                    date = text_to_date(line[67:75], 'mdy')
+                    try:
+                        date_start = line.rindex(' ', 70) + 1
+                        date_end = line.index(' ', 70)
+                        date = text_to_date(line[date_start:date_end], 'mdy')
+                    except ValueError:
+                        print repr(line)
+                        print repr(line[66:74])
+                        raise
                 continue
             elif line.endswith('\r\x0c\r\n'):
                 line = line[:-4]
