@@ -453,12 +453,12 @@ def text_to_date(text, format='ymd'):
     try:
         dd = mm = yyyy = None
         if '-' in text:
-            pieces = [p.zfill(2) for p in text.split('-')]
+            pieces = [p.zfill(2) for p in text.strip().split('-')]
             if len(pieces) != 3 or not all_equal(pieces, lambda p: p and len(p) in (2, 4)):
                 raise ValueError
             text = ''.join(pieces)
         elif '/' in text:
-            pieces = [p.zfill(2) for p in text.split('/')]
+            pieces = [p.zfill(2) for p in text.strip().split('/')]
             if len(pieces) != 3 or not all_equal(pieces, lambda p: p and len(p) in (2, 4)):
                 raise ValueError
             text = ''.join(pieces)
@@ -479,7 +479,6 @@ def text_to_date(text, format='ymd'):
             arg0 = ''
             exc.args = (arg0 + 'date %r must have two digits for day and month, and two or four digits for year' % text, ) + exc.args[1:]
         raise
-
     if dd is None:
         raise ValueError("don't know how to convert %r using %r" % (text, format))
     return Date(yyyy, mm, dd)
