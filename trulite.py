@@ -18,18 +18,21 @@ class ARAgingLine(tuple):
     __slots__ = ()
     def __new__(cls, text):
         try:
-            pieces = text.split('\t', 3)
-            pieces, end_piece = pieces[:3], pieces[3]
-            pieces.extend(end_piece.rsplit('\t', 5))
-            pieces[3] = pieces[3].replace('\t', ' ')
-            data = [f.strip() for f in pieces]
-            data[2] = text_to_date(data[2], 'mdy')
-            data[7] = int(data[7])
-            data[8] = int(data[8])
-            data.append(data[1].startswith('**'))
-            data[1] = data[1].strip('*')
+            if isinstance(text, tuple):
+                data = text
+            else:
+                pieces = text.split('\t', 3)
+                pieces, end_piece = pieces[:3], pieces[3]
+                pieces.extend(end_piece.rsplit('\t', 5))
+                pieces[3] = pieces[3].replace('\t', ' ')
+                data = [f.strip() for f in pieces]
+                data[2] = text_to_date(data[2], 'mdy')
+                data[7] = int(data[7])
+                data[8] = int(data[8])
+                data.append(data[1].startswith('**'))
+                data[1] = data[1].strip('*')
         except Exception, exc:
-            exc.args = (exc.args[0] + '\noriginal row: %r\n' % text,) + exc.args[1:]
+            exc.args = (exc.args[0] + '\noriginal row: %r\n' % (text,) ,) + exc.args[1:]
             raise
         return tuple.__new__(cls, tuple(data))
     @property
@@ -83,15 +86,18 @@ class ARInvoice(object):
         self.end_discount_date = rec.trans_date.replace(delta_month=1, day=DISCOUNT_CUTOFF)
         self._starred = rec.starred
         self._transactions = []
-        if '1-INVCE' in rec.trans_type:
-            self._amount = rec.debit - rec.credit
+        if ( '1-INVCE' in rec.trans_type
+          or '8-CREDT' in rec.trans_type
+          or '9-SVCHG' in rec.trans_type
+          ):
+            self._original_amount = rec.debit - rec.credit
         else:
-            self._amount = 0
+            self._original_amount = 0
         self._balance = 0
         self.add_transaction(rec)
     def __repr__(self):
-        return ('<ARInvoice: cust_id->%s  name->%s  date->%s  inv_num->%s  balance->%s>'
-                % (self.cust_id, self.name, self.date, self.inv_num, self.balance))
+        return ('<ARInvoice: cust_id=%s, name=%s, date=%s, inv_num=%.6s, original_amount=%s>'
+                % (self.cust_id, self.name, self.date, self.inv_num, self.amount))
     def add_transaction(self, trans):
         self._transactions.append(trans)
         self._balance += trans.debit - trans.credit
@@ -102,7 +108,7 @@ class ARInvoice(object):
         return self._actual_inv_num
     @property
     def amount(self):
-        return self._amount
+        return self._original_amount
     @property
     def balance(self):
         return self._balance
@@ -144,6 +150,9 @@ def ar_invoices(filename):
     '''returns all invoices'''
     result = {}
     for rec in ARAgingIter(filename):
+        if rec.inv_num[:2] == '99':
+            # service charge, add cust_id
+            rec = ARAgingLine(tuple(rec[:5] + (rec.inv_num + rec.cust_num,) + rec[6:]))
         if rec.inv_num in result:
             result[rec.inv_num].add_transaction(rec)
         else:
@@ -163,7 +172,7 @@ def ar_open_invoices(filename):
 
 class Inv(object):
     def __init__(self, inv_num, amount, quality, discount, ar_inv):
-        self.inv_num = self.actual_inv_num = inv_num
+        self.inv_num = self.actual_inv_num = inv_num[:6]
         self.amount = amount
         self.quality = quality
         self.discount = discount
@@ -191,15 +200,15 @@ class FakeInv(ARInvoice):
         self.end_discount_date = trans_date.replace(delta_month=1, day=DISCOUNT_CUTOFF)
         self._starred = False
         self._transactions = []
-        self._amount = amount
+        self._original_amount = amount
         self._balance = amount
         self._desc = desc
         self._gl_acct = gl_acct
     def __repr__(self):
-        return ('<FakeInv: cust_id=%r, name=%r, date=%r, inv_num=%r, balance=%r>'
-                % (self.cust_id, self.name, self.date, self.inv_num, self.balance))
+        return ('<FakeInv: cust_id=%r, name=%r, date=%r, inv_num=%r, original_amount=%r, desc=%r>'
+                % (self.cust_id, self.name, self.date, self.inv_num, self.amount, self._desc))
     def add_amount(self, amount):
-        self._amount += amount
+        self._original_amount += amount
     @property
     def desc(self):
         return self._desc
@@ -225,14 +234,18 @@ class Batch(object):
     """
     A collection af `Inv`s that must balance to the creation amount.
 
+    Uses the inv's original amount, not the current balance, because of the
+    tendency to post extra funds to (apparently) random invoices, and then
+    later the customer will pay the whole amount of said random invoice.
     """
 
-    def __init__(self, number, amount, date):
+    def __init__(self, number, amount, date, max_discount=1):
         self.ck_nbr = number
         self.ck_amt = amount
         self.ck_date = date
         self.transactions = []
         self.discount_allowed = None
+        self.max_discount = max_discount
 
     def __contains__(self, inv):
         "inv should be either an AR_Invoice or an invoice number; compares against actual_inv_num"
@@ -251,7 +264,7 @@ class Batch(object):
         result.append("payment: %r" % self.ck_amt)
         result.append('')
         calc = 0
-        for tran in self.transactions:
+        for tran in sorted(self.transactions, key=lambda t: t.inv_num):
             calc += tran.amount
             result.append("transaction: %r" % tran)
         if not self.transactions:
@@ -263,35 +276,25 @@ class Batch(object):
     def __len__(self):
         return len(self.transactions)
 
-    @property
-    def balance(self):
-        "amount of check - amount owed on all invoices (negative when discounts are taken)"
-        return self.ck_amt - self.total_paid - self.total_discount
-
-    @property
-    def is_balanced(self):
-        return self.balance == 0 
-
-    @property
-    def total_discount(self):
-        discount = 0
-        for inv in self.transactions:
-            discount += inv.discount
-        return discount
-
-    @property
-    def total_owed(self):
-        total = 0
-        for inv in self.transactions:
-            total += inv.ar_inv.balance or inv.ar_inv.amount
-        return total
-
-    @property
-    def total_paid(self):
-        total = 0
-        for inv in self.transactions:
-            total += inv.amount
-        return total
+    def _distribute_discount(self, adjustment):
+        discount = self.max_discount / 100.0
+        for adjust in (False, True):
+            amount = adjustment
+            for more, inv in reversed(list(enumerate(self.transactions))):
+                if not inv.discount and inv.ar_inv.end_discount_date >= self.ck_date:
+                    inv_discount = -int(round(discount * inv.amount))
+                    if inv_discount <= amount:
+                        inv_discount = amount
+                    elif not more and abs(amount - inv_discount) < len(self.transactions):
+                        inv_discount = amount
+                    if adjust:
+                        inv.discount = inv_discount
+                    amount -= inv_discount
+                    if not amount:
+                        break
+            else:
+                # unable to distribute adjustment
+                break
 
     def add_invoice(self, ar_inv, amount, quality, discount=0, replace=False):
         self.discount_allowed = max(
@@ -312,88 +315,71 @@ class Batch(object):
         else:
             self.transactions.append(Inv(inv_num, amount, quality, discount, ar_inv))
 
-    def balance_batch(self, amount=None):
-        _debug_ = False
-        if self.ck_nbr == '063051':
-            _debug_ = True
+    @property
+    def balance(self):
+        "amount of check - amount owed on all invoices (negative when discounts are taken)"
+        return self.ck_amt - self.total_paid #- self.total_discount
+
+    def balance_batch(self):
         if not self.transactions:
-            raise EmptyBatchError('cannot balance batch %r -- it has no invoices' % self.ck_nbr)
-        if _debug_:
-            print '0, Batch.balance_batch --> amount: %r, balanced: %r (%r)' % (amount, self.is_balanced, self.balance)
-        if self.is_balanced and amount in (0, None):
+            raise EmptyBatchError('cannot balance batch %r -- it has no transactions' % self.ck_nbr)
+        if self.is_balanced:
             return
         adjustment = self.balance
-        if amount is None:
-            # batch is out of balance; allow write-offs equal to 1 penny per invoice
-            if not -len(self) <= adjustment <= len(self):
-                print self
-                raise OutOfBalanceError("unable to balance batch %r" % self.ck_nbr)
-            #!amount = sum([inv.discount for inv in self.transactions]) or adjustment
-        else:
-            if adjustment != amount:
-                #import pdb; pdb.set_trace()
-                print '\n%s  %s' % (adjustment, amount)
-                print self
-                raise OutOfBalanceError('amount %s will not put batch %r in balance' % (amount, self.ck_nbr))
-            elif amount < 0:
-                # case 1: no discounts reflected in invoices, but check does show it:  amount will be negative
-                # case 2: some invoices not being paid: amount will be negative
-                # case 3: service charge being paid: amount will be positive (misses this branch, as non-error)
-                if float(-amount) / self.total_paid > 0.021:
-                    # too big for (1), must be (2)
-                    raise OutOfBalanceError('Amount %d too big to balance; unpaid invoices?' % amount)
+        # allow write-offs equal to 1 penny per invoice
         if abs(adjustment) <= len(self):
             # write off pennies
-            desc = 'transcription error'
-            gl_acct = GL_DISCOUNTS
+            template = self.transactions[0].ar_inv
+            invoice = FakeInv(
+                    template.cust_id,
+                    template.name,
+                    self.ck_nbr,
+                    adjustment,
+                    template.date,
+                    'transcription error',
+                    GL_DISCOUNTS
+                    )
+            self.add_invoice(invoice, adjustment, excellent)
         elif adjustment < 0:
-            discount = int(float(self.total_owed) / (self.total_paid - adjustment) * 100)
-            if _debug_:
-                print '2, Batch.balance_batch --> amount: %r,  adjustment: %r,  balanced: %r,  discount allowed: %r, discount: %r' % (amount, adjustment, self.is_balanced, self.discount_allowed, discount)
-            if self.discount_allowed and discount >= 98:
-                desc = '%d%% DISCOUNT TAKEN' % discount
-                gl_acct = GL_DISCOUNTS
-            else:
-                recorded = False
-                for invoice in self.transactions:
-                    # if discounts have been recorded, undo it
-                    if invoice.discount:
-                        recorded = True
-                        amount = invoice.discount
-                        if amount < adjustment:
-                            amount = adjustment
-                        invoice.amount += amount
-                        adjustment -= amount
-                if not recorded:
-                    discount = 1 - (float(self.ck_amt) / self.total_paid)
-                    if discount < 0.01005:
-                        discount = -0.01005
-                    elif discount < 0.02005:
-                        discount = -0.02005
-                    else:
-                        discount = -discount
-                    for invoice in self.transactions:
-                        amount = int(invoice.amount * discount)
-                        if amount < adjustment:
-                            amount = adjustment
-                        invoice.amount += amount
-                        adjustment -= amount
-                return
-        else:
-            desc = 'SERVICE CHARGE PAID'
-            gl_acct = GL_ACCT_REC
-        inv_num = self.ck_nbr
-        template = self.transactions[0].ar_inv
-        invoice = FakeInv(
-                template.cust_id,
-                template.name,
-                inv_num,
-                adjustment,
-                template.date,
-                desc,
-                gl_acct
-                )
-        self.add_invoice(invoice, adjustment, excellent)
+            self._distribute_discount(adjustment)
+        if not self.is_balanced:
+            raise OutOfBalanceError
+
+    @property
+    def is_balanced(self):
+        return self.balance == 0 
+
+    @property
+    def total_discount(self):
+        discount = 0
+        for inv in self.transactions:
+            discount += inv.discount
+        return discount
+
+    @property
+    def total_owed(self):
+        "original amount of all transactions"
+        total = 0
+        for inv in self.transactions:
+            #total += inv.ar_inv.balance or inv.ar_inv.amount
+            total += inv.ar_inv.amount
+        return total
+
+    @property
+    def total_paid(self):
+        "amount actually paid (could be less than total_owed due to discounts)"
+        total = 0
+        for inv in self.transactions:
+            total += inv.amount + inv.discount
+        return total
+
+    def update(self, other_batch):
+        self.ck_nbr = other_batch.ck_nbr
+        self.ck_amt = other_batch.ck_amt
+        self.ck_date = other_batch.ck_date
+        self.transactions = other_batch.transactions
+        self.discount_allowed = other_batch.discount_allowed
+        self.max_discount = other_batch.max_discount
 
 
 class Status(AutoEnum):
@@ -583,14 +569,9 @@ def ar_receipts(filename):
                 data = []
             elif line.startswith('\r'):
                 if date is None and 'BATCH:' in line:
-                    try:
-                        date_start = line.rindex(' ', 70) + 1
-                        date_end = line.index(' ', 70)
-                        date = text_to_date(line[date_start:date_end], 'mdy')
-                    except ValueError:
-                        print repr(line)
-                        print repr(line[66:74])
-                        raise
+                    date_start = line.rindex(' ', 70) + 1
+                    date_end = line.index(' ', 70)
+                    date = text_to_date(line[date_start:date_end], 'mdy')
                 continue
             elif line.endswith('\r\x0c\r\n'):
                 line = line[:-4]
