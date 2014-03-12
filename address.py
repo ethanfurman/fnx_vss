@@ -1,4 +1,5 @@
 from VSS.utils import translator, AutoEnum, tuples
+import re
 
 building_subs = set([
     '#','APARTMENT','APT','BLDG','BUILDING','CONDO','FL','FLR','FLOOR','LOT','LOWER','NO','NUM','NUMBER',
@@ -1432,7 +1433,7 @@ def ordinals(text):
     # both
 
     pieces = text
-    if isinstance(pieces, String):
+    if isinstance(pieces, basestring):
         pieces = pieces.split()
     AS = AddressSegment
     tokens = []

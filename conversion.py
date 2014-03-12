@@ -44,9 +44,9 @@ from datetime import date, datetime, time
 from path import Path
 from string import uppercase, lowercase, digits
 from VSS import Table
-from VSS.decorators import LazyAttr, Missing
-from VSS.utils import BiDict, PropertyDict, translator
-from VSS.iterators import OpenERPcsv, EmbeddedNewlineError
+from VSS.openerp import OpenERPcsv, EmbeddedNewlineError
+from VSS.time_machine import BiDict, PropertyDict
+from VSS.utils import LazyAttr, Missing, translator
 csv_line = OpenERPcsv._convert_line; del OpenERPcsv
 
 import xlrd

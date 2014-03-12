@@ -1,12 +1,12 @@
 from __future__ import with_statement
 from datetime import timedelta
 from itertools import groupby
-from VSS import Table, Month, Weekday, days_per_month, AutoEnum, IntEnum, OrderedDict
+from VSS import Table, Month, Weekday, days_per_month, AutoEnum, IntEnum
 from VSS.BBxXlate.bbxfile import BBxFile
 from VSS.path import Path
-from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time, xrange, Date, Time, OrderedDict, PropertyDict
+from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time, xrange, Date, Time
 from VSS.finance import ACHPayment, ACHStore, ACH_ETC, ACHError, Customer
-
+from VSS.time_machine import OrderedDict, PropertyDict
 try:
     next
 except NameError:
