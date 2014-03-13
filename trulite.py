@@ -536,21 +536,21 @@ class CashReceipt(object):
         seq, cust, chk, inv, gl = self.line_elements(lines[0])
         self.sequence = int(seq)
         self.customer = Customer(*cust)
-        self.check = Check(*chk, batch_date=date)
+        self.check = Check(batch_date=date, *chk)
         if any(inv):
-            self.invoices.append(Invoice(*inv, batch_date=date))
+            self.invoices.append(Invoice(batch_date=date, *inv))
         if any(gl):
             self.gl_distribution.append(GLEntry(*gl))
         seq, cust, chk, inv, gl = self.line_elements(lines[1])
         self.check.num2 = chk[0]
         if any(inv):
-            self.invoices.append(Invoice(*inv, batch_date=date))
+            self.invoices.append(Invoice(batch_date=date, *inv))
         if any(gl):
             self.gl_distribution.append(GLEntry(*gl))
         for line in lines[2:]:
             seq, cust, chk, inv, gl = self.line_elements(line)
             if any(inv):
-                self.invoices.append(Invoice(*inv, batch_date=date))
+                self.invoices.append(Invoice(batch_date=date, *inv))
             if any(gl):
                 self.gl_distribution.append(GLEntry(*gl))
 
