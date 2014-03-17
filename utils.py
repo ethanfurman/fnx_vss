@@ -27,7 +27,7 @@ one_day = timedelta(1)
 spelled_out_numbers = set(['ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN'])
 
 
-def Table(*args, **kwds):
+def Table(fn, *args, **kwds):
     'default to Clipper, Char, Logical, etc'
     data_types = {
             'C' : dbf.Char,
@@ -38,11 +38,16 @@ def Table(*args, **kwds):
         data_types.update(kwds['default_data_types'])
     kwds['default_data_types'] = data_types
     if 'dbf_type' not in kwds:
-        kwds['dbf_type'] = 'clp'
+        try:
+            possibilities = dbf.guess_table_type(fn)
+        except dbf.DbfError:
+            possibilities = [('clp',)]
+        if len(possibilities) != 1 or 'clp' in [t[0] for t in possibilities]:
+            kwds['dbf_type'] = 'clp'
     if (len(args) > 1 or kwds.get('field_specs') is not None) \
     and ('codepage' not in kwds):
         kwds['codepage'] = 'utf8'
-    return dbf.Table(*args, **kwds)
+    return dbf.Table(fn, *args, **kwds)
 
 
 def days_per_month(year):
