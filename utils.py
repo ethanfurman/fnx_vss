@@ -24,9 +24,6 @@ from VSS.time_machine import Sentinel, simplegeneric
 
 one_day = timedelta(1)
 
-spelled_out_numbers = set(['ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN'])
-
-
 def Table(fn, *args, **kwds):
     'default to Clipper, Char, Logical, etc'
     data_types = {
