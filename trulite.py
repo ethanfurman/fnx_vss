@@ -459,7 +459,7 @@ class CashReceipt(object):
 
     class Check(object):
         def __init__(self, number, date, amount, s, batch_date):
-            self.number = number
+            self.number = number.zfill(6)
             try:
                 self.date = text_to_date(date, 'mdy')
             except ValueError:
@@ -553,6 +553,12 @@ class CashReceipt(object):
                 self.invoices.append(Invoice(batch_date=date, *inv))
             if any(gl):
                 self.gl_distribution.append(GLEntry(*gl))
+
+    def __repr__(self):
+        customer = '%s: %s' % (self.customer.number, self.customer.name)
+        amount = currency(self.check.amount)
+        check = "%s (%s) $%s" % (self.check.number, self.check.date, amount)
+        return "<Cash Receipt for %-30s with check %s>" % (customer, check)
 
 def ar_receipts(filename):
     receipts = []
