@@ -221,6 +221,12 @@ def translator(frm='', to='', delete='', keep=None):
 
 phone = translator(delete=' -().')
 
+def contains_any(container, *targets):
+    for t in targets:
+        if t in container:
+            return True
+    return False
+
 def crc32(binary_data):
     "wrapper around binascii.crc32 that is consistent across python versions"
     return binascii.crc32(binary_data) & 0xffffffff
