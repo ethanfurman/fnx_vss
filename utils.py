@@ -610,3 +610,8 @@ class ProgressBar(object):
     def tick(yo):
         yo.current_count += 1
         yo.progress(yo.current_count)
+
+def var(value=None, _storage=[]):
+   if value is not None:
+      _storage[:] = [value]
+   return _storage[0] 
