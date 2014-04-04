@@ -3,7 +3,7 @@
 Copyright
 =========
     - Portions copyright: 2008-2012 Ad-Mail, Inc -- All rights reserved.
-    - Portions copyright: 2012-2013 Ethan Furman -- All rights reserved.
+    - Portions copyright: 2012-2014 Ethan Furman -- All rights reserved.
     - Author: Ethan Furman
     - Contact: ethan@stoneleaf.us
 
@@ -30,7 +30,7 @@ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-version = (0, 95, 8)
+version = (0, 95, 9)
 
 __all__ = (
         'Table', 'Record', 'List', 'Index', 'Relation', 'Iter', 'Date', 'DateTime', 'Time',
@@ -937,9 +937,10 @@ class Date(object):
         return Date(year, month, day)
 
     def strftime(self, format):
+        fmt_cls = type(format)
         if self:
-            return self._date.strftime(format)
-        return ''
+            return fmt_cls(self._date.strftime(format))
+        return fmt_cls('')
 
     @classmethod
     def strptime(cls, date_string, format=None):
@@ -1237,9 +1238,10 @@ class DateTime(object):
         return DateTime(year, month, day, hour, minute, second, microsecond)
 
     def strftime(self, format):
+        fmt_cls = type(format)
         if self:
-            return self._datetime.strftime(format)
-        return ''
+            return fmt_cls(self._datetime.strftime(format))
+        return fmt_cls('')
 
     @classmethod
     def strptime(cls, datetime_string, format=None):
@@ -1510,9 +1512,10 @@ class Time(object):
         return Time(hour, minute, second, microsecond)
 
     def strftime(self, format):
+        fmt_cls = type(format)
         if self:
-            return self._time.strftime(format)
-        return ''
+            return fmt_cls(self._time.strftime(format))
+        return fmt_cls('')
 
     @classmethod
     def strptime(cls, time_string, format=None):
@@ -7889,4 +7892,3 @@ fake_module('api',
     ).register()
 
 dbf = fake_module('dbf', *__all__)
-
