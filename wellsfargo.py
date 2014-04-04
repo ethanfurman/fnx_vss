@@ -1,4 +1,5 @@
 from __future__ import with_statement
+from copy import deepcopy
 from datetime import timedelta
 from itertools import groupby
 from VSS import Table, Month, Weekday, days_per_month, AutoEnum, IntEnum
@@ -298,13 +299,16 @@ class IFTBundle(object):
 class RMFFRecord(tuple):
     __slots__ = ()
     def __new__(cls, text):
-        args = text.strip('~').split('|')
-        rec_def = cls.fields[args[0]]
-        for index, func, help in rec_def.values():
-            try:
-                args[index] = func(args[index])
-            except IndexError:
-                args.append(None) 
+        if isinstance(text, tuple):
+            args = text
+        else:
+            args = text.strip('~').split('|')
+            rec_def = cls.fields[args[0]]
+            for index, func, help in rec_def.values():
+                try:
+                    args[index] = func(args[index])
+                except IndexError:
+                    args.append(None) 
         return tuple.__new__(cls, tuple(args))
     def __getattr__(self, name):
         search_name = name.lower()
@@ -696,35 +700,52 @@ class RmInvoice(object):
     def duplicate_number(self, new_number):
         self._inv_num = new_number
 
-def lockbox_payments(filename):
-    """Return payments from filename"""
+class RMFlatFile(object):
+    "create an object that represents the RM files downloaded from WFB"
+    
+    def __init__(self, filename):
+        """Return payments from filename"""
 
-    in_lockbox = False
-    result = []
-    batch_header = None
-    batch_footer = None
-    rmgr = RMFlatFileIterator(filename)
-    for rec in rmgr:
-        if rec.id == 'BH':
-            batch_header = rec
-        elif rec.id == 'BT':
-            batch_footer = rec
-            in_lockbox = False
-        if not in_lockbox:
-            if rec.id != 'PR' or rec.prpt != 'LBX':
-                continue
-            in_lockbox = True
-            payment = RmPayment(rmgr.header, batch_header, rec)
-            result.append(payment)
-        elif rec.id == 'PR':
-            payment = RmPayment(rmgr.header, batch_header, rec)
-            result.append(payment)
-        if rec.id in ('PA', 'SP'):
-            payment.add_record(rec)
-        elif rec.id == 'IV':
-            new_invoice = RmInvoice(rec)
-            payment.add_invoice(new_invoice)
-        elif rec.id == 'SI':
-            new_invoice.add_record(rec)
-    return result
+        in_lockbox = False
+        self._lockbox = result = []
+        batch_header = None
+        batch_footer = None
+        rmgr = RMFlatFileIterator(filename)
+        self.file_header = rmgr.header.fhrt
+        self.file_control = rmgr.header.fhfn
+        self.file_creation_date = rmgr.header.fhfd
+        self.file_creation_time = rmgr.header.fdft
+        for rec in rmgr:
+            if rec.id == 'BH':
+                batch_header = rec
+            elif rec.id == 'BT':
+                batch_footer = rec
+                in_lockbox = False
+            if not in_lockbox:
+                if rec.id != 'PR' or rec.prpt != 'LBX':
+                    continue
+                in_lockbox = True
+                payment = RmPayment(rmgr.header, batch_header, rec)
+                result.append(payment)
+            elif rec.id == 'PR':
+                payment = RmPayment(rmgr.header, batch_header, rec)
+                result.append(payment)
+            if rec.id in ('PA', 'SP'):
+                payment.add_record(rec)
+            elif rec.id == 'IV':
+                new_invoice = RmInvoice(rec)
+                payment.add_invoice(new_invoice)
+            elif rec.id == 'SI':
+                new_invoice.add_record(rec)
+    
+    @property
+    def effective_date(self):
+        if self.file_creation_time > Time(5, 00):
+            return self.file_creation_date
+        else:
+            return self.file_creation_date.replace(delta_day=-1)
 
+    @property
+    def lockbox_payments(self):
+        "return a copy of the lockbox payments"
+        return deepcopy(self._lockbox)
