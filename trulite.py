@@ -1,5 +1,6 @@
 from __future__ import with_statement
 
+from itertools import groupby
 from VSS.address import any_digits
 from VSS.BBxXlate.bbxfile import BBxFile
 from VSS.utils import one_day, text_to_date, String, Integer
@@ -591,3 +592,62 @@ def ar_receipts(filename):
             else:
                 data.append(line[:-2])
     return receipts
+
+class LockboxEntry(tuple):
+    __slots__ = ()
+    def __new__(cls, text):
+        try:
+            if isinstance(text, tuple):
+                data = text
+            else:
+                data = [t.strip() for t in text.split('\t')]
+                data[3] = text_to_date(data[3], 'ymd')
+                data[6] = currency(data[6].strip('-'))
+                data[7] = currency(data[7].strip('-'))
+        except Exception, exc:
+            exc.args = (exc.args[0] + '\noriginal data: %r\n' % (text,) ,) + exc.args[1:]
+            raise
+        return tuple.__new__(cls, tuple(data))
+    @property
+    def cust_num(self):
+        return self[0]
+    @property
+    def cust_name(self):
+        return self[1]
+    @property
+    def desc(self):
+        return self[2]
+    @property
+    def date(self):
+        return self[3]
+    @property
+    def inv_num(self):
+        return self[4]
+    @property
+    def gl_acct(self):
+        return self[5]
+    @property
+    def debit(self):
+        return self[6]
+    @property
+    def credit(self):
+        return self[7]
+
+class LockboxBatch(object):
+    "a representation of a processed WFB lockbox batch"
+
+    def __init__(self, filename):
+        def not_blank(line):
+            return bool(line.strip())
+        def cust_id(rec):
+            return rec.cust_num
+        with open(filename) as file:
+            file_lines = file.readlines()
+        self.checks = {}
+        for data, lines in groupby(file_lines, not_blank):
+            if not data:
+                continue
+            lines = [LockboxEntry(l) for l in lines]
+            check = lines[0]
+            #lines.sort(key=cust_id)
+            self.checks[check.inv_num] = lines
