@@ -1245,10 +1245,16 @@ class DateTime(object):
     def strptime(cls, datetime_string, format=None):
         if format is not None:
             return cls(datetime.datetime.strptime(datetime_string, format))
-        try:
-            return cls(datetime.datetime.strptime(datetime_string, "%Y-%m-%d %H:%M:%S.%f"))
-        except ValueError:
-            return cls(datetime.datetime.strptime(datetime_string, "%Y-%m-%d %H:%M:%S"))
+        for format in (
+                "%Y-%m-%d %H:%M:%S.%f",
+                "%Y-%m-%d %H:%M:%S",
+                "%Y-%m-%dT%H:%M:%SZ",
+                ):
+            try:
+                return cls(datetime.datetime.strptime(datetime_string, format))
+            except ValueError:
+                pass
+        raise ValueError("Unable to convert %r" % datetime_string)
 
     def time(self):
         if self:
