@@ -10,6 +10,12 @@ try:
 except NameError:
     from dbf import next
 
+try:
+    basestring
+except NameError:
+    # only a problem on Python 3.1
+    basestring = unicode
+
 
 try:
     from collections import OrderedDict
@@ -786,7 +792,7 @@ class PropertyDict(object):
     def __setitem__(yo, name, value):
         if name in yo._internal:
             object.__setattr__(yo, name, value)
-        elif isinstance(name, String) and name[0:1] == '_':
+        elif isinstance(name, basestring) and name[0:1] == '_':
             raise KeyError("illegal attribute name: %s" % name)
         else:
             if name not in yo._values:

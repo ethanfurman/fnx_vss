@@ -65,8 +65,17 @@ def get_records(OE, model, domain=[], fields=None, max_qty=None):
     result = model.search_read(domain=domain, fields=fields)
     if max_qty is not None and len(result) > max_qty:
         raise ValueError('no more than %s records expected, but received %s' % (max_qty, len(results)))
-    return [PropertyDict(r) for r in result]
+    return [_normalize(r) for r in result]
 
+def _normalize(d):
+    'recursively convert each dict into a PropertyDict'
+    res = PropertyDict()
+    for key, value in d.items():
+        if isinstance(value, dict):
+            res[key] = _normalize(value)
+        else:
+            res[key] = value
+    return res
 
 def update_from_nightly():
     "routine to install nightly updates"
