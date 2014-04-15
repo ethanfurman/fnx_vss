@@ -534,7 +534,7 @@ del strip_ext
 
 def unlink(self):
     "thin wrapper around os.unlink"
-    os.unlink(self)
+    _os.unlink(self)
 methods['unlink'] = unlink
 methods['remove'] = unlink
 del unlink
