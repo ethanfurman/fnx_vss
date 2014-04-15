@@ -28,8 +28,9 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 """
 
-import os as _os
 import glob as _glob
+import os as _os
+import shutil as _shutil
 import sys as _sys
 
 __all__ = ['Path']
@@ -340,7 +341,7 @@ def copy(self, dst):
     if isinstance(dst, self.__class__):
         dst = str(dst)
     src = str(self)
-    shutil.copy2(src, dst)
+    _shutil.copy2(src, dst)
 methods['copy'] = copy
 del copy
 
@@ -349,7 +350,7 @@ def copytree(self, dst, symlinks=False, ignore=None):
     if isinstance(dst, self.__class__):
         dst = str(dst)
     src = str(src)
-    shutil.copytree(src, dst, symlinks, ignore)
+    _shutil.copytree(src, dst, symlinks, ignore)
 methods['copytree'] = copytree
 del copytree
 
@@ -465,7 +466,7 @@ def move(self, dst):
     if isinstance(dst, self.__class__):
         dst = str(dst)
     src = str(self)
-    shutil.move(src, dst)
+    _shutil.move(src, dst)
 methods['move'] = move
 del move
 
@@ -483,11 +484,11 @@ def rmtree(self, ignore_errors=None, onerror=None):
     'thin wrapper around shutil.rmtree'
     target = str(self)
     if ignore_errors is None and onerror is None:
-        shutil.rmtree(target)
+        _shutil.rmtree(target)
     elif ignore_errors is not None and onerror is None:
-        shutil.rmtree(target, ignore_errors)
+        _shutil.rmtree(target, ignore_errors)
     elif onerror is not None:
-        shutil.rmtree(target, ignore_errors, onerror)
+        _shutil.rmtree(target, ignore_errors, onerror)
 methods['rmtree'] = rmtree
 del rmtree
 
