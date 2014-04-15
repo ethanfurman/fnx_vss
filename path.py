@@ -532,6 +532,13 @@ def strip_ext(self, remove=1):
 methods['strip_ext'] = strip_ext 
 del strip_ext
 
+def unlink(self):
+    "thin wrapper around os.unlink"
+    os.unlink(self)
+methods['unlink'] = unlink
+methods['remove'] = unlink
+del unlink
+
 if pyver < 2.6:
     def walk(self, topdown=True, onerror=None):
         p = self.__class__
