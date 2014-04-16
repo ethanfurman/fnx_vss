@@ -569,6 +569,31 @@ class LazyAttr(object):
             return yo
         return yo.fget(instance)
 
+class Open(object):
+    builtin_open = open
+    _cache = {}
+    @classmethod
+    def __call__(cls, name, *args):
+        file = cls.builtin_open(name, *args)
+        cls._cache[name] = file
+        return file
+    @classmethod
+    def active(cls, name):
+        cls.open_files()
+        try:
+            return cls._cache[name]
+        except KeyError:
+            raise ValueError('%s has been closed' % name)
+    @classmethod
+    def open_files(cls):
+        closed = []
+        for name, file in cls._cache.items():
+            if file.closed:
+                closed.append(name)
+        for name in closed:
+            cls._cache.pop(name)
+        return cls._cache.items()
+
 
 class Missing(object):
     "if object hasn't been created, raise AttributeError"
