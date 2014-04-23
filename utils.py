@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import __builtin__
 import binascii
 import datetime
+import htmlentitydefs
 import re
 import smtplib
 import string
@@ -152,6 +153,22 @@ class Weekday(AutoEnum):
     @classmethod
     def from_date(cls, date):
         return cls(date.isoweekday())
+    def next(self, day):
+        """Return number of days needed to get from self to day."""
+        if self == day:
+            return 7
+        delta = day - self
+        if delta < 0:
+            delta += 7
+        return delta
+    def last(self, day):
+        """Return number of days needed to get from self to day."""
+        if self == day:
+            return -7
+        delta = day - self
+        if delta > 0:
+            delta -= 7
+        return delta
 
 
 class Month(AutoEnum):
@@ -646,3 +663,13 @@ def var(value=None, _storage=[]):
    if value is not None:
       _storage[:] = [value]
    return _storage[0] 
+
+def xml_quote(string):
+    if any(ch in string for ch in (' ','<','>',"'")):
+        string = string.replace(' ','%20').replace('<','%3C').replace('>','%3E').replace("'",'&apos;')
+    return string
+
+def xml_unquote(string):
+    if any(qch in string for qch in ('%20', '%3C', '%3E', '&apos;')):
+        string = string.replace('%20',' ').replace('%3C','<').replace('%3E','>').replace('&apos;',"'")
+    return string
