@@ -4,7 +4,7 @@ Copyright
     - Copyright: 2011-2014 Ethan Furman
     - Author: Ethan Furman
     - Contact: ethan@stoneleaf.us
-    - Version: 0.61.000 as of 2014-03-12
+    - Version: 0.65.000 as of 2014-04-18
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -100,10 +100,11 @@ del ext
 def dir_pieces(self):
     result = []
     cls = self.__class__
-    if self._dirs[0] == SEP:
-        result = [cls(SEP)]
-    dirs = self._dirs.strip(SEP)
-    result.extend([cls(d) for d in dirs.split(SEP)])
+    if self._dirs:
+        if self._dirs[0] == SEP:
+            result = [cls(SEP)]
+        dirs = self._dirs.strip(SEP)
+        result.extend([cls(d) for d in dirs.split(SEP)])
     return result
 methods['dir_pieces'] = property(dir_pieces)
 del dir_pieces
