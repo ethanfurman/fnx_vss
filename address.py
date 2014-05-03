@@ -433,7 +433,7 @@ country_abbr = {
     "SE":  "SWEDEN",
     "CH":  "SWITZERLAND",
     "SY":  "SYRIAN ARAB REPUBLIC",
-    "TW":  "TAIWAN, PROVINCE OF CHINA",
+    "TW":  "TAIWAN",
     "TJ":  "TAJIKISTAN",
     "TZ":  "TANZANIA, UNITED REPUBLIC OF",
     "TH":  "THAILAND",
@@ -469,7 +469,6 @@ country_abbr = {
     "ZW":  "ZIMBABWE",
     }
 country_name = dict([(v, k) for k, v in country_abbr.items()])
-
 
 @tuples
 def Rise(*fields):
@@ -531,7 +530,8 @@ def cszk(line1, line2):
     line1, line2 = Sift(line1.replace('.',' ').replace(',',' '), line2.replace('.',' ').replace(',',' '))
     line1 = ' '.join(line1.split())
     line2 = ' '.join(line2.split())
-    street = city = state = postal = country = ''
+    street = city = state = country = ''
+    postal = PostalCode('', '')
     try:
         pieces, line2 = line2.split(), ''
         k = kountry = ''
@@ -1533,7 +1533,7 @@ def normalize_address(line):
         return line
     orig_line = line
     line = ' '.join(line.replace(',',' ').replace('.',' ').replace('-',' ').upper().split())
-    if pobox(line) == 'POBOX':
+    if 'POBOX' in pobox(line):
         index = line.index('X')
         trailer = line[index+1:]
         if trailer and not trailer.isalpha():
@@ -1547,6 +1547,38 @@ def normalize_address(line):
         line.append(usps_street_suffix_common.get(p, p))
     line = ordinals(line)
     return ' '.join(line)
+
+def normalize_address_line(line):
+    "return two normalized address lines (second line may be blank)"
+    if not line.strip():
+        return line, ''
+    lines = []
+    orig_line = line
+    line = ' '.join(line.replace(',',' ').replace('.',' ').replace('-',' ').strip().upper().split())
+    if 'POBOX' in pobox(line):
+        x = line.index('X')
+        p = line.rindex('P', 0, x)
+        trailer = line[x+1:]
+        if trailer:
+            po_line = ' '.join(['PO BOX', line[x+1:].strip()])
+            if not p:
+                return po_line, ''
+            line = line[:p]
+            lines.append(po_line)
+    pieces = line.split()
+    if not has_digits(pieces[0]) and pieces[0].upper() not in spelled_out_numbers:
+        lines.append(line)
+        if len(lines) < 2:
+            lines.append('')
+        return tuple(lines)
+    line = []
+    for p in pieces:
+        line.append(usps_street_suffix_common.get(p, p))
+    line = ordinals(line)
+    lines.append(' '.join(line))
+    if len(lines) < 2:
+        lines.append('')
+    return tuple(lines)
 
 
 class PostalCode(object):
@@ -1566,21 +1598,20 @@ class PostalCode(object):
                 '5'   : 'S',
                 }
         postal = postal.strip('-,')
-        if len(postal.replace('-', '')) in (5, 9):
-            yo.code = postal[:5]
-        elif postal[:5].isdigit():
-            yo.code = postal[:5]
-        elif (has_alpha(postal) and len(postal.replace(' ', '')) == 6
-        and   (not country or country == 'CANADA')):
-            # alpha-num-alpha num-alpha-num
-            postal = list(postal.replace(' ', '').upper())
-            for i in (0, 2, 4):
-                postal[i] = num2alpha.get(postal[i], postal[i])
-            for i in (1, 3, 5):
-                postal[i] = alpha2num.get(postal[i], postal[i])
-            yo.code = "%s %s" % (''.join(postal[:3]), ''.join(postal[3:]))
-        else:
-            yo.code = postal
+        if country in ('UNITED STATES', 'CANADA', ''):
+            if '-' in postal and len(postal.replace('-', '')) in (5, 9):
+                postal = postal[:5]
+            elif postal[:5].isdigit():
+                postal = postal[:5]
+            elif has_alpha(postal) and len(postal.replace(' ', '')) == 6:
+                # alpha-num-alpha num-alpha-num
+                postal = list(postal.replace(' ', '').upper())
+                for i in (0, 2, 4):
+                    postal[i] = num2alpha.get(postal[i], postal[i])
+                for i in (1, 3, 5):
+                    postal[i] = alpha2num.get(postal[i], postal[i])
+                postal = "%s %s" % (''.join(postal[:3]), ''.join(postal[3:]))
+        yo.code = postal
 
     def __eq__(yo, other):
         if not isinstance(other, (str, unicode, yo.__class__)):
