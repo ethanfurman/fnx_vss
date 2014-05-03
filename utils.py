@@ -236,7 +236,7 @@ def translator(frm='', to='', delete='', keep=None):
             return s.translate(bytes_trans, delete)
     return translate
 
-phone = translator(delete=' -().')
+phone = translator(delete=' -().etET')
 
 def contains_any(container, *targets):
     for t in targets:
@@ -449,15 +449,45 @@ def fix_phone(text):
     text = str(text) # convert numbers to digits
     text = text.strip()
     data = phone(text)
+    data = data.replace('#', 'x').replace('X','x')
+    if 'x' in data:
+        data, ext = data.split('x', 1)
+    else:
+        ext = ''
+    if ext:
+        ext = ' x%s' % ext
+    if data.startswith('011'):
+        if int(data[3:4]) in (
+                20, 27, 30, 31, 32, 33, 34, 36, 39, 40, 41, 43, 44, 45, 46, 47, 49, 49,
+                51, 52, 53, 54, 55, 56, 57, 58, 60, 61, 62, 63, 64, 65, 66,  7, 81, 82,
+                84, 86, 90, 91, 92, 93, 94, 95, 98,
+                ):
+            pre = [data[:3], data[3:5]]
+            data = data[5:]
+        else:
+            pre = [data[:3], data[3:6]]
+            data = data[6:]
+        post = [data[-4:]]
+        data = data[:-4]
+        if len(data) % 4 == 0:
+            while data:
+                post.append(data[-4:])
+                data = data[:-4]
+        else:
+            while data:
+                post.append(data[-3:])
+                data = data[:-3]
+        post.reverse()
+        return '.'.join(pre + post) + ext
     if len(data) not in (7, 10, 11):
-        return text
+        return text + ext
     if len(data) == 11:
         if data[0] != '1':
-            return text
+            return text + ext
         data = data[1:]
     if len(data) == 7:
-        return '%s.%s' % (data[:3], data[3:])
-    return '%s.%s.%s' % (data[:3], data[3:6], data[6:])
+        return '%s.%s' % (data[:3], data[3:]) + ext
+    return '%s.%s.%s' % (data[:3], data[3:6], data[6:]) + ext
 
 
 def fix_date(text, format='mdy'):
