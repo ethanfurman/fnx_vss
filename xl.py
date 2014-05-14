@@ -1,5 +1,7 @@
 from functools import partial
 import xlrd
+import sys
+sys.modules['VSS.xl.xlrd'] = xlrd
 
 __all__ = ('xlrd', 'open_workbook')
 
