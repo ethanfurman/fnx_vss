@@ -41,7 +41,7 @@ etc., if necessary."""
 import os, sys, shlex, shutil, stat, subprocess, re, dbf, csv
 from collections import defaultdict
 from datetime import date, datetime, time
-from path import Path
+from VSS.path import Path
 from string import uppercase, lowercase, digits
 from VSS import Table
 from VSS.openerp import OpenERPcsv, EmbeddedNewlineError
@@ -49,20 +49,8 @@ from VSS.time_machine import BiDict, PropertyDict
 from VSS.utils import LazyAttr, Missing, translator
 csv_line = OpenERPcsv._convert_line; del OpenERPcsv
 
-import xlrd
-from xlrd import open_workbook, xldate_as_tuple
-from xlrd import XL_CELL_TEXT, XL_CELL_NUMBER, XL_CELL_DATE, XL_CELL_BOOLEAN, XL_CELL_ERROR, XL_CELL_BLANK
-
-def _get_sheet(self, index_or_name):
-    if isinstance(index_or_name, (int, long)):
-        return self.sheet_by_index(index_or_name)
-    return self.sheet_by_name(index_or_name)
-
-def _get_cell(self, row_col):
-    return self.cell(*row_col)
-
-xlrd.book.Book.__getitem__ = _get_sheet
-xlrd.sheet.Sheet.__getitem__ = _get_cell
+from VSS.xl import open_workbook
+from VSS.xl.xlrd import XL_CELL_TEXT, XL_CELL_NUMBER, XL_CELL_DATE, XL_CELL_BOOLEAN, XL_CELL_ERROR, XL_CELL_BLANK, xldate_as_tuple
 
 integer = int, long
 string = str, unicode
@@ -79,10 +67,10 @@ class DataStore(object):
         yo.module = module
         yo.module_id = module.lower().replace(' ','_')
         file_name = yo.diskname = Path(file_name)     # name of originating jet tables
-        basename = yo.basename = file_name.basename.split('.', 1)[0].replace('-','')
+        basename = yo.basename = file_name.base.split('.', 1)[0].replace('-','')
         yo.folder = Path('./converting')
-        if not os.path.exists(yo.folder):
-            os.mkdir(yo.folder)
+        if not yo.folder.exists():
+            yo.folder.mkdir()
         #if yo.folder not in sys.path:
         #    sys.path.insert(0, yo.folder)
         yo.tables = PropertyDict(default=PropertyDict)  # tablename -> various bits about the table
@@ -154,7 +142,9 @@ class DataStore(object):
             csv_contents = get_external_command_output(command)
             if not csv_contents:
                 raise ConversionError("unable to get data for %s:%s" % (yo.diskname, yo.table_names[table]))
-            csv_contents = csv_contents.strip().split('\n')
+            with open('converting/%s' % (yo.table_names[table] + '.csv', ), 'w') as csv_dump:
+                csv_dump.write(csv_contents)
+            csv_contents = csv_contents.strip().decode('utf-8').split('\n')
             dbf_file = yo.folder/yo.tables[table].dbf_file
             yo.tables[table].dbf_fields = BiDict()
             dbf_fields = []
@@ -176,7 +166,8 @@ class DataStore(object):
                     final_line = []
                     try:
                         for i, value in enumerate(csv_line(line, prev_state=state)):
-                            final_line.append(value.decode('utf8', 'ignore'))
+                            final_line.append(value)
+                            #final_line.append(value.decode('utf8', 'ignore'))
                     except EmbeddedNewlineError, exc:
                         state = exc.state
                     else:
