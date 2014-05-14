@@ -35,6 +35,10 @@ def Table(fn, *args, **kwds):
     if 'default_data_types' in kwds:
         data_types.update(kwds['default_data_types'])
     kwds['default_data_types'] = data_types
+    if (args or kwds.get('field_specs') is not None):
+        new_table = True
+    else:
+        new_table = False
     if 'dbf_type' not in kwds:
         try:
             possibilities = dbf.guess_table_type(fn)
@@ -42,8 +46,7 @@ def Table(fn, *args, **kwds):
             possibilities = [('clp',)]
         if len(possibilities) != 1 or 'clp' in [t[0] for t in possibilities]:
             kwds['dbf_type'] = 'clp'
-    if (len(args) > 1 or kwds.get('field_specs') is not None) \
-    and ('codepage' not in kwds):
+    if new_table:
         kwds['codepage'] = 'utf8'
     return dbf.Table(fn, *args, **kwds)
 
@@ -358,15 +361,15 @@ class Memory(object):
 
     _default = None
 
-    def __init__(yo, cell=_memory_sentinel, **kwargs):
-        if 'default' in kwargs:
-            yo._default = kwargs.pop('default')
+    def __init__(yo, cell=_memory_sentinel, **kwds):
+        if 'default' in kwds:
+            yo._default = kwds.pop('default')
         if cell is not _memory_sentinel:
             yo._order.append('cell')
             yo._values['cell'] = cell
-        yo._values = _values = kwargs.copy()
+        yo._values = _values = kwds.copy()
         yo._order = _order = sorted(_values.keys())
-        for attr, value in sorted(kwargs.items()):
+        for attr, value in sorted(kwds.items()):
             _values[attr] = value
             _order.append(attr)
 
@@ -431,7 +434,7 @@ class Memory(object):
     def keys(yo):
         return yo._order[:]
 
-    def set(yo, cell=_memory_sentinel, **kwargs):
+    def set(yo, cell=_memory_sentinel, **kwds):
         _values = yo._values
         _order = yo._order
         if cell is not _memory_sentinel:
@@ -439,7 +442,7 @@ class Memory(object):
                 _order.append('cell')
             _values['cell'] = cell
             return cell
-        for attr, value in sorted(kwargs.items()):
+        for attr, value in sorted(kwds.items()):
             _order.append(attr)
             _values[attr] = value
             return value
