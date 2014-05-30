@@ -1,16 +1,18 @@
-import address
-import dbf
-import enum
-import finance
-import path
-import time_machine
-
 import sys
-sys.modules['VSS.address'] = address
+
+import dbf
 sys.modules['VSS.dbf'] = dbf
+import enum
 sys.modules['VSS.enum'] = enum
-sys.modules['VSS.finance'] = finance
+import path
 sys.modules['VSS.path'] = path
+
+import address
+sys.modules['VSS.address'] = address
+import finance
+sys.modules['VSS.finance'] = finance
+import time_machine
 sys.modules['VSS.time_machine'] = time_machine
+del sys
 
 from utils import *
