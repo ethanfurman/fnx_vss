@@ -239,8 +239,6 @@ def translator(frm='', to='', delete='', keep=None):
             return s.translate(bytes_trans, delete)
     return translate
 
-phone = translator(delete=' -().etET')
-
 def contains_any(container, *targets):
     for t in targets:
         if t in container:
@@ -447,11 +445,20 @@ class Memory(object):
             _values[attr] = value
             return value
 
+phone = translator(delete=' -().etET')
 
 def fix_phone(text):
     text = str(text) # convert numbers to digits
     text = text.strip()
     data = phone(text)
+    if not data:
+        return text
+    # fix double leading zeros
+    if data[:2] == '00':
+        data = '011' + data[2:]
+    # fix leading '+' signs
+    if data[0] == '+':
+        data = '011' + data[1:].replace('+', '')
     data = data.replace('#', 'x').replace('X','x')
     if 'x' in data:
         data, ext = data.split('x', 1)
@@ -483,10 +490,10 @@ def fix_phone(text):
         post.reverse()
         return '.'.join(pre + post) + ext
     if len(data) not in (7, 10, 11):
-        return text + ext
+        return text
     if len(data) == 11:
         if data[0] != '1':
-            return text + ext
+            return text
         data = data[1:]
     if len(data) == 7:
         return '%s.%s' % (data[:3], data[3:]) + ext
@@ -692,10 +699,11 @@ class ProgressBar(object):
         yo.current_count += 1
         yo.progress(yo.current_count)
 
-def var(value=None, _storage=[]):
-   if value is not None:
+_var_sentinel = Sentinel('no value')
+def var(value=_var_sentinel, _storage=[]):
+   if value is not _var_sentinel:
       _storage[:] = [value]
-   return _storage[0] 
+   return _storage[0]
 
 def xml_quote(string):
     if any(ch in string for ch in (' ','<','>',"'")):
