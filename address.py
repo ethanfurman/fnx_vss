@@ -1570,7 +1570,7 @@ def normalize_address_line(line):
         lines.append(line)
         if len(lines) < 2:
             lines.append('')
-        return tuple(lines)
+        return _fix_parens(*lines)
     line = []
     for p in pieces:
         line.append(usps_street_suffix_common.get(p, p))
@@ -1578,8 +1578,21 @@ def normalize_address_line(line):
     lines.append(' '.join(line))
     if len(lines) < 2:
         lines.append('')
-    return tuple(lines)
+    return _fix_parens(*lines)
 
+def _fix_parens(l1, l2):
+    "if l1 has half a paren pair, and l2 the other half, remove both"
+    l1lp = l1.count('(')
+    l1rp = l1.count(')')
+    l2lp = l2.count('(')
+    l2rp = l2.count(')')
+    if (
+            l1lp or l1rp and l1lp != l1rp and l1lp + l1rp == 1
+        and l2lp or l2rp and l2lp != l2rp and l2lp + l2rp == 1
+      ):
+        l1 = ' '.join(l1.replace('(',' ').replace(')',' ').split())
+        l2 = ' '.join(l2.replace('(',' ').replace(')',' ').split())
+    return l1, l2
 
 class PostalCode(object):
     """
