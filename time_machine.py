@@ -815,7 +815,7 @@ class PropertyDict(object):
         return "PropertyDict([%s])" % ', '.join(["(%r, %r)" % (x, yo._values[x]) for x in yo])
 
     def __str__(yo):
-        return '\n'.join(["%r=%r" % (x, yo._values[x]) for x in yo])
+        return '\n'.join(["%s=%r" % (x, yo._values[x]) for x in yo])
 
     def keys(yo):
         return yo._order[:]
