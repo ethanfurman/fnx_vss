@@ -19,6 +19,7 @@ from email import email
 from enum import Enum, IntEnum
 from math import floor
 from scription import mail
+from socket import socket, AF_INET, SOCK_DGRAM
 from VSS import dbf
 from VSS.dbf import DateTime, Date, Time, Integer, String
 from VSS.time_machine import Sentinel, simplegeneric
@@ -510,6 +511,19 @@ def fix_date(text, format='mdy'):
     elif format == 'ymd':
         yyyy, mm, dd = int(text[:2], 16)-160+2000, int(text[2:4]), int(text[4:])
     return Date(yyyy, mm, dd)
+
+
+def get_local_ip(target):
+    "get local ip address needed to talk to target"
+    # based on http://www.linux-support.com/cms/get-local-ip-address-with-python/
+    try:
+        s = socket(AF_INET, SOCK_DGRAM)
+        s.connect((target, 8000))
+        ipaddr = s.getsockname()[0]
+        s.close()
+    except Exception:
+        ipaddr = None
+    return ipaddr 
 
 
 def text_to_date(text, format='ymd'):
