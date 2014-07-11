@@ -40,19 +40,19 @@ def adjust_permissions(oe_groups, allowed_groups, user):
     return list(permissions)
 
 def host_site(hostname, database, login='admin', password='admin'):
-    hostname = {'wsg':'westernstatesglass.com','falcon':'falcon.tzo.com','salesinq':'demo.salesinq.com'}.get(hostname, hostname)
+    hostname = {'wsg':'westernstatesglass.com','falcon':'sunridge_farms.com','salesinq':'demo.salesinq.com'}.get(hostname, hostname)
     result = PropertyDict()
     result.connection = conn = openerplib.get_connection(hostname=hostname, database=database, login=login, password=password)
-    result.user_model = um = conn.get_model('res.users')
+    result.user_model = result.res_users = um = conn.get_model('res.users')
     users = um.read(um.search([('login','!=','""')]))
     users.extend(um.read(um.search([('login','!=','""'), ('active','!=','True')])))
-    result.users = [PropertyDict(d) for d in users]
-    result.group_model = gm = conn.get_model('res.groups')
+    result.users = [_normalize(d) for d in users]
+    result.group_model = result.res_groups = gm = conn.get_model('res.groups')
     groups = gm.read(gm.search([('name','!=','""')]))
-    result.groups = [PropertyDict(d) for d in groups]
+    result.groups = [_normalize(d) for d in groups]
     return result
 
-def get_records(OE, model=None, domain=[], fields=None, max_qty=None, ids=None):
+def get_records(OE, model=None, domain=[(1,'=',1)], fields=[], max_qty=None, ids=None):
     """get records from model
 
     domain <- OpenERP domain for selecting records
@@ -65,6 +65,7 @@ def get_records(OE, model=None, domain=[], fields=None, max_qty=None, ids=None):
         model, OE = OE, model
     else:
         model = OE.conn.get_model(model)
+    model.search([('id','=',0)])
     single = False
     if ids:
         if isinstance(ids, (int,long)):
