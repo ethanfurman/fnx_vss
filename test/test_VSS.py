@@ -16,7 +16,7 @@ from VSS.finance import FederalHoliday, ACHStore, ACHPayment, ACHFile, ACH_ETC, 
 from VSS.time_machine import suppress
 from VSS.trulite import ARInvoice, ARAgingLine, ar_open_invoices, ar_invoices, Batch
 from VSS.utils import xrange, all_equal
-from VSS.wellsfargo import RmInvoice, RmPayment, RMFFRecord, lockbox_payments, Int
+from VSS.wellsfargo import RmInvoice, RmPayment, RMFFRecord, RMFlatFile, Int
 
 globals().update(Customer.__members__)
 

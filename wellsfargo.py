@@ -5,7 +5,7 @@ from itertools import groupby
 from VSS import Table, Month, Weekday, days_per_month, AutoEnum, IntEnum
 from VSS.BBxXlate.bbxfile import BBxFile
 from VSS.path import Path
-from VSS.utils import one_day, bb_text_to_date, text_to_date, text_to_time, xrange, Date, Time
+from VSS.utils import currency, one_day, bb_text_to_date, text_to_date, text_to_time, xrange, Date, DateTime, Time
 from VSS.finance import ACHPayment, ACHStore, ACH_ETC, ACHError, Customer
 from VSS.time_machine import OrderedDict, PropertyDict
 try:
@@ -700,6 +700,20 @@ class RmInvoice(object):
     def duplicate_number(self, new_number):
         self._inv_num = new_number
 
+
+class RMBatch(object):
+    "represents a batch from an RM Flat File"
+
+    def __init__(self, sequence, date, time, batch_type, amount):
+        self.sequence = sequence
+        self.datetime = DateTime.combine(date, time)
+        self.type = batch_type
+        self.amount = amount
+
+    def __str__(self):
+        return "<%02d> %s batch generated on %s for %s" % (self.sequence, self.type, self.datetime, currency(self.amount))
+
+
 class RMFlatFile(object):
     "create an object that represents the RM files downloaded from WFB"
     
@@ -715,13 +729,26 @@ class RMFlatFile(object):
         self.file_control = rmgr.header.fhfn
         self.file_creation_date = rmgr.header.fhfd
         self.file_creation_time = rmgr.header.fdft
+        self._batches = []
+        batch_type = None
         for rec in rmgr:
             if rec.id == 'BH':
                 batch_header = rec
             elif rec.id == 'BT':
                 batch_footer = rec
                 in_lockbox = False
+                self._batches.append(
+                        RMBatch(
+                            batch_header.bhbn,
+                            batch_header.bhbd,
+                            batch_header.bhbt,
+                            batch_type,
+                            batch_footer.btpa,
+                            ))
+                batch_type = None
             if not in_lockbox:
+                if rec.id == 'PR' and batch_type is None:
+                    batch_type = rec.prpt
                 if rec.id != 'PR' or rec.prpt != 'LBX':
                     continue
                 in_lockbox = True
@@ -737,6 +764,10 @@ class RMFlatFile(object):
                 payment.add_invoice(new_invoice)
             elif rec.id == 'SI':
                 new_invoice.add_record(rec)
+
+    @property
+    def batches(self):
+        return deepcopy(self._batches)
     
     @property
     def effective_date(self):

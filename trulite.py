@@ -3,7 +3,7 @@ from __future__ import with_statement
 from itertools import groupby
 from VSS.address import any_digits
 from VSS.BBxXlate.bbxfile import BBxFile
-from VSS.utils import one_day, text_to_date, String, Integer
+from VSS.utils import currency, one_day, text_to_date, String, Integer
 from VSS import AutoEnum
 
 GL_ACCT_REC = '1100-00'
@@ -391,17 +391,6 @@ class Status(AutoEnum):
     review = ()
     bad = ()
 globals().update(Status.__members__)
-
-def currency(number):
-    if not isinstance(number, (Integer, String)):
-        raise ValueError('currency only works with integer and string types (received %s %r )' % (type(number), number))
-    if isinstance(number, Integer):
-        number = str(number)
-        number = '0' * (3 - len(number)) + number
-        number = number[:-2] + '.' + number[-2:]
-    elif isinstance(number, String):
-        number = int(number.replace('.',''))
-    return number
 
 
 class CashReceipt(object):

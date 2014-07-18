@@ -216,6 +216,18 @@ def bb_text_to_date(text):
     return Date(yyyy, mm, dd)
 
 
+def currency(number):
+    if not isinstance(number, (Integer, String)):
+        raise ValueError('currency only works with integer and string types (received %s %r )' % (type(number), number))
+    if isinstance(number, Integer):
+        number = str(number)
+        number = '0' * (3 - len(number)) + number
+        number = number[:-2] + '.' + number[-2:]
+    elif isinstance(number, String):
+        number = int(number.replace('.',''))
+    return number
+
+
 def translator(frm='', to='', delete='', keep=None):
     if len(to) == 1:
         to = to * len(frm)
