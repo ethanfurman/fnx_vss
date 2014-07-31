@@ -22,7 +22,6 @@ from os import strerror
 from platform import machine, system
 from signal import signal, SIGINT, SIG_DFL
 from stat import S_IFDIR
-from traceback import print_exc
 
 
 __version__ = '1.1'
@@ -344,7 +343,6 @@ class FUSE(object):
         except OSError, e:
             return -(e.errno or EFAULT)
         except:
-            print_exc()
             return -EFAULT
     
     def getattr(self, path, buf):
