@@ -42,7 +42,7 @@ def adjust_permissions(oe_groups, allowed_groups, user):
 def host_site(hostname, database, login='admin', password='admin'):
     hostname = {'wsg':'westernstatesglass.com','falcon':'sunridge_farms.com','salesinq':'demo.salesinq.com'}.get(hostname, hostname)
     result = PropertyDict()
-    result.connection = conn = openerplib.get_connection(hostname=hostname, database=database, login=login, password=password)
+    result.connection = result.conn = conn = openerplib.get_connection(hostname=hostname, database=database, login=login, password=password)
     result.user_model = result.res_users = um = conn.get_model('res.users')
     users = um.read(um.search([('login','!=','""')]))
     users.extend(um.read(um.search([('login','!=','""'), ('active','!=','True')])))
