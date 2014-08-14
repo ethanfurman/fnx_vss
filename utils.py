@@ -4,6 +4,7 @@ import __builtin__
 import binascii
 import datetime
 import htmlentitydefs
+import random
 import re
 import smtplib
 import string
@@ -536,6 +537,39 @@ def get_local_ip(target):
     except Exception:
         ipaddr = None
     return ipaddr 
+
+
+def generate_password(length, upper=True, lower=True, digit=True, special='!@#$%^'):
+    """
+    generate a random password that is length characters, and contains at least one of
+    the True items, plus special if only two Trues present
+    """
+    uppers = 'ABCDEFHJKLMNPQRTUVWXY'
+    lowers = 'abcdefghijkmnopqrstuvwxyz'
+    digits = '0123456789'
+    if not isinstance(length, (int, long)):
+        if length[0] < 4:
+            raise ValueError('Minimum length is four')
+        length = random.randint(*length)
+    if length < 4:
+        raise ValueError('Minimum length is four')
+    result = []
+    source = ''
+    if upper:
+        result.append(random.choice(uppers))
+        source += uppers
+    if lower:
+        result.append(random.choice(lowers))
+        source += lowers
+    if digit:
+        result.append(random.choice(digits))
+        source += digits
+    if upper + lower + digit < 3 and special:
+        result.append(random.choice(special))
+    source += special or ''
+    result.extend(random.sample(source, length - len(result)))
+    random.shuffle(result)
+    return ''.join(result)
 
 
 def text_to_date(text, format='ymd'):
