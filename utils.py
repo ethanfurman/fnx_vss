@@ -115,6 +115,7 @@ class AutoEnum(Enum):
         for name, member in cls.__members__.items():
             if name == member.name:
                 namespace[name] = member
+    export_to = export
 
 
 class IndexEnum(Enum):

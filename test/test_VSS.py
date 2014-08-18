@@ -586,10 +586,11 @@ class TestFederalHoliday(TestCase):
 
     
     next_business_day_values = (
-            (Date(2013, 12, 30), (Date(2013, 12, 31), Date(2014,  1,  2), Date(2014,  1,  3), Date(2014,  1,  6))),
-            (Date(2008,  3, 15), (Date(2008,  3, 17), Date(2008,  3, 18), Date(2008,  3, 19), Date(2008,  3, 20))),
-            (Date(2008,  3, 16), (Date(2008,  3, 17), Date(2008,  3, 18), Date(2008,  3, 19), Date(2008,  3, 20))),
-            (Date(2010,  5, 21), (Date(2010,  5, 25), Date(2010,  5, 26), Date(2010,  5, 27), Date(2010,  5, 28))),
+            (Date(2013, 12, 30), (Date(2013, 12, 30), Date(2013, 12, 31), Date(2014,  1,  2), Date(2014,  1,  3), Date(2014,  1,  6))),
+            (Date(2008,  3, 15), (Date(2008,  3, 17), Date(2008,  3, 17), Date(2008,  3, 18), Date(2008,  3, 19), Date(2008,  3, 20))),
+            (Date(2008,  3, 16), (Date(2008,  3, 17), Date(2008,  3, 17), Date(2008,  3, 18), Date(2008,  3, 19), Date(2008,  3, 20))),
+            (Date(2010,  5, 28), (Date(2010,  5, 28), Date(2010,  6,  1), Date(2010,  6,  2), Date(2010,  6,  3), Date(2010,  6,  4), Date(2010,  6,  7), Date(2010,  6,  8))),
+            (Date(2014,  5, 23), (Date(2014,  5, 23), Date(2014,  5, 27), Date(2014,  5, 28), Date(2014,  5, 29), Date(2014,  5, 30), Date(2014,  6,  2), Date(2014,  6,  3))),
             )
 
     def _test_next_business_day(self, current, forward, next):
@@ -597,7 +598,6 @@ class TestFederalHoliday(TestCase):
 
     for src_date, target_dates in next_business_day_values:
         for i, tgt_date in enumerate(target_dates):
-            i += 1
             ns['test_%s-%s-%s_forward_%d' % (src_date.year, src_date.month, src_date.day, i)] = (
                 lambda self, date=src_date, correct=tgt_date, forward=i: self._test_next_business_day(current=date, forward=forward, next=correct)
                 )
@@ -675,10 +675,11 @@ class TestACH(TestCase):
         ach_file = ACHFile(MockOE(), self.ACHStore)
         today = ach_file.today
         time = ach_file.time
-        next_business_day = FederalHoliday.next_business_day(today, 2)
+        #next_business_day = FederalHoliday.next_business_day(today, 2)
+        payment_date = FederalHoliday.next_business_day(today, 3)
         target[0] = target[0].replace('YYYYYY', today.strftime('%y%m%d')).replace('TTTT', time.strftime('%H%M'))
-        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
-        payment = ACHPayment(*self.vendors[0])
+        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date.strftime('%y%m%d'))
+        payment = ACHPayment(*self.vendors[0] + (payment_date,))
         ach_file.add_payment(payment)
         ach_file.save_at('.')
         with open('.'/ach_file.filename) as file:
@@ -700,11 +701,11 @@ class TestACH(TestCase):
         ach_file = ACHFile(MockOE(), self.ACHStore)
         today = ach_file.today
         time = ach_file.time
-        next_business_day = FederalHoliday.next_business_day(today, 2)
+        payment_date = FederalHoliday.next_business_day(today, 3)
         target[0] = target[0].replace('YYYYYY', today.strftime('%y%m%d')).replace('TTTT', time.strftime('%H%M'))
-        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
-        ach_file.add_payment(ACHPayment(*self.vendors[0]))
-        ach_file.add_payment(ACHPayment(*self.vendors[1]))
+        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date.strftime('%y%m%d'))
+        ach_file.add_payment(ACHPayment(*self.vendors[0] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[1] + (payment_date,)))
         ach_file.save_at('.')
         with open('.'/ach_file.filename) as file:
             contents = file.read()
@@ -726,12 +727,12 @@ class TestACH(TestCase):
         ach_file = ACHFile(MockOE(), self.ACHStore)
         today = ach_file.today
         time = ach_file.time
-        next_business_day = FederalHoliday.next_business_day(today, 2)
+        payment_date = FederalHoliday.next_business_day(today, 3)
         target[0] = target[0].replace('YYYYYY', today.strftime('%y%m%d')).replace('TTTT', time.strftime('%H%M'))
-        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
-        ach_file.add_payment(ACHPayment(*self.vendors[0]))
-        ach_file.add_payment(ACHPayment(*self.vendors[1]))
-        ach_file.add_payment(ACHPayment(*self.vendors[2]))
+        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date.strftime('%y%m%d'))
+        ach_file.add_payment(ACHPayment(*self.vendors[0] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[1] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[2] + (payment_date,)))
         ach_file.save_at('.')
         with open('.'/ach_file.filename) as file:
             contents = file.read()
@@ -756,14 +757,14 @@ class TestACH(TestCase):
         ach_file = ACHFile(MockOE(), self.ACHStore)
         today = ach_file.today
         time = ach_file.time
-        next_business_day = FederalHoliday.next_business_day(today, 2)
+        payment_date = FederalHoliday.next_business_day(today, 3)
         target[0] = target[0].replace('YYYYYY', today.strftime('%y%m%d')).replace('TTTT', time.strftime('%H%M'))
-        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
-        target[6] = target[6].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
-        ach_file.add_payment(ACHPayment(*self.vendors[0]))
-        ach_file.add_payment(ACHPayment(*self.vendors[1]))
-        ach_file.add_payment(ACHPayment(*self.vendors[2]))
-        ach_file.add_payment(ACHPayment(*self.vendors[3]))
+        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date.strftime('%y%m%d'))
+        target[6] = target[6].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date.strftime('%y%m%d'))
+        ach_file.add_payment(ACHPayment(*self.vendors[0] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[1] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[2] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[3] + (payment_date,)))
         ach_file.save_at('.')
         with open('.'/ach_file.filename) as file:
             contents = file.read()
@@ -790,15 +791,84 @@ class TestACH(TestCase):
         ach_file = ACHFile(MockOE(), self.ACHStore)
         today = ach_file.today
         time = ach_file.time
-        next_business_day = FederalHoliday.next_business_day(today, 2)
+        payment_date = FederalHoliday.next_business_day(today, 3)
         target[0] = target[0].replace('YYYYYY', today.strftime('%y%m%d')).replace('TTTT', time.strftime('%H%M'))
-        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
-        target[6] = target[6].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
-        ach_file.add_payment(ACHPayment(*self.vendors[0]))
-        ach_file.add_payment(ACHPayment(*self.vendors[1]))
-        ach_file.add_payment(ACHPayment(*self.vendors[2]))
-        ach_file.add_payment(ACHPayment(*self.vendors[3]))
-        ach_file.add_payment(ACHPayment(*self.vendors[4]))
+        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date.strftime('%y%m%d'))
+        target[6] = target[6].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date.strftime('%y%m%d'))
+        ach_file.add_payment(ACHPayment(*self.vendors[0] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[1] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[2] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[3] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[4] + (payment_date,)))
+        ach_file.save_at('.')
+        with open('.'/ach_file.filename) as file:
+            contents = file.read()
+        lines = contents.split('\n')
+        for should_be, found in zip(target, lines):
+            self.assertEqual(should_be, found)
+
+    def test_multi_batch_by_date(self):
+        target = [
+                '101 1928374659753102468YYYYYYTTTTA094101COOLER BANK            REALLY AWESOME COMPANY         ',
+                '5200RAC CO INC LLC                      8642013579CCDINVOICES  yyyyyyYYYYYY   1864213570000001',
+				'6220710000398172904027       0000000100123456         GLASS SOURCE            0864213570000001',
+				'6220710000398172904027       0000037118246855         GLASS SOURCE            0864213570000002',
+				'62207100001324584196         0000000299987654         SUPER SILICA SANDS      0864213570000003',
+				'820000000300213000070000000000000000000375178642013579                         864213570000001',
+                '5200RAC CO INC LLC                      8642013579CCDINVOICES  yyyyyyYYYYYY   1864213570000002',
+				'622043000096426159872245841960000000795192837         WAX ON WAX OFF          0864213570000001',
+				'820000000100043000090000000000000000000007958642013579                         864213570000002',
+				'9000002000001000000040025600016000000000000000000038312                                       ',
+                ]
+
+        ach_file = ACHFile(MockOE(), self.ACHStore)
+        today = ach_file.today
+        time = ach_file.time
+        payment_date1 = FederalHoliday.next_business_day(today, 3)
+        payment_date2 = FederalHoliday.next_business_day(payment_date1, 2)
+        target[0] = target[0].replace('YYYYYY', today.strftime('%y%m%d')).replace('TTTT', time.strftime('%H%M'))
+        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date1.strftime('%y%m%d'))
+        target[6] = target[6].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date2.strftime('%y%m%d'))
+        ach_file.add_payment(ACHPayment(*self.vendors[0] + (payment_date1,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[1] + (payment_date1,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[2] + (payment_date1,)))
+        ach_file.add_payment(ACHPayment(*('invoices',) + self.vendors[3][1:] + (payment_date2,)))
+        ach_file.save_at('.')
+        with open('.'/ach_file.filename) as file:
+            contents = file.read()
+        lines = contents.split('\n')
+        for should_be, found in zip(target, lines):
+            self.assertEqual(should_be, found)
+
+    def test_multi_batch2_by_date(self):
+        target = [
+                '101 1928374659753102468YYYYYYTTTTA094101COOLER BANK            REALLY AWESOME COMPANY         ',
+                '5200RAC CO INC LLC                      8642013579CCDINVOICES  yyyyyyYYYYYY   1864213570000001',
+				'6220710000398172904027       0000000100123456         GLASS SOURCE            0864213570000001',
+				'6220710000398172904027       0000037118246855         GLASS SOURCE            0864213570000002',
+				'62207100001324584196         0000000299987654         SUPER SILICA SANDS      0864213570000003',
+				'820000000300213000070000000000000000000375178642013579                         864213570000001',
+                '5200RAC CO INC LLC                      8642013579CCDINVOICES  yyyyyyYYYYYY   1864213570000002',
+				'622043000096426159872245841960000000795192837         WAX ON WAX OFF          0864213570000001',
+				'6221250001059154876          0000000025579135         ACME GLASS AND COFFEE   0864213570000002',
+				'820000000200168000190000000000000000000008208642013579                         864213570000002',
+				'9000002000002000000050038100026000000000000000000038337                                       ',
+                ]
+
+
+        ach_file = ACHFile(MockOE(), self.ACHStore)
+        today = ach_file.today
+        time = ach_file.time
+        payment_date1 = FederalHoliday.next_business_day(today, 3)
+        payment_date2 = FederalHoliday.next_business_day(payment_date1, 2)
+        target[0] = target[0].replace('YYYYYY', today.strftime('%y%m%d')).replace('TTTT', time.strftime('%H%M'))
+        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date1.strftime('%y%m%d'))
+        target[6] = target[6].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date2.strftime('%y%m%d'))
+        ach_file.add_payment(ACHPayment(*self.vendors[0] + (payment_date1,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[1] + (payment_date1,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[2] + (payment_date1,)))
+        ach_file.add_payment(ACHPayment(*('invoices',) + self.vendors[3][1:] + (payment_date2,)))
+        ach_file.add_payment(ACHPayment(*('invoices',) + self.vendors[4][1:] + (payment_date2,)))
         ach_file.save_at('.')
         with open('.'/ach_file.filename) as file:
             contents = file.read()

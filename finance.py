@@ -9,6 +9,9 @@ from VSS.utils import translator, one_day, xrange, AutoEnum, IntEnum, Month, Wee
 # ACHPayment stores one payment from TRU to a vendor
 # ACHFile takes the payments and makes a WFB achfile for transmission
 
+module = globals()
+Month.export_to(module)
+Weekday.export_to(module)
 
 class ACHError(Exception):
     "generic ACH error"
@@ -38,7 +41,7 @@ class ACHStore(object):
 
 
 class ACHFile(object):
-    """Accepts multiple ACH payments and generates file for tranmission to WFB."""
+    """Accepts multiple ACH payments and generates file for tranmission."""
 
     file_header = '101 %(immed_dest_rtng)09d%(immed_origin)s%(date)s%(time)s%(id_mod)s094101%(immed_dest_name)-23s%(company)-23s        '
     batch_header = '5200%(company)-16s%(discretionary)-20s%(company_id)s%(sec)s%(description)-10s%(ref_date)-6s%(eff_date)s   1%(origin_dfi)08d%(batch_number)07d'
@@ -107,14 +110,14 @@ class ACHFile(object):
         total_hash = 0
         total_debit = 0
         total_credit = 0
-        eff_date = FederalHoliday.next_business_day(self.today, days=2).strftime('%y%m%d')
+        #eff_date = FederalHoliday.next_business_day(self.today, days=2).strftime('%y%m%d')
 
         def pdscd(rec):
-            return rec.sec_code, rec.description
+            return rec.payment_date, rec.sec_code, rec.description
 
         payments = sorted(self.payments, key=pdscd)
         
-        for (sec_code, description), group in groupby(payments, pdscd):
+        for (payment_date, sec_code, description), group in groupby(payments, pdscd):
             batch_entries = 0
             batch_hash = 0
             batch_debit = 0
@@ -129,7 +132,7 @@ class ACHFile(object):
                     discretionary='',
                     description=description[:10],
                     ref_date=ref_date,
-                    eff_date=eff_date,
+                    eff_date=payment_date.strftime('%y%m%d'),
                     batch_number=batches,
                     sec=sec_code
                     ))
@@ -206,16 +209,16 @@ class ACH_ETC(IntEnum):
 
 class FederalHoliday(AutoEnum):
     __order__ = 'NewYear MartinLutherKingJr President Memorial Independence Labor Columbus Veterans Thanksgiving Christmas'
-    NewYear = "First day of the year.", 'absolute', Month.JANUARY, 1
-    MartinLutherKingJr = "Birth of Civil Rights leader.", 'relative', Month.JANUARY, Weekday.MONDAY, 3
-    President = "Birth of George Washington", 'relative', Month.FEBRUARY, Weekday.MONDAY, 3
-    Memorial = "Memory of fallen soldiers", 'relative', Month.MAY, Weekday.MONDAY, 5
-    Independence = "Declaration of Independence", 'absolute', Month.JULY, 4
-    Labor = "American Labor Movement", 'relative', Month.SEPTEMBER, Weekday.MONDAY, 1
-    Columbus = "Americas discovered", 'relative', Month.OCTOBER, Weekday.MONDAY, 2
-    Veterans = "Recognition of Armed Forces service", 'relative', Month.NOVEMBER, 11, 1
-    Thanksgiving = "Day of Thanks", 'relative', Month.NOVEMBER, Weekday.THURSDAY, 4
-    Christmas = "Birth of Jesus Christ", 'absolute', Month.DECEMBER, 25
+    NewYear = "First day of the year.", 'absolute', JANUARY, 1
+    MartinLutherKingJr = "Birth of Civil Rights leader.", 'relative', JANUARY, MONDAY, 3
+    President = "Birth of George Washington", 'relative', FEBRUARY, MONDAY, 3
+    Memorial = "Memory of fallen soldiers", 'relative', MAY, MONDAY, 5
+    Independence = "Declaration of Independence", 'absolute', JULY, 4
+    Labor = "American Labor Movement", 'relative', SEPTEMBER, MONDAY, 1
+    Columbus = "Americas discovered", 'relative', OCTOBER, MONDAY, 2
+    Veterans = "Recognition of Armed Forces service", 'relative', NOVEMBER, 11, 1
+    Thanksgiving = "Day of Thanks", 'relative', NOVEMBER, THURSDAY, 4
+    Christmas = "Birth of Jesus Christ", 'absolute', DECEMBER, 25
 
     def __init__(self, doc, type, month, day, occurance=None):
         self.__doc__ = doc
@@ -228,17 +231,17 @@ class FederalHoliday(AutoEnum):
         "returns the observed date of the holiday for `year`"
         if self.type == 'absolute' or isinstance(self.day, int):
             holiday =  Date(year, self.month, self.day)
-            if Weekday(holiday.isoweekday()) is Weekday.SUNDAY:
+            if Weekday.from_date(holiday) is SUNDAY:
                 holiday = holiday.replace(delta_day=1)
             return holiday
         days_in_month = days_per_month(year)
-        target_end = self.occurance * 7 + 1
+        target_end = self.occurance * 7 
         if target_end > days_in_month[self.month]:
-            target_end = days_in_month[self.month]
-        target_start = target_end - 7
+            target_end = days_in_month[self.month] 
+        target_start = target_end - 6
         target_week = list(xrange(start=Date(year, self.month, target_start), step=one_day, count=7))
         for holiday in target_week:
-            if Weekday(holiday.isoweekday()) is self.day:
+            if Weekday.from_date(holiday) is self.day:
                 return holiday
 
     @classmethod
@@ -248,15 +251,19 @@ class FederalHoliday(AutoEnum):
         """
         holidays = cls.year(date.year)
         years = set([date.year])
-        while days > 0:
+        day = Weekday.from_date(date)
+        while "not at target business day":
+            if days == 0 and day not in (SATURDAY, SUNDAY) and date not in holidays:
+                return date
             date = date.replace(delta_day=1)
             if date.year not in years:
                 holidays.extend(cls.year(date.year))
                 years.add(date.year)
-            if Weekday(date.isoweekday()) in (Weekday.SATURDAY, Weekday.SUNDAY) or date in holidays:
+            day = Weekday.from_date(date)
+            if day in (SATURDAY, SUNDAY) or date in holidays:
                 continue
-            days -= 1
-        return date
+            if days > 0:
+                days -= 1
 
     @classmethod
     def year(cls, year):
@@ -277,7 +284,7 @@ class ACHPayment(object):
     def __init__(self,
             description, sec_code, 
             vendor_name, vendor_inv_num, vendor_rtng, vendor_acct,
-            transaction_code, vendor_acct_type, amount):
+            transaction_code, vendor_acct_type, amount, payment_date):
         """
         description:  10 chars
         sec_code: CCD or CTX
@@ -288,6 +295,7 @@ class ACHPayment(object):
         transaction_code: ACH_ETC code
         vendor_acct_type: 'domestic' or 'foreign'
         amount: 10 digits (pennies)
+        payment_date: date payment should occur on
         """
         self.description = description.upper()
         self.sec_code = sec_code.upper()
@@ -298,6 +306,7 @@ class ACHPayment(object):
         self.transaction_code = transaction_code
         self.vendor_acct_type = vendor_acct_type
         self.amount = amount
+        self.payment_date = self.business_day_from(payment_date)
         self.validate_routing(self.vendor_rtng)
 
     def __repr__(self):
@@ -306,6 +315,13 @@ class ACHPayment(object):
                 self.description, self.sec_code, self.vendor_name, self.vendor_inv_num, self.vendor_rtng, self.vendor_acct,
                 self.transaction_code, self.vendor_acct_type, self.amount,
                 )]))
+
+    @staticmethod
+    def business_day_from(date):
+        """
+        if 'date' is a business day, return it; otherwise return the next business day
+        """
+        return FederalHoliday.next_business_day(date, days=0)
 
     @staticmethod
     def validate_routing(rtng):
