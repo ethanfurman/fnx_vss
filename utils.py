@@ -22,7 +22,7 @@ from math import floor
 from scription import mail
 from socket import socket, AF_INET, SOCK_DGRAM
 from VSS import dbf
-from VSS.dbf import DateTime, Date, Time, Integer, String
+from VSS.dbf import DateTime, Date, Time, baseinteger, basestring
 from VSS.time_machine import Sentinel, simplegeneric
 
 one_day = timedelta(1)
@@ -219,13 +219,13 @@ def bb_text_to_date(text):
 
 
 def currency(number):
-    if not isinstance(number, (Integer, String)):
+    if not isinstance(number, (baseinteger, basestring)):
         raise ValueError('currency only works with integer and string types (received %s %r )' % (type(number), number))
-    if isinstance(number, Integer):
+    if isinstance(number, baseinteger):
         number = str(number)
         number = '0' * (3 - len(number)) + number
         number = number[:-2] + '.' + number[-2:]
-    elif isinstance(number, String):
+    elif isinstance(number, basestring):
         number = int(number.replace('.',''))
     return number
 
@@ -281,7 +281,7 @@ def unabbreviate(text, abbr):
 
 def tuples(func):
     def wrapper(*args):
-        if len(args) == 1 and not isinstance(args[0], String):
+        if len(args) == 1 and not isinstance(args[0], basestring):
             args = args[0]
         result = tuple(func(*args))
         if len(result) == 1:
