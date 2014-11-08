@@ -3,7 +3,7 @@ Bbx File utilities.
 """
 
 from stat import ST_MTIME
-from VSS import path
+from path import Path
 import logging
 import os
 import string
@@ -282,7 +282,7 @@ class BBxFile(object):
 
 
 def getfilename(target):
-    files = path.glob(target.path + target.base[:5] + '*')
+    files = Path.glob(target.path + target.base[:5] + '*')
     possibles = []
     for file in files:
         if len(file.base) in (5, 6):
