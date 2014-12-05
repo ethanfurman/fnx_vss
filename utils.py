@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+from __future__ import absolute_import, with_statement
 
 import __builtin__
 import binascii
@@ -572,6 +572,25 @@ def generate_password(length, upper=True, lower=True, digit=True, special='!@#$%
     random.shuffle(result)
     return ''.join(result)
 
+def generate_passphrase(words=[]):
+    """
+    xkcd password generator
+
+    http://xkcd.com/936/
+    """
+    if not words:
+        with open('/usr/share/dict/words') as fh:
+            for line in fh:
+                word = line.strip()
+                if word.isalpha() and word.islower() and 5 <= len(word) <= 7:
+                    words.append(word)
+    pass_phrase = []
+    while len(pass_phrase) < 4:
+        word = random.choice(words)
+        if word in pass_phrase:
+            continue
+        pass_phrase.append(word)
+    return ' '.join(pass_phrase)
 
 def text_to_date(text, format='ymd'):
     '''(yy)yymmdd'''
