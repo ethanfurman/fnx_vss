@@ -207,6 +207,9 @@ class BBxFile(object):
             if filter:
                 if filter(rec):
                     records[ky] = rec
+            elif leader is trailer is None and keymatch is not None:
+                if keymatch == ky:
+                    records[ky] = rec
             elif leader is None or ky.startswith(leader):
                 if trailer is None or ky.endswith(trailer):
                     records[ky] = rec
@@ -226,8 +229,12 @@ class BBxFile(object):
         if self.records.has_key(ky):
             return self.records[ky]
         elif self.keymatch:
-            if self.records.has_key(self.keymatch % ky):
-                return self.records[self.keymatch % ky]
+            if '%' in self.keymatch:
+                keymatch = self.keymatch % ky
+            else:
+                keymatch = self.keymatch
+            if self.records.has_key(keymatch):
+                return self.records[keymatch]
         raise KeyError(ky)
 
     def __iter__(self):
