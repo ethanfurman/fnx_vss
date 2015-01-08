@@ -3,7 +3,7 @@ from __future__ import with_statement
 from itertools import groupby
 from VSS.address import any_digits
 from VSS.BBxXlate.bbxfile import BBxFile
-from VSS.utils import currency, one_day, text_to_date, String, Integer
+from VSS.utils import currency, one_day, text_to_date
 from VSS import AutoEnum
 
 GL_ACCT_REC = '1100-00'
