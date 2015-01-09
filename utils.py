@@ -297,71 +297,144 @@ class xrange(object):
     accepts arbitrary objects to use to produce sequences
     '''
 
-    types = {
-            int :    {
-                     'start' : 0,
-                     'step'  : 1,
-                     },
-            float :  {
-                     'start' : 0.0,
-                     'step'  : 1.0,
-                     },
-            date :   {
-                     'start' : None,
-                     'step'  : one_day,
-                     },
-            Decimal: {'start' : 0,
-                      'step'  : 1.0,
-                     }
-            }
-    
-    def __init__(yo, start, stop=None, step=None, count=None):
+    def __init__(self, start, stop=None, step=None, count=None, epsilon=None):
         if stop is not None and count is not None:
-            raise TypeError("cannot specify both stop and count")
-        if stop is None and count is None:    # check for default start based on type
+            raise ValueError("cannot specify both stop and count")
+        if stop is None and count is None:
+            # check for default start based on type
             start, stop = None, start
-            for t in yo.types:
-                if isinstance(stop, t):
-                    start = yo.types[t]['start']
-                    break
-            else:
-                raise TypeError("start must be specified for unknown type %r" % stop.__class__)
-            if start is None:
-                raise TypeError("start must be specified for type %r" % stop.__class__)
+            try:
+                start = type(stop)(0)
+            except Exception:
+                raise ValueError("start must be specified for type %r" %
+                        type(stop))
+        if start is None:
+            ref = type(stop)
+        else:
+            ref = type(start)
         if step is None:
-            step = yo.types[type(start or stop)]['step']
+            try:
+                step = ref(1)
+            except TypeError:
+                raise ValueError("step must be specified for type %r" %
+                        type(stop))
+        if epsilon is None:
+            try:
+                epsilon = .0000001 * step
+                if not isinstance(epsilon, type(step)):
+                    raise TypeError
+            except TypeError:
+                try:
+                    epsilon = type(step)(0)
+                except Exception:
+                    pass
+        if count is None:
+            try:
+                stop = stop - epsilon
+            except TypeError:
+                pass
+        self.start = self.init_start = start
+        self.stop = stop
+        self.step = step
+        self.count = self.init_count = count
+        self.epsilon = epsilon
 
-        yo.start = yo.init_start = start
-        yo.count = yo.init_count = count
-        yo.stop = stop
-        yo.step = step
-        yo.reverse = stop is not None and stop < start
-
-    def __iter__(yo):
-        return yo
-
-    def __next__(yo):
-        if not yo.reverse:
-            if (yo.count is not None and yo.count < 1
-            or  yo.stop is not None and yo.start >= yo.stop):   # all done!
-                raise StopIteration
+    def __contains__(self, value):
+        start, stop, step = self.start, self.stop, self.step
+        count, epsilon = self.count, self.epsilon
+        if callable(step):
+            raise TypeError(
+                    "range with step %r does not support containment checks" %
+                    step)
+        try:
+            distance = round((value - start) / step)
+        except TypeError:
+            raise TypeError(
+                    "range of %s with step %s does not support "
+                    "containment checks" % (type(start), type(step)))
+        if epsilon is None:
+            if start == value:
+                return True
+            if stop > start:
+                if start == value:
+                    return False
+                elif stop is not None and stop <= value:
+                    return False
+                elif count is not None and distance >= count:
+                    return False
+            else:
+                if start < value:
+                    return False
+                elif stop is not None and stop >= value:
+                    return False
+                elif count is not None and distance >= count:
+                    return False
+            target = start + distance * step
+            if target == value:
+                return True
         else:
-            if (yo.count is not None and yo.count < 1
-            or  yo.start <= yo.stop):   # all done!
-                raise StopIteration
-        current = yo.start
-        if callable(yo.step):   # custom function?
-            yo.start = yo.step(yo.start)
-        else:
-            yo.start = yo.start + yo.step
-        if yo.count is not None:
-            yo.count -= 1
-        return current
-    next = __next__
+            if start - epsilon <= value <= start + epsilon:
+                return True
+            if step > type(step)(0):
+                if start + epsilon > value:
+                    return False
+                elif stop is not None and stop - epsilon <= value:
+                    return False
+                elif count is not None and distance >= count:
+                    return False
+            else:
+                if start + epsilon < value:
+                    return False
+                elif stop is not None and stop - epsilon >= value:
+                    return False
+                elif count is not None and distance >= count:
+                    return False
+            target = start + distance * step
+            if target - epsilon <= value <= target + epsilon:
+                return True
+        return False
 
-    def __repr__(yo):
-        values = [ '%s=%s' % (k,v) for k,v in (('start',yo.start), ('stop',yo.stop), ('step', yo.step), ('count', yo.count)) if v is not None ]
-        return '<%s(%s)>' % (yo.__class__.__name__, ', '.join(values))
+    def __iter__(self):
+        start = self.start
+        stop = self.stop
+        step = self.step
+        count = self.count
+        epsilon = self.epsilon
+        i = -1
+        while 'more values to yield':
+            i += 1
+            if callable(step):
+                if i:
+                    value = step(start, i, value)
+                else:
+                    value = start
+            else:
+                value = start + i * step
+            if count is not None:
+                if count < 1:
+                    break
+                count -= 1
+            else:
+                if stop > start and value >= stop:
+                    break
+                if stop < start and value <= stop:
+                    break
+            yield value
+
+    def __repr__(self):
+        values = [
+                '%s=%s' % (k,v)
+                for k,v in (
+                    ('start',self.start),
+                    ('stop',self.stop),
+                    ('step', self.step),
+                    ('count', self.count),
+                    ('epsilon', self.epsilon),
+                    )
+                if v is not None
+                ]
+        return '<%s(%s)>' % (self.__class__.__name__, ', '.join(values))
+
 
 _memory_sentinel = Sentinel("amnesiac")
 

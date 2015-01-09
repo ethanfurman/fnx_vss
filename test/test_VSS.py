@@ -8,6 +8,7 @@ sys.path.insert(0, '../..')
 from tempfile import mkstemp
 from types import MethodType
 from unittest import TestCase, main as Run
+import datetime
 
 from VSS import Table
 from VSS.address import cszk, normalize_address
@@ -901,6 +902,161 @@ class Test_suppress(TestCase):
     def test_exception_hierarchy(self):
         with suppress(LookupError):
             'Hello'[50]
+
+class Test_xrange(TestCase):
+
+    def test_int_iter_forwards(self):
+        self.assertEqual(
+                list(range(10)),
+                list(xrange(10)))
+        self.assertEqual(
+                list(range(0, 10)),
+                list(xrange(0, 10)))
+        self.assertEqual(
+                list(range(0, 10, 1)),
+                list(xrange(0, 10, 1)))
+        self.assertEqual(
+                list(range(0, 10, 1)),
+                list(xrange(0, count=10)))
+        self.assertEqual(
+                list(range(0, 10, 1)),
+                list(xrange(10, step=lambda s, i, v: v+1)))
+        self.assertEqual(
+                list(range(0, 10, 1)),
+                list(xrange(0, 10, step=lambda s, i, v: v+1)))
+        self.assertEqual(
+                list(range(5, 15)),
+                list(xrange(5, count=10)))
+        self.assertEqual(
+                list(range(-10, 0)),
+                list(xrange(-10, 0)))
+        self.assertEqual(
+                list(range(-9, 1)),
+                list(xrange(-9, 1)))
+        self.assertEqual(
+                list(range(-20, 20, 1)),
+                list(xrange(-20, 20, 1)))
+        self.assertEqual(
+                list(range(-20, 20, 2)),
+                list(xrange(-20, 20, 2)))
+        self.assertEqual(
+                list(range(-20, 20, 3)),
+                list(xrange(-20, 20, 3)))
+        self.assertEqual(
+                list(range(-20, 20, 4)),
+                list(xrange(-20, 20, 4)))
+        self.assertEqual(
+                list(range(-20, 20, 5)),
+                list(xrange(-20, 20, 5)))
+
+    def test_int_iter_backwards(self):
+        self.assertEqual(
+                list(range(9, -1, -1)),
+                list(xrange(9, -1, -1)))
+        self.assertEqual(
+                list(range(9, -9, -1)),
+                list(xrange(9, -9, -1)))
+        self.assertEqual(
+                list(range(9, -9, -2)),
+                list(xrange(9, -9, -2)))
+        self.assertEqual(
+                list(range(9, -9, -3)),
+                list(xrange(9, -9, -3)))
+        self.assertEqual(
+                list(range(9, 0, -1)),
+                list(xrange(9, 0, -1)))
+        self.assertEqual(
+                list(range(9, -1, -1)),
+                list(xrange(9, step=-1, count=10)))
+
+    def test_int_containment(self):
+        robj = xrange(10)
+        for i in range(10):
+            self.assertTrue(i in robj)
+        self.assertFalse(-1 in robj)
+        self.assertFalse(10 in robj)
+        self.assertFalse(5.23 in robj)
+
+    def test_float_iter(self):
+        floats = [float(i) for i in range(100)]
+        self.assertEqual(
+                floats,
+                list(xrange(100.0)))
+        self.assertEqual(
+                floats,
+                list(xrange(0, 100.0)))
+        self.assertEqual(
+                floats,
+                list(xrange(0, 100.0, 1.0)))
+        self.assertEqual(
+                floats,
+                list(xrange(100.0, step=lambda s, i, v: v + 1.0)))
+        self.assertEqual(
+                floats,
+                list(xrange(100.0, step=lambda s, i, v: s + i * 1.0)))
+        self.assertEqual(
+                floats,
+                list(xrange(0.0, count=100)))
+        self.assertEqual(
+                [0.3, 0.6],
+                list(xrange(0.3, 0.9, 0.3)))
+        self.assertEqual(
+                [0.4, 0.8],
+                list(xrange(0.4, 1.2, 0.4)))
+
+    def test_float_iter_backwards(self):
+        floats = [float(i) for i in range(99, -1, -1)]
+        self.assertEqual(
+                floats,
+                list(xrange(99, -1, -1)))
+        self.assertEqual(
+                floats,
+                list(xrange(99, step=lambda s, i, v: v - 1.0, count=100)))
+        self.assertEqual(
+                [0.6, 0.3],
+                list(xrange(0.6, 0.0, -0.3)))
+        self.assertEqual(
+                [0.8, 0.4]
+                , list(xrange(0.8, 0.0, -0.4)))
+
+    def test_float_containment(self):
+        robj = xrange(100000000.0)
+        for i in [float(i) for i in range(10000)]:
+            self.assertTrue(i in robj)
+        self.assertFalse(0.000001 in robj)
+        self.assertFalse(100000000.0 in robj)
+        self.assertFalse(50.23 in robj)
+
+    def test_date_iter(self):
+        ONE_DAY = datetime.timedelta(1)
+        ONE_WEEK = datetime.timedelta(7)
+        robj = xrange(datetime.date(2014, 1, 1), step=ONE_DAY, count=31)
+        day1 = datetime.date(2014, 1, 1)
+        riter = iter(robj)
+        try:
+            datetime.timedelta(7) / datetime.timedelta(1)
+            containment = True
+        except TypeError:
+            containment = False
+        for i in range(31):
+            day = day1 + i * ONE_DAY
+            rday = next(riter)
+            self.assertEqual(day, rday)
+            if containment:
+                self.assertTrue(day in robj)
+            else:
+                self.assertRaises(TypeError, robj.__contains__, day)
+        self.assertRaises(StopIteration, next, riter)
+        if containment:
+            self.assertFalse(day + ONE_DAY in robj)
+        else:
+            self.assertRaises(TypeError, robj.__contains__, day + ONE_DAY)
+
+    def test_fraction_iter(self):
+        from fractions import Fraction as F
+        f = xrange(F(5, 10), count=3)
+        self.assertEqual([F(5, 10), F(15, 10), F(25, 10)], list(f))
+
 
 if __name__ == '__main__':
     Run()
