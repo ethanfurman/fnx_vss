@@ -26,6 +26,8 @@ try:
 except Exception:
     pass
 
+OE = PropertyDict()
+
 def adjust_permissions(oe_groups, allowed_groups, user):
     permissions = set(user.groups_id)
     for group_name, ints in oe_groups.items():
@@ -38,6 +40,14 @@ def adjust_permissions(oe_groups, allowed_groups, user):
         else:  # remove all priveleges for this group
             permissions -= ints
     return list(permissions)
+
+def connect(hostname, database, user, password, *tables):
+    OE.conn = conn = openerplib.get_connection(hostname=hostname, database=database, login=user, password=password)
+    for table in tables:
+        model = table.replace('.', '_')
+        OE[model] = conn.get_model(table)
+        OE[model].search([('id','=',0)])
+    return OE
 
 def host_site(hostname, database, login='admin', password='admin'):
     hostname = {'wsg':'westernstatesglass.com','falcon':'sunridge_farms.com','salesinq':'demo.salesinq.com'}.get(hostname, hostname)
