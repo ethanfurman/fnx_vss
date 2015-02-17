@@ -3,7 +3,7 @@ Bbx File utilities.
 """
 
 from stat import ST_MTIME
-from path import Path
+from VSS.path import Path
 import logging
 import os
 import string

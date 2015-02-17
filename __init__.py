@@ -4,7 +4,7 @@ import dbf
 sys.modules['VSS.dbf'] = dbf
 import enum
 sys.modules['VSS.enum'] = enum
-import path
+import antipathy as path
 sys.modules['VSS.path'] = path
 
 import address
