@@ -148,9 +148,9 @@ class BBxRec(object):
         lines = []
         for i, row in enumerate(self.fieldlist):
             if '$' in row[3]:
-                lines.append('%5d | %-12s | %-35s | %s' % (i, row[3], self[row[3]], row[1]))
+                lines.append('%5d | %-12s | %-40s | %s' % (i, row[3], self[row[3]], row[1]))
             else:
-                lines.append('%5d | %-12s | %35s | %s' % (i, row[3], self[row[3]], row[1]))
+                lines.append('%5d | %-12s | %40s | %s' % (i, row[3], self[row[3]], row[1]))
         return '\n'.join(lines)
 
 
