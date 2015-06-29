@@ -704,9 +704,12 @@ def text_to_date(text, format='ymd'):
 
 
 def text_to_time(text):
+    "convert text to time
+    
+    hhmmss... -> hh and mm are required, ss is optional, ... is ignored"
     if not text.strip():
         return None
-    return Time(int(text[:2]), int(text[2:]))
+    return Time(int(text[:2]), int(text[2:4]), int(text[4:6] or 0))
 
 
 @simplegeneric
