@@ -141,6 +141,7 @@ us_ca_state_abbr = {
     'YT' : 'YUKON' ,
     }
 us_ca_state_name = dict([(v, k) for k, v in us_ca_state_abbr.items()])
+us_ca_state_name['BRITISH COLOMBIA'] = 'BC'
 
 ca_province_abbr = {
     'AB' : 'ALBERTA' ,
@@ -158,6 +159,7 @@ ca_province_abbr = {
     'YT' : 'YUKON' ,
     }
 ca_province_name = dict([(v, k) for k, v in ca_province_abbr.items()])
+ca_province_name['BRITISH COLOMBIA'] = 'BC'
 
 addr_abbr = {
         'rd.'       : 'road',
@@ -525,8 +527,8 @@ def cszk(line1, line2):
       returns street, city, state, zip, country; but state is only
       populated if country is US or CA
     """
-    line1 = re.sub(r'\b[A-Z]\.[A-Z]\.[^A-Z]', lambda s: s.group().replace('.',''), line1)
-    line2 = re.sub(r'\b[A-Z]\.[A-Z]\.[^A-Z]', lambda s: s.group().replace('.',''), line2)
+    line1 = re.sub(r'\b[A-Z]\.[A-Z]\.[^A-Z]', lambda s: s.group().replace('.',''), line1.upper())
+    line2 = re.sub(r'\b[A-Z]\.[A-Z]\.[^A-Z]', lambda s: s.group().replace('.',''), line2.upper())
     line1, line2 = Sift(line1.replace('.',' ').replace(',',' '), line2.replace('.',' ').replace(',',' '))
     line1 = ' '.join(line1.split())
     line2 = ' '.join(line2.split())
@@ -1599,7 +1601,7 @@ class PostalCode(object):
     primarily for US and Canadian postal codes (ignores US +4)
     """
 
-    def __init__(yo, postal, country=None):
+    def __init__(yo, postal, country=''):
         alpha2num = {
                 'I' : '1',
                 'O' : '0',
@@ -1611,7 +1613,7 @@ class PostalCode(object):
                 '5'   : 'S',
                 }
         postal = postal.strip('-,')
-        if country in ('UNITED STATES', 'CANADA', ''):
+        if country.upper() in ('UNITED STATES', 'CANADA', ''):
             if '-' in postal and len(postal.replace('-', '')) in (5, 9):
                 postal = postal[:5]
             elif postal[:5].isdigit():
@@ -1626,6 +1628,9 @@ class PostalCode(object):
                 postal = "%s %s" % (''.join(postal[:3]), ''.join(postal[3:]))
         yo.code = postal
 
+    def __hash__(yo):
+        return hash(yo.code)
+
     def __eq__(yo, other):
         if not isinstance(other, (str, unicode, yo.__class__)):
             return NotImplemented
@@ -1634,7 +1639,12 @@ class PostalCode(object):
         return yo.code == other
 
     def __ne__(yo, other):
+        if not isinstance(other, (str, unicode, yo.__class__)):
+            return NotImplemented
         return not yo.__eq__(other)
+
+    def __nonzero__(yo):
+        return bool(yo.code)
 
     def __repr__(yo):
         return repr(yo.code)
