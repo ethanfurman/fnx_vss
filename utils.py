@@ -229,8 +229,8 @@ def currency(number):
         number = int(number.replace('.',''))
     return number
 
-
-def translator(frm='', to='', delete='', keep=None, strip=None):
+_strip_sentinel = Sentinel('no strip argument')
+def translator(frm='', to='', delete='', keep=None, strip=_strip_sentinel):
     if len(to) == 1:
         to = to * len(frm)
     bytes_trans = string.maketrans(frm, to)
@@ -251,7 +251,7 @@ def translator(frm='', to='', delete='', keep=None, strip=None):
                 s = s.translate(uni_table)
         else:
             s = s.translate(bytes_trans, delete)
-        if strip:
+        if strip is not _strip_sentinel:
             s = s.strip(strip)
         return s
     return translate
