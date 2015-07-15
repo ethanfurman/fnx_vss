@@ -230,7 +230,7 @@ def currency(number):
     return number
 
 
-def translator(frm='', to='', delete='', keep=None):
+def translator(frm='', to='', delete='', keep=None, strip=None):
     if len(to) == 1:
         to = to * len(frm)
     bytes_trans = string.maketrans(frm, to)
@@ -249,9 +249,11 @@ def translator(frm='', to='', delete='', keep=None):
                 for chr in set(s) - set(keep):
                     uni_table[ord(chr)] = None
                 s = s.translate(uni_table)
-            return s
         else:
-            return s.translate(bytes_trans, delete)
+            s = s.translate(bytes_trans, delete)
+        if strip:
+            s = s.strip(strip)
+        return s
     return translate
 
 def contains_any(container, *targets):
