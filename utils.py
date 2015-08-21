@@ -229,14 +229,24 @@ def currency(number):
         number = int(number.replace('.',''))
     return number
 
-_strip_sentinel = Sentinel('no strip argument')
-def translator(frm='', to='', delete='', keep=None, strip=_strip_sentinel):
+_trans_sentinel = Sentinel('no strip argument')
+def translator(frm='', to='', delete='', keep=None, strip=_trans_sentinel, compress=False):
+    replacement = None
     if len(to) == 1:
-        to = to * len(frm)
+        if frm == '':
+            replacement = to
+            to = ''
+        else:
+            to = to * len(frm)
     bytes_trans = string.maketrans(frm, to)
     if keep is not None:
         allchars = string.maketrans('', '')
         delete = allchars.translate(allchars, keep.translate(allchars, delete)+frm)
+        if replacement is not None:
+            frm = delete
+            to = replacement * len(delete)
+            delete = ''
+            bytes_trans = string.maketrans(frm, to)
     uni_table = {}
     for src, dst in zip(frm, to):
         uni_table[ord(src)] = ord(dst)
@@ -247,12 +257,14 @@ def translator(frm='', to='', delete='', keep=None, strip=_strip_sentinel):
             s = s.translate(uni_table)
             if keep is not None:
                 for chr in set(s) - set(keep):
-                    uni_table[ord(chr)] = None
+                    uni_table[ord(chr)] = replacement
                 s = s.translate(uni_table)
         else:
             s = s.translate(bytes_trans, delete)
-        if strip is not _strip_sentinel:
+        if strip is not _trans_sentinel:
             s = s.strip(strip)
+        if replacement and compress:
+            s = replacement.join([p for p in s.split(replacement) if p])
         return s
     return translate
 
@@ -666,6 +678,23 @@ def generate_passphrase(words=[]):
             continue
         pass_phrase.append(word)
     return ' '.join(pass_phrase)
+
+def grouped(it, size):
+    'yield chunks of it in groups of size'
+    if size < 1:
+        raise ValueError('size must be greater than 0 (not %r)' % size)
+    result = []
+    count = 0
+    for ele in it:
+        result.append(ele)
+        count += 1
+        if count == size:
+            yield tuple(result)
+            count = 0
+            result = []
+    if result:
+        yield tuple(result)
+
 
 def text_to_date(text, format='ymd'):
     '''(yy)yymmdd'''
