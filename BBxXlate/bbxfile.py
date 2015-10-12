@@ -7,6 +7,7 @@ from VSS.path import Path
 import logging
 import os
 import string
+import subprocess
 
 _logger = logging.getLogger('BBx')
 
@@ -289,7 +290,13 @@ class BBxFile(object):
 
 
 def getfilename(target):
-    files = Path.glob(target.path / target.base[:5] + '*')
+    template = target.path / target.base[:5] + '*'
+    files = Path.glob(template)
+    if not files:
+        subprocess.call(['tar', '--directory', '/FIS/data', '--wildcards', '-xf', target.path/'FIS_data.tar.gz', target.base[:5]+'*'])
+        files = Path.glob(template)
+        if not files:
+            raise ValueError('unable to find any files matching %s' % template)
     possibles = []
     for file in files:
         if len(file.base) in (5, 6):
