@@ -227,16 +227,8 @@ class BBxFile(object):
         return self[ky] is not None
 
     def __getitem__(self, ky):
-        if self.records.has_key(ky):
-            return self.records[ky]
-        elif self.keymatch:
-            if '%' in self.keymatch:
-                keymatch = self.keymatch % ky
-            else:
-                keymatch = self.keymatch
-            if self.records.has_key(keymatch):
-                return self.records[keymatch]
-        raise KeyError(ky)
+        ky = self._normalize_key(ky)
+        return self.records[ky]
 
     def __iter__(self):
         """
@@ -257,17 +249,28 @@ class BBxFile(object):
                 pieces.append("%s=%r" % (attr, value))
         return "BBxFile(%s)" % (', '.join(pieces) + "[%d records]" % len(self.records))
 
+    def _normalize_key(self, ky):
+        if self.records.has_key(ky):
+            return ky
+        elif self.keymatch:
+            if '%' in self.keymatch:
+                return self.keymatch % ky
+            else:
+                return self.keymatch
+
     def get(self, ky, sentinel=None):
+        ky = self._normalize_key(ky)
         try:
             return self[ky]
         except KeyError:
             return sentinel
 
-    def get_subset(self, ky):
+    def get_subset(self, ky=None):
         if not self.subset:
             raise ValueError('subset not defined')
-        match = self.subset % ky
-        rv = [(key,rec) for key,rec in self.records.items() if key.startswith(match)]
+        if ky is not None:
+            match = self.subset % ky
+        rv = [(key, rec) for key, rec in self.records.items() if key.startswith(match)]
         rv.sort()
         return rv
 
@@ -279,7 +282,8 @@ class BBxFile(object):
 
     def has_key(self, ky):
         #print 'testing for %s ' % ky
-        return not not self[ky]
+        ky = self._normalize_key(ky)
+        return self.records.has_key(ky)
 
     def values(self):
         return self.records.values()
@@ -394,12 +398,11 @@ Notes:  The entire file is read into memory.
         raise Exception("UnknownFileTypeError: %s" % (filetype))
     return keychainkeys
 
-if __name__ == '__main__':
-    import time
+# if __name__ == '__main__':
+#     import time
     #print "Starting..."
     #for fn in ("ICIMF0","GMCMF0","GMAFF0","GMCFF0"):   # "ICCXF0",
     #    start = time.time()
     #    print fn, len(getfile(fn)), time.time()-start
     #start = time.time()
     #print "ICCXXF", len(open(r'C:\Zope\v2.4\Extensions\WSGSourceData\ICCXXF', 'rb').read()), time.time()-start
-    
