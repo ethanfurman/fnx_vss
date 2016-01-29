@@ -1,6 +1,7 @@
 #!/usr/local/bin/python
 import sys, getpass, shlex, subprocess, re, os
-from bbxfile import BBxFile, getfilename
+import bbxfile
+from bbxfile import BBxFile, getfilename, TableError, MissingTableError, UnknownTableError
 
 from VSS.path import Path
 
@@ -23,7 +24,7 @@ def slicendice(line, *nums):
     return tuple(results)
 
 def parse_FIS_Schema(source):
-    iolist = None    
+    iolist = None
     contents = open(source).readlines()
     TABLES = {}
     skip_table = False
@@ -45,6 +46,7 @@ def parse_FIS_Schema(source):
             name = line[2:9].strip()
             parts = line[9:].rsplit(" (", 1)
             desc = parts[0].strip()
+            last_letter = chr(ord('A') - 1)
             if parts[1].startswith('at '):
                 if name in TABLES:
                     # skip duplicate tables
@@ -57,7 +59,7 @@ def parse_FIS_Schema(source):
             else:
                 filenum = int(parts[1].split()[0])
                 fields = TABLES.setdefault(filenum, {'name':name, 'desc':desc, 'filenum':filenum, 'fields':[], 'iolist':[], 'key':None})['fields']
-                
+
                 if name in TABLES:
                     del TABLES[name]    # only allow names if there aren't any duplicates
                 else:
@@ -68,7 +70,8 @@ def parse_FIS_Schema(source):
             fieldnum, fielddesc, fieldsize, rest = slicendice(line, 10, 50, 56)
             rest = rest.split()
             if not rest:
-                fieldmask, fieldvar = '', 'None'
+                last_letter = chr(ord(last_letter) + 1)
+                fieldmask, fieldvar = '', last_letter + 'n$'
                 if fielddesc.strip('()').lower() != 'open':
                     fieldvar = 'Fld%02d' % int(fieldnum)
             else:
@@ -86,8 +89,10 @@ def parse_FIS_Schema(source):
                         fieldvar = maybe
                 else:
                     fieldvar = rest[0]
+                fieldvar = fieldvar.title()
+                last_letter = fieldvar[0]
             if "(" in fieldvar and not fieldvar.endswith(")"):
-                fieldvar+=")"                    
+                fieldvar+=")"
             fieldvar = fieldvar.title()
             if "$" in fieldvar:
                 basevar = fieldvar.split("(")[0]
@@ -131,11 +136,18 @@ def fisData (table, keymatch=None, subset=None, filter=None):
     datamap = tables[table_id]['iolist']
     fieldlist = tables[table_id]['fields']
     rectype = tables[table_id]['key']
-    table = BBxFile(datafile, datamap, keymatch=keymatch, subset=subset, filter=filter, rectype=rectype, fieldlist=fieldlist, name=tablename, desc=description)
+    table = BBxFile(
+            datafile, datamap,
+            keymatch=keymatch, subset=subset,
+            filter=filter, rectype=rectype,
+            fieldlist=fieldlist, name=tablename,
+            desc=description, _cache_key=key,
+            )
     DATACACHE[key] = table, mtime
     return table
 
 tables = parse_FIS_Schema(SCHEMA)
+bbxfile.tables = tables
 
 #tables['NVTY1']['fields'][77]
 

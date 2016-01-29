@@ -11,6 +11,16 @@ import subprocess
 
 _logger = logging.getLogger('BBx')
 
+class TableError(Exception):
+    'generic problem'
+
+class UnknownTableError(TableError):
+    'unknown table format'
+
+class MissingTableError(TableError):
+    'unable to find table file'
+
+
 def asc(strval):                    ##USED in bbxfile
     if len(strval) == 0:
         return 0
@@ -50,12 +60,21 @@ def unicode_strip(text):
 def Int(text=''):
     if not text.strip():
         return 0
-    return int(text)
+    return int(float(text))
 
 def Float(text=''):
     if not text.strip():
         return 0.0
     return float(text)
+
+def IntFloat(text=''):
+    if not text.strip():
+        return 0
+    try:
+        return int(text)
+    except ValueError:
+        return float(text)
+
 
 class BBxRec(object):
     # define datamap as per the iolist in the subclasses
@@ -69,6 +88,18 @@ class BBxRec(object):
             for fieldvar in datamap:
                 fieldlist.append(None, '', None, fieldvar, None)
         self.fieldlist = fieldlist
+        # calculate max width for printing
+        max_width = 20
+        for field_row in fieldlist:
+            field_def = field_row[3]
+            if ',' in field_def:
+                # get width from spec
+                width = int(field_def.split(',')[1].strip(')'))
+            else:
+                # get width by measurement
+                width = len(unicode(self[field_def]))
+            max_width = max(max_width, width)
+        self._width = max_width
 
     def __getitem__(self, ref):
         if isinstance(ref, (int, long)):
@@ -97,6 +128,8 @@ class BBxRec(object):
                 cls = Int
             elif m:
                 cls = Float
+            elif '$' not in r:
+                cls = IntFloat
             else:
                 cls = unicode_strip
             if r in self.datamap:
@@ -116,7 +149,7 @@ class BBxRec(object):
                 result.append(cls(val))
             except Exception:
                 _logger.error(repr(self))
-                _logger.exception('unable to convert, data lost')
+                _logger.exception('unable to convert %r to %s, data lost' % (val, cls))
                 result.append(cls())
         if single:
             return result[0]
@@ -147,11 +180,20 @@ class BBxRec(object):
 
     def __str__(self):
         lines = []
+        field_num = 0
+        last_field = None
         for i, row in enumerate(self.fieldlist):
-            if '$' in row[3]:
-                lines.append('%5d | %-12s | %-40s | %s' % (i, row[3], self[row[3]], row[1]))
+            name, spec = row[1:4:2]
+            current_field = spec.split('(')[0]
+            if current_field != last_field or current_field.lower() == 'i':
+                field_num += 1
+                last_field = current_field
+                display_field_num = '%2d' % field_num
+            if '$' in spec:
+                lines.append('%3d | %s | %-12s | %-*s | %s' % (i, display_field_num, spec, self._width, self[spec], name))
             else:
-                lines.append('%5d | %-12s | %40s | %s' % (i, row[3], self[row[3]], row[1]))
+                lines.append('%3d | %s | %-12s | %*s | %s' % (i, display_field_num, spec, self._width, self[spec] or '-', name))
+            display_field_num = '  '
         return '\n'.join(lines)
 
 
@@ -182,7 +224,7 @@ def BBVarLength(datamap, fieldlist):
 
 class BBxFile(object):
 
-    def __init__(self, srcefile, datamap, fieldlist, keymatch=None, subset=None, filter=None, rectype=None, name=None, desc=None):
+    def __init__(self, srcefile, datamap, fieldlist, keymatch=None, subset=None, filter=None, rectype=None, name=None, desc=None, _cache_key=None):
         records = {}
         datamap = [xx.strip() for xx in datamap]
         leader = trailer = None
@@ -198,12 +240,18 @@ class BBxFile(object):
         fieldlengths = BBVarLength(datamap, fieldlist)
         fixedLengthFields = set([fld for fld in fieldlist if '$' in fld and field[-1] != '$'])
         for ky, rec in getfile(srcefile).items():
-            if (len(ky) != fieldlengths[0]
-            or  len(rec) < len(fieldlengths)
-            or  any(len(field) != length for field, length, name in
-                    zip(rec, fieldlengths, datamap) if name in fixedLengthFields)
-            or  rectype and ky[start:stop] != token):
-                continue    # record is not a match for this table
+            try:
+                if (
+                    len(ky) != fieldlengths[0] or
+                    len(rec) < len(fieldlengths) or
+                    any(len(field) != length for field, length, name in
+                        zip(rec, fieldlengths, datamap) if name in fixedLengthFields
+                        ) or
+                    rectype and ky[start:stop] != token
+                    ):
+                        continue    # record is not a match for this table
+            except:
+                raise UnknownTableError
             rec = BBxRec(rec, datamap, fieldlist)
             if filter:
                 if filter(rec):
@@ -222,6 +270,8 @@ class BBxFile(object):
         self.rectype = rectype
         self.name = name
         self.desc= desc
+        self.filename = srcefile
+        self._cache_key = _cache_key
 
     def __contains__(self, ky):
         return self[ky] is not None
@@ -255,8 +305,7 @@ class BBxFile(object):
         elif self.keymatch:
             if '%' in self.keymatch:
                 return self.keymatch % ky
-            else:
-                return self.keymatch
+        return ky
 
     def get(self, ky, sentinel=None):
         ky = self._normalize_key(ky)
@@ -265,11 +314,10 @@ class BBxFile(object):
         except KeyError:
             return sentinel
 
-    def get_subset(self, ky=None):
+    def get_subset(self, ky):
         if not self.subset:
             raise ValueError('subset not defined')
-        if ky is not None:
-            match = self.subset % ky
+        match = self.subset % ky
         rv = [(key, rec) for key, rec in self.records.items() if key.startswith(match)]
         rv.sort()
         return rv
@@ -292,6 +340,12 @@ class BBxFile(object):
         xx = getSubset(self.items(), pattern)
         return iter(xx)
 
+    def release(self):
+        'remove physical file'
+        if self._cache_key in tables:
+            del tables[self._cache_key]
+        os.unlink(self.filename)
+
 
 def getfilename(target):
     template = target.path / target.base[:5] + '*'
@@ -300,7 +354,7 @@ def getfilename(target):
         subprocess.call(['tar', '--directory', '/FIS/data', '--wildcards', '-xf', target.path/'FIS_data.tar.gz', target.base[:5]+'*'])
         files = Path.glob(template)
         if not files:
-            raise ValueError('unable to find any files matching %s' % template)
+            raise MissingTableError('unable to find any files matching %s' % template)
     possibles = []
     for file in files:
         if len(file.base) in (5, 6):
@@ -321,7 +375,9 @@ Notes:  The entire file is read into memory.
     """
 
     try:
-        data = open(filename,'rb').read()
+        fh = open(filename,'rb')
+        data = fh.read()
+        fh.close()
     except:
         raise Exception("File not found or read/permission error: %s") % (filename, )
 
