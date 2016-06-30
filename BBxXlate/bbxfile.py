@@ -318,8 +318,13 @@ class BBxFile(object):
         if not self.subset:
             raise ValueError('subset not defined')
         match = self.subset % ky
-        rv = [(key, rec) for key, rec in self.records.items() if key.startswith(match)]
-        rv.sort()
+        rv = []
+        for key, rec in self.records.items():
+            if not key.replace('\xff', ''):
+                # skipping weird record
+                continue
+            if key.startswith(match):
+                rv.append((key, rec))
         return rv
 
     def keys(self):
