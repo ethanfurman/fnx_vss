@@ -88,7 +88,8 @@ class BBxRec(object):
             for fieldvar in datamap:
                 fieldlist.append(None, '', None, fieldvar, None)
         self.fieldlist = fieldlist
-        # calculate max width for printing
+        # calculate (max) widths for printing
+        widths = []
         max_width = 20
         for field_row in fieldlist:
             field_def = field_row[3]
@@ -98,8 +99,10 @@ class BBxRec(object):
             else:
                 # get width by measurement
                 width = len(unicode(self[field_def]))
+            widths.append(width)
             max_width = max(max_width, width)
         self._width = max_width
+        self._widths = widths
 
     def __getitem__(self, ref):
         if isinstance(ref, (int, long)):
@@ -239,6 +242,7 @@ class BBxFile(object):
                 trailer = keymatch[last_ps+2:]     # skip the %s ;)
         fieldlengths = BBVarLength(datamap, fieldlist)
         fixedLengthFields = set([fld for fld in fieldlist if '$' in fld and field[-1] != '$'])
+        widths = [1] * len(fieldlist)
         for ky, rec in getfile(srcefile).items():
             try:
                 if (
@@ -253,15 +257,22 @@ class BBxFile(object):
             except:
                 raise UnknownTableError
             rec = BBxRec(rec, datamap, fieldlist)
+            kept = False
             if filter:
                 if filter(rec):
                     records[ky] = rec
+                    kept = True
             elif leader is trailer is None and keymatch is not None:
                 if keymatch == ky:
                     records[ky] = rec
+                    kept = True
             elif leader is None or ky.startswith(leader):
                 if trailer is None or ky.endswith(trailer):
                     records[ky] = rec
+                    kept = True
+            if kept:
+                for i, (w1, w2) in enumerate(zip(widths, rec._widths)):
+                    widths[i] = max(w1, w2)
         self.records = records
         self.datamap = datamap
         self.fieldlist = fieldlist
@@ -272,6 +283,7 @@ class BBxFile(object):
         self.desc= desc
         self.filename = srcefile
         self._cache_key = _cache_key
+        self.field_widths = widths
 
     def __contains__(self, ky):
         return self[ky] is not None
