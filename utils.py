@@ -146,6 +146,12 @@ class IndexEnum(Enum):
             return self.value < other.value
         return NotImplemented
 
+    @classmethod
+    def export(cls, namespace):
+        for name, member in cls.__members__.items():
+            if name == member.name:
+                namespace[name] = member
+    export_to = export
 
 class Weekday(AutoEnum):
     __order__ = 'MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY SATURDAY SUNDAY'
