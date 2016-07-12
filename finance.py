@@ -96,7 +96,7 @@ class ACHFile(object):
         self.immed_origin = ach_account.ach_company_number
         self.company_name = ach_account.ach_company_name_short
         self.company_id = ach_account.ach_company_id
-            
+
     def save_at(self, path):
         """
         Create the file, write the entries, close the file.
@@ -116,7 +116,7 @@ class ACHFile(object):
             return rec.payment_date, rec.sec_code, rec.description
 
         payments = sorted(self.payments, key=pdscd)
-        
+
         for (payment_date, sec_code, description), group in groupby(payments, pdscd):
             batch_entries = 0
             batch_hash = 0
@@ -235,9 +235,9 @@ class FederalHoliday(AutoEnum):
                 holiday = holiday.replace(delta_day=1)
             return holiday
         days_in_month = days_per_month(year)
-        target_end = self.occurance * 7 
+        target_end = self.occurance * 7
         if target_end > days_in_month[self.month]:
-            target_end = days_in_month[self.month] 
+            target_end = days_in_month[self.month]
         target_start = target_end - 6
         target_week = list(xrange(start=Date(year, self.month, target_start), step=one_day, count=7))
         for holiday in target_week:
@@ -266,6 +266,28 @@ class FederalHoliday(AutoEnum):
                 days -= 1
 
     @classmethod
+    def count_business_days(cls, date1, date2):
+        """
+        Return the number of business days between start and order.
+        """
+        if date2 < date1:
+            date1, date2 = date2, date1
+        holidays = cls.year(date1.year)
+        years = set([date1.year])
+        day = Weekday.from_date(date1)
+        day_count = 0
+        while "not at target":
+            if date1 == date2:
+                return day_count
+            date1 = date1.replace(delta_day=1)
+            if date1.year not in years:
+                holidays.extend(cls.year(date1.year))
+                years.add(date1.year)
+            day = Weekday.from_date(date1)
+            if day not in (SATURDAY, SUNDAY) and date1 not in holidays:
+                day_count += 1
+
+    @classmethod
     def year(cls, year):
         """
         Return a list of the actual FederalHoliday dates for `year`.
@@ -282,7 +304,7 @@ class ACHPayment(object):
     _strip = staticmethod(translator(delete=' -'))
 
     def __init__(self,
-            description, sec_code, 
+            description, sec_code,
             vendor_name, vendor_inv_num, vendor_rtng, vendor_acct,
             transaction_code, vendor_acct_type, amount, payment_date):
         """
