@@ -80,7 +80,8 @@ class BBxRec(object):
     # define datamap as per the iolist in the subclasses
     datamap = "iolist here".split(",")
 
-    def __init__(self, rec, datamap, fieldlist):
+    def __init__(self, rec, datamap, fieldlist, filename):
+        self.filename = filename
         self.rec = rec
         self.datamap = [ xx.strip() for xx in datamap ]
         if fieldlist is None:
@@ -151,8 +152,8 @@ class BBxRec(object):
             try:
                 result.append(cls(val))
             except Exception:
-                _logger.error(repr(self))
-                _logger.exception('unable to convert %r to %s, data lost' % (val, cls))
+                # _logger.error(repr(self))
+                _logger.error('<%s::%s> unable to convert %r to %s, data lost' % (self.filename, r+m, val, cls.__name__))
                 result.append(cls())
         if single:
             return result[0]
@@ -228,6 +229,7 @@ def BBVarLength(datamap, fieldlist):
 class BBxFile(object):
 
     def __init__(self, srcefile, datamap, fieldlist, keymatch=None, subset=None, filter=None, rectype=None, name=None, desc=None, _cache_key=None):
+        record_filename = srcefile.split('/')[-1]
         records = {}
         datamap = [xx.strip() for xx in datamap]
         leader = trailer = None
@@ -256,7 +258,7 @@ class BBxFile(object):
                         continue    # record is not a match for this table
             except:
                 raise UnknownTableError
-            rec = BBxRec(rec, datamap, fieldlist)
+            rec = BBxRec(rec, datamap, fieldlist, record_filename)
             kept = False
             if filter:
                 if filter(rec):
