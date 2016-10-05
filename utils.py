@@ -819,7 +819,9 @@ class LazyAttr(object):
     def __get__(yo, instance, owner):
         if instance is None:
             return yo
-        return yo.fget(instance)
+        result =  yo.fget(instance)
+        setattr(instance, yo.fget.__name__, result)
+        return result
 
 class Open(object):
     builtin_open = open
