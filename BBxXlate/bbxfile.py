@@ -4,6 +4,7 @@ Bbx File utilities.
 
 from stat import ST_MTIME
 from VSS.path import Path
+from VSS.utils import LazyAttr as lazy
 import logging
 import os
 import string
@@ -89,21 +90,6 @@ class BBxRec(object):
             for fieldvar in datamap:
                 fieldlist.append(None, '', None, fieldvar, None)
         self.fieldlist = fieldlist
-        # calculate (max) widths for printing
-        widths = []
-        max_width = 20
-        for field_row in fieldlist:
-            field_def = field_row[3]
-            if ',' in field_def:
-                # get width from spec
-                width = int(field_def.split(',')[1].strip(')'))
-            else:
-                # get width by measurement
-                width = len(unicode(self[field_def]))
-            widths.append(width)
-            max_width = max(max_width, width)
-        self._width = max_width
-        self._widths = widths
 
     def __getitem__(self, ref):
         if isinstance(ref, (int, long)):
@@ -200,6 +186,33 @@ class BBxRec(object):
             display_field_num = '  '
         return '\n'.join(lines)
 
+    def _calc_widths(self):
+        # calculate (max) widths for printing
+        widths = []
+        max_width = 20
+        for field_row in self.fieldlist:
+            field_def = field_row[3]
+            if ',' in field_def:
+                # get width from spec
+                width = int(field_def.split(',')[1].strip(')'))
+            else:
+                # get width by measurement
+                width = len(unicode(self[field_def]))
+            widths.append(width)
+            max_width = max(max_width, width)
+        self._width = max_width
+        self._widths = widths
+
+    @lazy
+    def _width(self):
+        self._calc_widths()
+        return self._width
+
+    @lazy
+    def _widths(self):
+        self._calc_widths()
+        return self._widths
+
 
 def getSubset(itemslist, pattern):
     # returns a sorted itemslist where keys match pattern
@@ -244,7 +257,6 @@ class BBxFile(object):
                 trailer = keymatch[last_ps+2:]     # skip the %s ;)
         fieldlengths = BBVarLength(datamap, fieldlist)
         fixedLengthFields = set([fld for fld in fieldlist if '$' in fld and field[-1] != '$'])
-        widths = [1] * len(fieldlist)
         for ky, rec in getfile(srcefile).items():
             try:
                 if (
@@ -272,9 +284,6 @@ class BBxFile(object):
                 if trailer is None or ky.endswith(trailer):
                     records[ky] = rec
                     kept = True
-            if kept:
-                for i, (w1, w2) in enumerate(zip(widths, rec._widths)):
-                    widths[i] = max(w1, w2)
         self.records = records
         self.datamap = datamap
         self.fieldlist = fieldlist
@@ -285,7 +294,14 @@ class BBxFile(object):
         self.desc= desc
         self.filename = srcefile
         self._cache_key = _cache_key
-        self.field_widths = widths
+
+    @lazy
+    def field_widths(self):
+        widths = [1] * len(self.fieldlist)
+        for rec in self:
+            for i, (w1, w2) in enumerate(zip(widths, rec._widths)):
+                widths[i] = max(w1, w2)
+        return widths
 
     def __contains__(self, ky):
         return self[ky] is not None
@@ -348,7 +364,6 @@ class BBxFile(object):
         return self.records.items()
 
     def has_key(self, ky):
-        #print 'testing for %s ' % ky
         ky = self._normalize_key(ky)
         return self.records.has_key(ky)
 
