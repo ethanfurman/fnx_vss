@@ -270,6 +270,8 @@ class FederalHoliday(AutoEnum):
         """
         Return the number of business days between start and order.
         """
+        date1 = Date(date1)
+        date2 = Date(date2)
         if date2 < date1:
             date1, date2 = date2, date1
         holidays = cls.year(date1.year)
