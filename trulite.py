@@ -1,7 +1,9 @@
 from __future__ import with_statement
 
+from itertools import groupby
+from VSS.address import any_digits
 from VSS.BBxXlate.bbxfile import BBxFile
-from VSS.utils import one_day, text_to_date, String, Integer
+from VSS.utils import currency, one_day, text_to_date
 from VSS import AutoEnum
 
 GL_ACCT_REC = '1100-00'
@@ -17,18 +19,21 @@ class ARAgingLine(tuple):
     __slots__ = ()
     def __new__(cls, text):
         try:
-            pieces = text.split('\t', 3)
-            pieces, end_piece = pieces[:3], pieces[3]
-            pieces.extend(end_piece.rsplit('\t', 5))
-            pieces[3] = pieces[3].replace('\t', ' ')
-            data = [f.strip() for f in pieces]
-            data[2] = text_to_date(data[2], 'mdy')
-            data[7] = int(data[7])
-            data[8] = int(data[8])
-            data.append(data[1].startswith('**'))
-            data[1] = data[1].strip('*')
+            if isinstance(text, tuple):
+                data = text
+            else:
+                pieces = text.split('\t', 3)
+                pieces, end_piece = pieces[:3], pieces[3]
+                pieces.extend(end_piece.rsplit('\t', 5))
+                pieces[3] = pieces[3].replace('\t', ' ')
+                data = [f.strip() for f in pieces]
+                data[2] = text_to_date(data[2], 'mdy')
+                data[7] = int(data[7])
+                data[8] = int(data[8])
+                data.append(data[1].startswith('**'))
+                data[1] = data[1].strip('*')
         except Exception, exc:
-            exc.args = (exc.args[0] + '\noriginal row: %r\n' % text,) + exc.args[1:]
+            exc.args = (exc.args[0] + '\noriginal row: %r\n' % (text,) ,) + exc.args[1:]
             raise
         return tuple.__new__(cls, tuple(data))
     @property
@@ -82,15 +87,18 @@ class ARInvoice(object):
         self.end_discount_date = rec.trans_date.replace(delta_month=1, day=DISCOUNT_CUTOFF)
         self._starred = rec.starred
         self._transactions = []
-        if '1-INVCE' in rec.trans_type:
-            self._amount = rec.debit - rec.credit
+        if ( '1-INVCE' in rec.trans_type
+          or '8-CREDT' in rec.trans_type
+          or '9-SVCHG' in rec.trans_type
+          ):
+            self._original_amount = rec.debit - rec.credit
         else:
-            self._amount = 0
+            self._original_amount = 0
         self._balance = 0
         self.add_transaction(rec)
     def __repr__(self):
-        return ('<ARInvoice: cust_id->%s  name->%s  date->%s  inv_num->%s  balance->%s>'
-                % (self.cust_id, self.name, self.date, self.inv_num, self.balance))
+        return ('<ARInvoice: cust_id=%s, name=%s, date=%s, inv_num=%.6s, original_amount=%s>'
+                % (self.cust_id, self.name, self.date, self.inv_num, self.amount))
     def add_transaction(self, trans):
         self._transactions.append(trans)
         self._balance += trans.debit - trans.credit
@@ -101,7 +109,7 @@ class ARInvoice(object):
         return self._actual_inv_num
     @property
     def amount(self):
-        return self._amount
+        return self._original_amount
     @property
     def balance(self):
         return self._balance
@@ -143,6 +151,9 @@ def ar_invoices(filename):
     '''returns all invoices'''
     result = {}
     for rec in ARAgingIter(filename):
+        if rec.inv_num[:2] == '99':
+            # service charge, add cust_id
+            rec = ARAgingLine(tuple(rec[:5] + (rec.inv_num + rec.cust_num,) + rec[6:]))
         if rec.inv_num in result:
             result[rec.inv_num].add_transaction(rec)
         else:
@@ -162,7 +173,7 @@ def ar_open_invoices(filename):
 
 class Inv(object):
     def __init__(self, inv_num, amount, quality, discount, ar_inv):
-        self.inv_num = self.actual_inv_num = inv_num
+        self.inv_num = self.actual_inv_num = inv_num[:6]
         self.amount = amount
         self.quality = quality
         self.discount = discount
@@ -190,15 +201,15 @@ class FakeInv(ARInvoice):
         self.end_discount_date = trans_date.replace(delta_month=1, day=DISCOUNT_CUTOFF)
         self._starred = False
         self._transactions = []
-        self._amount = amount
+        self._original_amount = amount
         self._balance = amount
         self._desc = desc
         self._gl_acct = gl_acct
     def __repr__(self):
-        return ('<FakeInv: cust_id=%r, name=%r, date=%r, inv_num=%r, balance=%r>'
-                % (self.cust_id, self.name, self.date, self.inv_num, self.balance))
+        return ('<FakeInv: cust_id=%r, name=%r, date=%r, inv_num=%r, original_amount=%r, desc=%r>'
+                % (self.cust_id, self.name, self.date, self.inv_num, self.amount, self._desc))
     def add_amount(self, amount):
-        self._amount += amount
+        self._original_amount += amount
     @property
     def desc(self):
         return self._desc
@@ -207,18 +218,35 @@ class FakeInv(ARInvoice):
         return list()
 
 
+class BatchError(Exception):
+    "Base exception for Batch errors."
+
+class DuplicateEntryError(BatchError):
+    "Signals a batch is out of balance."
+
+class EmptyBatchError(BatchError):
+    "Signals a batch is out of balance."
+
+class OutOfBalanceError(BatchError):
+    "Signals a batch is out of balance."
+
+
 class Batch(object):
     """
     A collection af `Inv`s that must balance to the creation amount.
 
+    Uses the inv's original amount, not the current balance, because of the
+    tendency to post extra funds to (apparently) random invoices, and then
+    later the customer will pay the whole amount of said random invoice.
     """
 
-    def __init__(self, number, amount, date):
+    def __init__(self, number, amount, date, max_discount=1):
         self.ck_nbr = number
         self.ck_amt = amount
         self.ck_date = date
         self.transactions = []
         self.discount_allowed = None
+        self.max_discount = max_discount
 
     def __contains__(self, inv):
         "inv should be either an AR_Invoice or an invoice number; compares against actual_inv_num"
@@ -237,7 +265,7 @@ class Batch(object):
         result.append("payment: %r" % self.ck_amt)
         result.append('')
         calc = 0
-        for tran in self.transactions:
+        for tran in sorted(self.transactions, key=lambda t: t.inv_num):
             calc += tran.amount
             result.append("transaction: %r" % tran)
         if not self.transactions:
@@ -249,10 +277,74 @@ class Batch(object):
     def __len__(self):
         return len(self.transactions)
 
+    def _distribute_discount(self, adjustment):
+        discount = self.max_discount / 100.0
+        for adjust in (False, True):
+            amount = adjustment
+            for more, inv in reversed(list(enumerate(self.transactions))):
+                if not inv.discount and inv.ar_inv.end_discount_date >= self.ck_date:
+                    inv_discount = -int(round(discount * inv.amount))
+                    if inv_discount <= amount:
+                        inv_discount = amount
+                    elif not more and abs(amount - inv_discount) < len(self.transactions):
+                        inv_discount = amount
+                    if adjust:
+                        inv.discount = inv_discount
+                    amount -= inv_discount
+                    if not amount:
+                        break
+            else:
+                # unable to distribute adjustment
+                break
+
+    def add_invoice(self, ar_inv, amount, quality, discount=0, replace=False):
+        self.discount_allowed = max(
+                self.discount_allowed,
+                self.ck_date <= ar_inv.end_discount_date,
+                )
+        inv_num = ar_inv.actual_inv_num
+        if inv_num in self and inv_num != self.ck_nbr:
+            if not replace:
+                raise DuplicateEntryError("%s already in batch %r" % (inv_num, self.ck_nbr))
+            for invoice in self.transactions:
+                if invoice.inv_num == inv_num:
+                    invoice.amount = amount
+                    invoice.quality = quality
+                    break
+            else:
+                raise AssertionError('Invoice #%s passed __contains__, failed loop (batch %r)' % (inv_num, self.ck_nbr))
+        else:
+            self.transactions.append(Inv(inv_num, amount, quality, discount, ar_inv))
+
     @property
     def balance(self):
         "amount of check - amount owed on all invoices (negative when discounts are taken)"
-        return self.ck_amt - self.total_paid - self.total_discount
+        return self.ck_amt - self.total_paid #- self.total_discount
+
+    def balance_batch(self):
+        if not self.transactions:
+            raise EmptyBatchError('cannot balance batch %r -- it has no transactions' % self.ck_nbr)
+        if self.is_balanced:
+            return
+        adjustment = self.balance
+        # allow write-offs equal to 1 penny per invoice
+        if abs(adjustment) <= len(self):
+            # write off pennies
+            template = self.transactions[0].ar_inv
+            invoice = FakeInv(
+                    template.cust_id,
+                    template.name,
+                    self.ck_nbr,
+                    adjustment,
+                    template.date,
+                    'transcription error',
+                    GL_DISCOUNTS
+                    )
+            self.add_invoice(invoice, adjustment, excellent)
+        elif adjustment < 0:
+            self._distribute_discount(adjustment)
+        if not self.is_balanced:
+            raise OutOfBalanceError
 
     @property
     def is_balanced(self):
@@ -267,110 +359,28 @@ class Batch(object):
 
     @property
     def total_owed(self):
+        "original amount of all transactions"
         total = 0
         for inv in self.transactions:
-            total += inv.ar_inv.balance or inv.ar_inv.amount
+            #total += inv.ar_inv.balance or inv.ar_inv.amount
+            total += inv.ar_inv.amount
         return total
 
     @property
     def total_paid(self):
+        "amount actually paid (could be less than total_owed due to discounts)"
         total = 0
         for inv in self.transactions:
-            total += inv.amount
+            total += inv.amount + inv.discount
         return total
 
-    def add_invoice(self, ar_inv, amount, quality, discount=0, replace=False):
-        self.discount_allowed = max(
-                self.discount_allowed,
-                self.ck_date <= ar_inv.end_discount_date,
-                )
-        inv_num = ar_inv.actual_inv_num
-        if inv_num in self and inv_num != self.ck_nbr:
-            if not replace:
-                raise ValueError("%s already in batch %r" % (inv_num, self.ck_nbr))
-            for invoice in self.transactions:
-                if invoice.inv_num == inv_num:
-                    invoice.amount = amount
-                    invoice.quality = quality
-                    break
-            else:
-                raise AssertionError('Invoice #%s passed __contains__, failed loop (batch %r)' % (inv_num, self.ck_nbr))
-        else:
-            self.transactions.append(Inv(inv_num, amount, quality, discount, ar_inv))
-
-    def balance_batch(self, amount=None):
-        _debug_ = False
-        if self.ck_nbr == '054014':
-            _debug_ = True
-        if not self.transactions:
-            raise ValueError('cannot balance a batch %r -- it has no invoices' % self.ck_nbr)
-        adjustment = self.ck_amt - self.total_paid
-        if _debug_:
-            print '0, Batch.balance_batch --> amount: %r,  adjustment: %r,  balanced: %r (%r)' % (amount, adjustment, self.is_balanced, self.balance)
-        if self.is_balanced and amount in (0, None):
-            return
-        if amount is None:
-            # allow positive amounts equal to 1 penny per invoice
-            if adjustment > len(self):
-                raise ValueError("unable to balance batch %r" % self.ck_nbr)
-            amount = sum([inv.discount for inv in self.transactions]) or adjustment
-        if _debug_:
-            print '1, Batch.balance_batch --> amount: %r,  adjustment: %r,  balanced: %r' % (amount, adjustment, self.is_balanced)
-        if adjustment != amount:
-            import pdb; pdb.set_trace()
-            raise ValueError('amount %s will not put batch %r in balance' % (amount, self.ck_nbr))
-        if abs(adjustment) <= len(self):
-            # write off pennies
-            desc = 'transcription error'
-            gl_acct = GL_DISCOUNTS
-        elif adjustment < 0:
-            discount = int(float(self.total_owed) / (self.total_paid - adjustment) * 100)
-            if _debug_:
-                print '2, Batch.balance_batch --> amount: %r,  adjustment: %r,  balanced: %r,  discount allowed: %r, discount: %r' % (amount, adjustment, self.is_balanced, self.discount_allowed, discount)
-            if self.discount_allowed and discount >= 98:
-                desc = '%d%% DISCOUNT TAKEN' % discount
-                gl_acct = GL_DISCOUNTS
-            else:
-                recorded = False
-                for invoice in self.transactions:
-                    # if discounts have been recorded, undo it
-                    if invoice.discount:
-                        recorded = True
-                        amount = invoice.discount
-                        if amount < adjustment:
-                            amount = adjustment
-                        invoice.amount += amount
-                        adjustment -= amount
-                if not recorded:
-                    discount = 1 - (float(self.ck_amt) / self.total_paid)
-                    if discount < 0.01005:
-                        discount = -0.01005
-                    elif discount < 0.02005:
-                        discount = -0.02005
-                    else:
-                        discount = -discount
-                    for invoice in self.transactions:
-                        amount = int(invoice.amount * discount)
-                        if amount < adjustment:
-                            amount = adjustment
-                        invoice.amount += amount
-                        adjustment -= amount
-                return
-        else:
-            desc = 'SERVICE CHARGE PAID'
-            gl_acct = GL_ACCT_REC
-        inv_num = self.ck_nbr
-        template = self.transactions[0].ar_inv
-        invoice = FakeInv(
-                template.cust_id,
-                template.name,
-                inv_num,
-                adjustment,
-                template.date,
-                desc,
-                gl_acct
-                )
-        self.add_invoice(invoice, adjustment, excellent)
+    def update(self, other_batch):
+        self.ck_nbr = other_batch.ck_nbr
+        self.ck_amt = other_batch.ck_amt
+        self.ck_date = other_batch.ck_date
+        self.transactions = other_batch.transactions
+        self.discount_allowed = other_batch.discount_allowed
+        self.max_discount = other_batch.max_discount
 
 
 class Status(AutoEnum):
@@ -382,17 +392,6 @@ class Status(AutoEnum):
     bad = ()
 globals().update(Status.__members__)
 
-def currency(number):
-    if not isinstance(number, (Integer, String)):
-        raise ValueError('currency only works with integer and string types (received %s %r )' % (type(number), number))
-    if isinstance(number, Integer):
-        number = str(number)
-        number = '0' * (3 - len(number)) + number
-        number = number[:-2] + '.' + number[-2:]
-    elif isinstance(number, String):
-        number = int(number.replace('.',''))
-    return number
-
 
 class CashReceipt(object):
     class GLEntry(object):
@@ -401,6 +400,14 @@ class CashReceipt(object):
             self.acct = acct
             self.debit = currency(debit)
             self.credit = currency(credit)
+        def __eq__(self, other):
+            if not isinstance(other, self.__class__):
+                return NotImplemented
+            return self.dp == other.dp and self.acct == other.acct and self.debit == other.debit and self.credit == other.credit
+        def __ne__(self, other):
+            if not isinstance(other, self.__class__):
+                return NotImplemented
+            return self.dp != other.dp or self.acct != other.acct or self.debit != other.debit or self.credit != other.credit
         def __repr__(self):
             dp = str(self.dp)
             debit = currency(self.debit)
@@ -412,12 +419,23 @@ class CashReceipt(object):
             return '%s %s %10s %10s' % (self.dp, self.acct, debit, credit)
 
     class Invoice(object):
-        def __init__(self, number, date, discount, apply):
+        def __init__(self, number, date, discount, apply, batch_date):
             self.number = number
-            self.date = text_to_date(date, 'mdy')
+            try:
+                self.date = text_to_date(date, 'mdy')
+            except ValueError:
+                self.date = batch_date
             self.discount = currency(discount)
             self.apply = currency(apply)
             self.total = self.discount + self.apply
+        def __eq__(self, other):
+            if not isinstance(other, self.__class__):
+                return NotImplemented
+            return self.number == other.number and self.date == other.date and self.discount == other.discount and self.apply == other.apply
+        def __ne__(self, other):
+            if not isinstance(other, self.__class__):
+                return NotImplemented
+            return self.number != other.number or self.date != other.date or self.discount != other.discount or self.apply != other.apply
         def __repr__(self):
             discount = currency(self.discount)
             apply = currency(self.apply)
@@ -430,11 +448,22 @@ class CashReceipt(object):
             return '%6s %s %9s %10s' % (self.number, self.date, discount, apply)
 
     class Check(object):
-        def __init__(self, number, date, amount, s):
-            self.number = number
-            self.date = text_to_date(date, 'mdy')
+        def __init__(self, number, date, amount, s, batch_date):
+            self.number = number.zfill(6)
+            try:
+                self.date = text_to_date(date, 'mdy')
+            except ValueError:
+                self.date = batch_date
             self.amount = currency(amount)
             self.s = s
+        def __eq__(self, other):
+            if not isinstance(other, self.__class__):
+                return NotImplemented
+            return self.number == other.number and self.date == other.date and self.amount == other.amount
+        def __ne__(self, other):
+            if not isinstance(other, self.__class__):
+                return NotImplemented
+            return self.number != other.number or self.date != other.date or self.amount != other.amount
         def __repr__(self):
             amount = currency(self.amount)
             date = repr(self.date)
@@ -448,6 +477,14 @@ class CashReceipt(object):
         def __init__(self, number, name):
             self.number = number
             self.name = name
+        def __eq__(self, other):
+            if not isinstance(other, self.__class__):
+                return NotImplemented
+            return self.number == other.number and self.name == other.name
+        def __ne__(self, other):
+            if not isinstance(other, self.__class__):
+                return NotImplemented
+            return self.number != other.number or self.name != other.name
         def __repr__(self):
             return '%s(%s, %s)' % (self.__class__.__name__, self.number, self.name)
         def __str__(self):
@@ -489,23 +526,31 @@ class CashReceipt(object):
         seq, cust, chk, inv, gl = self.line_elements(lines[0])
         self.sequence = int(seq)
         self.customer = Customer(*cust)
-        self.check = Check(*chk)
-        self.invoices.append(Invoice(*inv))
-        self.gl_distribution.append(GLEntry(*gl))
+        self.check = Check(batch_date=date, *chk)
+        if any(inv):
+            self.invoices.append(Invoice(batch_date=date, *inv))
+        if any(gl):
+            self.gl_distribution.append(GLEntry(*gl))
         seq, cust, chk, inv, gl = self.line_elements(lines[1])
         self.check.num2 = chk[0]
         if any(inv):
-            self.invoices.append(Invoice(*inv))
+            self.invoices.append(Invoice(batch_date=date, *inv))
         if any(gl):
             self.gl_distribution.append(GLEntry(*gl))
         for line in lines[2:]:
             seq, cust, chk, inv, gl = self.line_elements(line)
             if any(inv):
-                self.invoices.append(Invoice(*inv))
+                self.invoices.append(Invoice(batch_date=date, *inv))
             if any(gl):
                 self.gl_distribution.append(GLEntry(*gl))
 
-def receipt_file(filename):
+    def __repr__(self):
+        customer = '%s: %s' % (self.customer.number, self.customer.name)
+        amount = currency(self.check.amount)
+        check = "%s (%s) $%s" % (self.check.number, self.check.date, amount)
+        return "<Cash Receipt for %-30s with check %s>" % (customer, check)
+
+def ar_receipts(filename):
     receipts = []
     with open(filename) as src:
         data = []
@@ -514,11 +559,15 @@ def receipt_file(filename):
         for line in src:
             if line == '\r\n':
                 if data and data[0][0] != ' ':
-                    receipts.append(CashReceipt(data, date))
+                    receipt = CashReceipt(data, date)
+                    if any_digits(receipt.check.number):
+                        receipts.append(receipt)
                 data = []
             elif line.startswith('\r'):
                 if date is None and 'BATCH:' in line:
-                    date = text_to_date(line[67:75], 'mdy')
+                    date_start = line.rindex(' ', 70) + 1
+                    date_end = line.index(' ', 70)
+                    date = text_to_date(line[date_start:date_end], 'mdy')
                 continue
             elif line.endswith('\r\x0c\r\n'):
                 line = line[:-4]
@@ -532,3 +581,62 @@ def receipt_file(filename):
             else:
                 data.append(line[:-2])
     return receipts
+
+class LockboxEntry(tuple):
+    __slots__ = ()
+    def __new__(cls, text):
+        try:
+            if isinstance(text, tuple):
+                data = text
+            else:
+                data = [t.strip() for t in text.split('\t')]
+                data[3] = text_to_date(data[3], 'ymd')
+                data[6] = currency(data[6].strip('-'))
+                data[7] = currency(data[7].strip('-'))
+        except Exception, exc:
+            exc.args = (exc.args[0] + '\noriginal data: %r\n' % (text,) ,) + exc.args[1:]
+            raise
+        return tuple.__new__(cls, tuple(data))
+    @property
+    def cust_num(self):
+        return self[0]
+    @property
+    def cust_name(self):
+        return self[1]
+    @property
+    def desc(self):
+        return self[2]
+    @property
+    def date(self):
+        return self[3]
+    @property
+    def inv_num(self):
+        return self[4]
+    @property
+    def gl_acct(self):
+        return self[5]
+    @property
+    def debit(self):
+        return self[6]
+    @property
+    def credit(self):
+        return self[7]
+
+class LockboxBatch(object):
+    "a representation of a processed WFB lockbox batch"
+
+    def __init__(self, filename):
+        def not_blank(line):
+            return bool(line.strip())
+        def cust_id(rec):
+            return rec.cust_num
+        with open(filename) as file:
+            file_lines = file.readlines()
+        self.checks = {}
+        for data, lines in groupby(file_lines, not_blank):
+            if not data:
+                continue
+            lines = [LockboxEntry(l) for l in lines]
+            check = lines[0]
+            #lines.sort(key=cust_id)
+            self.checks[check.inv_num] = lines

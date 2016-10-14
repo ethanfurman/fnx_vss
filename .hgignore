@@ -1,5 +1,8 @@
 syntax: glob
 *.pyc
+*.pyo
 .*.swp
+*.orig
+*.rej
 *~
 .*~

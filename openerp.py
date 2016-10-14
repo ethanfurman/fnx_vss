@@ -3,8 +3,8 @@
 from __future__ import division, print_function, with_statement
 
 import openerplib
-from .utils import PropertyDict
-from .path import Path
+from VSS.time_machine import PropertyDict
+from VSS.path import Path
 
 execfile('/etc/openerp/VSS.conf')
 
@@ -26,6 +26,8 @@ try:
 except Exception:
     pass
 
+OE = PropertyDict()
+
 def adjust_permissions(oe_groups, allowed_groups, user):
     permissions = set(user.groups_id)
     for group_name, ints in oe_groups.items():
@@ -39,18 +41,65 @@ def adjust_permissions(oe_groups, allowed_groups, user):
             permissions -= ints
     return list(permissions)
 
+def connect(hostname, database, user, password, *tables):
+    OE.conn = conn = openerplib.get_connection(hostname=hostname, database=database, login=user, password=password)
+    for table in tables:
+        model = table.replace('.', '_')
+        OE[model] = conn.get_model(table)
+        OE[model].search([('id','=',0)])
+    return OE
+
 def host_site(hostname, database, login='admin', password='admin'):
-    hostname = {'wsg':'westernstatesglass.com','falcon':'falcon.tzo.com','salesinq':'demo.salesinq.com'}.get(hostname, hostname)
+    hostname = {'wsg':'westernstatesglass.com','falcon':'sunridge_farms.com','salesinq':'demo.salesinq.com'}.get(hostname, hostname)
     result = PropertyDict()
-    result.connection = conn = openerplib.get_connection(hostname=hostname, database=database, login=login, password=password)
-    result.user_model = um = conn.get_model('res.users')
+    result.connection = result.conn = conn = openerplib.get_connection(hostname=hostname, database=database, login=login, password=password)
+    result.user_model = result.res_users = um = conn.get_model('res.users')
     users = um.read(um.search([('login','!=','""')]))
     users.extend(um.read(um.search([('login','!=','""'), ('active','!=','True')])))
-    result.users = [PropertyDict(d) for d in users]
-    result.group_model = gm = conn.get_model('res.groups')
+    result.users = [_normalize(d) for d in users]
+    result.group_model = result.res_groups = gm = conn.get_model('res.groups')
     groups = gm.read(gm.search([('name','!=','""')]))
-    result.groups = [PropertyDict(d) for d in groups]
+    result.groups = [_normalize(d) for d in groups]
     return result
+
+def get_records(OE, model=None, domain=[(1,'=',1)], fields=[], max_qty=None, ids=None):
+    """get records from model
+
+    domain <- OpenERP domain for selecting records
+    fields <- fields to retrieve (otherwise all)
+    max_qty <- raises ValueError if more than max_qty records retrieved
+
+    returns a list of all records found
+    """
+    if model is None:
+        model, OE = OE, model
+    else:
+        model = OE.conn.get_model(model)
+    model.search([('id','=',0)])
+    single = False
+    if ids:
+        if isinstance(ids, (int,long)):
+            single = True
+            ids = [ids]
+        result = model.read(ids, fields)
+    else:
+        result = model.search_read(domain=domain, fields=fields)
+    if max_qty is not None and len(result) > max_qty:
+        raise ValueError('no more than %s records expected, but received %s' % (max_qty, len(result)))
+    result = [_normalize(r) for r in result]
+    if single:
+        result = result[0]
+    return result
+
+def _normalize(d):
+    'recursively convert each dict into a PropertyDict'
+    res = PropertyDict()
+    for key, value in d.items():
+        if isinstance(value, dict):
+            res[key] = _normalize(value)
+        else:
+            res[key] = value
+    return res
 
 def update_from_nightly():
     "routine to install nightly updates"

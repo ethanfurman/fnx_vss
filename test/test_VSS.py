@@ -8,14 +8,44 @@ sys.path.insert(0, '../..')
 from tempfile import mkstemp
 from types import MethodType
 from unittest import TestCase, main as Run
+import datetime
 
 from VSS import Table
+from VSS.address import cszk, normalize_address
 from VSS.dbf import Date, Time
+from VSS.finance import FederalHoliday, ACHStore, ACHPayment, ACHFile, ACH_ETC, Customer
+from VSS.time_machine import suppress
 from VSS.trulite import ARInvoice, ARAgingLine, ar_open_invoices, ar_invoices, Batch
-from VSS.utils import cszk, normalize_address, xrange, suppress, all_equal
-from VSS.wellsfargo import RmInvoice, RmPayment, RMFFRecord, lockbox_payments, Int, FederalHoliday, ACHStore, ACHPayment, ACHFile, ACH_ETC, Customer
+from VSS.utils import xrange, all_equal
+from VSS.wellsfargo import RmInvoice, RmPayment, RMFFRecord, RMFlatFile, Int
 
 globals().update(Customer.__members__)
+
+
+class MockError(Exception):
+    "indicates something is not mocked"
+
+
+class MockOE(object):
+    def get_model(self, model_name):
+        if model_name != 'res.partner.bank':
+            raise MockError('model %r not mocked' % model_name)
+        return self.res_partner_bank()
+    class res_partner_bank(object):
+        def search_read(self, fields, domain):
+            if domain != [('ach_default','=',True)]:
+                raise MockError('domain %r is not mocked')
+            values = dict(
+                    ach_bank_name='COOLER BANK',
+                    ach_bank_number='192837465',
+                    ach_bank_id='86421357',
+                    ach_company_name='REALLY AWESOME COMPANY',
+                    ach_company_number='9753102468',
+                    ach_company_name_short='RAC CO INC LLC',
+                    ach_company_id='8642013579',
+                    )
+            return [dict([(k, values[k]) for k in fields])]
+
 
 class Test_all_equal(TestCase):
 
@@ -555,12 +585,13 @@ class TestFederalHoliday(TestCase):
         year = yearly_holidays[0].year
         ns['test_%s_holidays' % year] = lambda self, year=year, holidays=yearly_holidays: self._test_holidays_by_year(year, holidays)
 
-    
+
     next_business_day_values = (
-            (Date(2013, 12, 30), (Date(2013, 12, 31), Date(2014,  1,  2), Date(2014,  1,  3), Date(2014,  1,  6))),
-            (Date(2008,  3, 15), (Date(2008,  3, 17), Date(2008,  3, 18), Date(2008,  3, 19), Date(2008,  3, 20))),
-            (Date(2008,  3, 16), (Date(2008,  3, 17), Date(2008,  3, 18), Date(2008,  3, 19), Date(2008,  3, 20))),
-            (Date(2010,  5, 21), (Date(2010,  5, 25), Date(2010,  5, 26), Date(2010,  5, 27), Date(2010,  5, 28))),
+            (Date(2013, 12, 30), (Date(2013, 12, 30), Date(2013, 12, 31), Date(2014,  1,  2), Date(2014,  1,  3), Date(2014,  1,  6))),
+            (Date(2008,  3, 15), (Date(2008,  3, 17), Date(2008,  3, 17), Date(2008,  3, 18), Date(2008,  3, 19), Date(2008,  3, 20))),
+            (Date(2008,  3, 16), (Date(2008,  3, 17), Date(2008,  3, 17), Date(2008,  3, 18), Date(2008,  3, 19), Date(2008,  3, 20))),
+            (Date(2010,  5, 28), (Date(2010,  5, 28), Date(2010,  6,  1), Date(2010,  6,  2), Date(2010,  6,  3), Date(2010,  6,  4), Date(2010,  6,  7), Date(2010,  6,  8))),
+            (Date(2014,  5, 23), (Date(2014,  5, 23), Date(2014,  5, 27), Date(2014,  5, 28), Date(2014,  5, 29), Date(2014,  5, 30), Date(2014,  6,  2), Date(2014,  6,  3))),
             )
 
     def _test_next_business_day(self, current, forward, next):
@@ -568,10 +599,39 @@ class TestFederalHoliday(TestCase):
 
     for src_date, target_dates in next_business_day_values:
         for i, tgt_date in enumerate(target_dates):
-            i += 1
             ns['test_%s-%s-%s_forward_%d' % (src_date.year, src_date.month, src_date.day, i)] = (
                 lambda self, date=src_date, correct=tgt_date, forward=i: self._test_next_business_day(current=date, forward=forward, next=correct)
                 )
+
+    def _test_count_business_days(self, start, end, answer):
+        self.assertEqual(FederalHoliday.count_business_days(start, end), answer)
+        self.assertEqual(FederalHoliday.count_business_days(end, start), answer)
+
+    for i, (date1, date2, answer) in enumerate((
+            (Date(2016,  7,  3), Date(2016,  7,  3), 0),
+            (Date(2016,  7,  3), Date(2016,  7,  4), 0),
+            (Date(2016,  7,  3), Date(2016,  7,  5), 1),
+            (Date(2016,  7,  3), Date(2016,  7,  6), 2),
+            (Date(2016,  7,  3), Date(2016,  7,  7), 3),
+            (Date(2016,  7,  3), Date(2016,  7,  8), 4),
+            (Date(2016,  7,  3), Date(2016,  7,  9), 4),
+            (Date(2016,  7,  3), Date(2016,  7, 10), 4),
+            (Date(2016,  7,  3), Date(2016,  7, 11), 5),
+            (Date(2016,  7,  3), Date(2016,  7, 12), 6),
+            (Date(2016,  7,  3), Date(2016,  7, 13), 7),
+            (Date(2016,  7,  3), Date(2016,  7, 14), 8),
+            (Date(2016,  9, 29), Date(2016,  9, 29), 0),
+            (Date(2016,  9, 29), Date(2016,  9, 30), 1),
+            (Date(2016,  9, 29), Date(2016, 10,  1), 1),
+            (Date(2016,  9, 29), Date(2016, 10,  2), 1),
+            (Date(2016,  9, 29), Date(2016, 10,  3), 2),
+            (Date(2016,  9, 29), Date(2016, 10,  4), 3),
+            (Date(2016,  9, 29), Date(2016, 10,  5), 4),
+            (Date(2016,  9, 29), Date(2016, 10,  6), 5),
+            (Date(2016,  9, 29), Date(2016, 10,  7), 6),
+            ), start=1):
+        ns['test_count_business_days_%s' % i] = lambda self, d1=date1, d2=date2, a=answer: self._test_count_business_days(d1, d2, a)
+
 
 class TestACH(TestCase):
 
@@ -583,26 +643,23 @@ class TestACH(TestCase):
         self.store = Table(self.tmpfile, 'filedate D; filemod C(1)', dbf_type='db3')
         self.ACHStore = ACHStore(self.tmpfile)
         self.today = Date.today()
-        self.file_id = '1900918292'
-        self.company_name = 'TRULITE WSG LLC'
-        self.company_id = self.file_id
-    
+
     def tearDown(self):
         os.remove(self.tmpfile)
 
     def test_too_many_files(self):
         with self.store:
             self.store.append((self.today, 'Z'))
-        self.assertRaises(ValueError, self.ACHStore.get_achfile, self.company_name, self.company_id, self.file_id)
+        self.assertRaises(ValueError, ACHFile, MockOE(), self.ACHStore)
 
     def test_empty_file(self):
-        filen = self.ACHStore.get_achfile(self.company_name, self.company_id, self.file_id)
+        filen = ACHFile(MockOE(), self.ACHStore)
         with self.store:
             self.assertEqual(self.store[-1], (self.today, 'A'))
 
     def test_all_filenames(self):
-        for letter in xrange(start='A', count=26, step=lambda ltr: chr(ord(ltr)+1)):
-            filename = self.ACHStore.get_achfile(self.company_name, self.company_id, self.file_id).filename
+        for letter in xrange(start='A', count=26, step=lambda s, i, ltr: chr(ord(ltr)+1)):
+            filename = ACHFile(MockOE(), self.ACHStore).filename
             self.assertEqual(filename, 'ACH_%s_%s' % (self.today.ymd(), letter))
             with self.store:
                 self.assertEqual(self.store[-1], (self.today, letter))
@@ -639,20 +696,21 @@ class TestACH(TestCase):
             )
     def test_single_vendor_single_payment(self):
         target = [
-                '101 0910000191900918292YYYYYYTTTTA094101WELLS FARGO            TRULITE WSG LLC                ',
-                '5200TRULITE WSG LLC                     1900918292CCDINVOICES  yyyyyyYYYYYY   1091000010000001',
-				'6220710000398172904027       0000000100123456         GLASS SOURCE            0091000010000001',
-				'820000000100071000030000000000000000000001001900918292                         091000010000001',
-				'9000001000001000000010007100003000000000000000000000100                                       ',
+                '101 1928374659753102468YYYYYYTTTTA094101COOLER BANK            REALLY AWESOME COMPANY         ',
+                '5200RAC CO INC LLC                      8642013579CCDINVOICES  yyyyyyYYYYYY   1864213570000001',
+                '6220710000398172904027       0000000100123456         GLASS SOURCE            0864213570000001',
+                '820000000100071000030000000000000000000001008642013579                         864213570000001',
+                '9000001000001000000010007100003000000000000000000000100                                       ',
                 ]
 
-        ach_file = self.ACHStore.get_achfile(self.company_name, self.company_id, self.file_id)
+        ach_file = ACHFile(MockOE(), self.ACHStore)
         today = ach_file.today
         time = ach_file.time
-        next_business_day = FederalHoliday.next_business_day(today, 2)
+        #next_business_day = FederalHoliday.next_business_day(today, 2)
+        payment_date = FederalHoliday.next_business_day(today, 3)
         target[0] = target[0].replace('YYYYYY', today.strftime('%y%m%d')).replace('TTTT', time.strftime('%H%M'))
-        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
-        payment = ACHPayment(*self.vendors[0])
+        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date.strftime('%y%m%d'))
+        payment = ACHPayment(*self.vendors[0] + (payment_date,))
         ach_file.add_payment(payment)
         ach_file.save_at('.')
         with open('.'/ach_file.filename) as file:
@@ -663,22 +721,22 @@ class TestACH(TestCase):
 
     def test_single_vendor_multi_payment(self):
         target = [
-                '101 0910000191900918292YYYYYYTTTTA094101WELLS FARGO            TRULITE WSG LLC                ',
-                '5200TRULITE WSG LLC                     1900918292CCDINVOICES  yyyyyyYYYYYY   1091000010000001',
-				'6220710000398172904027       0000000100123456         GLASS SOURCE            0091000010000001',
-				'6220710000398172904027       0000037118246855         GLASS SOURCE            0091000010000002',
-				'820000000200142000060000000000000000000372181900918292                         091000010000001',
-				'9000001000001000000020014200006000000000000000000037218                                       ',
+                '101 1928374659753102468YYYYYYTTTTA094101COOLER BANK            REALLY AWESOME COMPANY         ',
+                '5200RAC CO INC LLC                      8642013579CCDINVOICES  yyyyyyYYYYYY   1864213570000001',
+                '6220710000398172904027       0000000100123456         GLASS SOURCE            0864213570000001',
+                '6220710000398172904027       0000037118246855         GLASS SOURCE            0864213570000002',
+                '820000000200142000060000000000000000000372188642013579                         864213570000001',
+                '9000001000001000000020014200006000000000000000000037218                                       ',
                 ]
 
-        ach_file = self.ACHStore.get_achfile(self.company_name, self.company_id, self.file_id)
+        ach_file = ACHFile(MockOE(), self.ACHStore)
         today = ach_file.today
         time = ach_file.time
-        next_business_day = FederalHoliday.next_business_day(today, 2)
+        payment_date = FederalHoliday.next_business_day(today, 3)
         target[0] = target[0].replace('YYYYYY', today.strftime('%y%m%d')).replace('TTTT', time.strftime('%H%M'))
-        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
-        ach_file.add_payment(ACHPayment(*self.vendors[0]))
-        ach_file.add_payment(ACHPayment(*self.vendors[1]))
+        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date.strftime('%y%m%d'))
+        ach_file.add_payment(ACHPayment(*self.vendors[0] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[1] + (payment_date,)))
         ach_file.save_at('.')
         with open('.'/ach_file.filename) as file:
             contents = file.read()
@@ -688,24 +746,24 @@ class TestACH(TestCase):
 
     def test_multi_vendor_multi_payment(self):
         target = [
-                '101 0910000191900918292YYYYYYTTTTA094101WELLS FARGO            TRULITE WSG LLC                ',
-                '5200TRULITE WSG LLC                     1900918292CCDINVOICES  yyyyyyYYYYYY   1091000010000001',
-				'6220710000398172904027       0000000100123456         GLASS SOURCE            0091000010000001',
-				'6220710000398172904027       0000037118246855         GLASS SOURCE            0091000010000002',
-				'62207100001324584196         0000000299987654         SUPER SILICA SANDS      0091000010000003',
-				'820000000300213000070000000000000000000375171900918292                         091000010000001',
-				'9000001000001000000030021300007000000000000000000037517                                       ',
+                '101 1928374659753102468YYYYYYTTTTA094101COOLER BANK            REALLY AWESOME COMPANY         ',
+                '5200RAC CO INC LLC                      8642013579CCDINVOICES  yyyyyyYYYYYY   1864213570000001',
+                '6220710000398172904027       0000000100123456         GLASS SOURCE            0864213570000001',
+                '6220710000398172904027       0000037118246855         GLASS SOURCE            0864213570000002',
+                '62207100001324584196         0000000299987654         SUPER SILICA SANDS      0864213570000003',
+                '820000000300213000070000000000000000000375178642013579                         864213570000001',
+                '9000001000001000000030021300007000000000000000000037517                                       ',
                 ]
 
-        ach_file = self.ACHStore.get_achfile(self.company_name, self.company_id, self.file_id)
+        ach_file = ACHFile(MockOE(), self.ACHStore)
         today = ach_file.today
         time = ach_file.time
-        next_business_day = FederalHoliday.next_business_day(today, 2)
+        payment_date = FederalHoliday.next_business_day(today, 3)
         target[0] = target[0].replace('YYYYYY', today.strftime('%y%m%d')).replace('TTTT', time.strftime('%H%M'))
-        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
-        ach_file.add_payment(ACHPayment(*self.vendors[0]))
-        ach_file.add_payment(ACHPayment(*self.vendors[1]))
-        ach_file.add_payment(ACHPayment(*self.vendors[2]))
+        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date.strftime('%y%m%d'))
+        ach_file.add_payment(ACHPayment(*self.vendors[0] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[1] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[2] + (payment_date,)))
         ach_file.save_at('.')
         with open('.'/ach_file.filename) as file:
             contents = file.read()
@@ -715,29 +773,29 @@ class TestACH(TestCase):
 
     def test_multi_batch(self):
         target = [
-                '101 0910000191900918292YYYYYYTTTTA094101WELLS FARGO            TRULITE WSG LLC                ',
-                '5200TRULITE WSG LLC                     1900918292CCDINVOICES  yyyyyyYYYYYY   1091000010000001',
-				'6220710000398172904027       0000000100123456         GLASS SOURCE            0091000010000001',
-				'6220710000398172904027       0000037118246855         GLASS SOURCE            0091000010000002',
-				'62207100001324584196         0000000299987654         SUPER SILICA SANDS      0091000010000003',
-				'820000000300213000070000000000000000000375171900918292                         091000010000001',
-                '5200TRULITE WSG LLC                     1900918292CCDSUPPLIES  yyyyyyYYYYYY   1091000010000002',
-				'622043000096426159872245841960000000795192837         WAX ON WAX OFF          0091000010000001',
-				'820000000100043000090000000000000000000007951900918292                         091000010000002',
-				'9000002000001000000040025600016000000000000000000038312                                       ',
+                '101 1928374659753102468YYYYYYTTTTA094101COOLER BANK            REALLY AWESOME COMPANY         ',
+                '5200RAC CO INC LLC                      8642013579CCDINVOICES  yyyyyyYYYYYY   1864213570000001',
+                '6220710000398172904027       0000000100123456         GLASS SOURCE            0864213570000001',
+                '6220710000398172904027       0000037118246855         GLASS SOURCE            0864213570000002',
+                '62207100001324584196         0000000299987654         SUPER SILICA SANDS      0864213570000003',
+                '820000000300213000070000000000000000000375178642013579                         864213570000001',
+                '5200RAC CO INC LLC                      8642013579CCDSUPPLIES  yyyyyyYYYYYY   1864213570000002',
+                '622043000096426159872245841960000000795192837         WAX ON WAX OFF          0864213570000001',
+                '820000000100043000090000000000000000000007958642013579                         864213570000002',
+                '9000002000001000000040025600016000000000000000000038312                                       ',
                 ]
 
-        ach_file = self.ACHStore.get_achfile(self.company_name, self.company_id, self.file_id)
+        ach_file = ACHFile(MockOE(), self.ACHStore)
         today = ach_file.today
         time = ach_file.time
-        next_business_day = FederalHoliday.next_business_day(today, 2)
+        payment_date = FederalHoliday.next_business_day(today, 3)
         target[0] = target[0].replace('YYYYYY', today.strftime('%y%m%d')).replace('TTTT', time.strftime('%H%M'))
-        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
-        target[6] = target[6].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
-        ach_file.add_payment(ACHPayment(*self.vendors[0]))
-        ach_file.add_payment(ACHPayment(*self.vendors[1]))
-        ach_file.add_payment(ACHPayment(*self.vendors[2]))
-        ach_file.add_payment(ACHPayment(*self.vendors[3]))
+        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date.strftime('%y%m%d'))
+        target[6] = target[6].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date.strftime('%y%m%d'))
+        ach_file.add_payment(ACHPayment(*self.vendors[0] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[1] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[2] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[3] + (payment_date,)))
         ach_file.save_at('.')
         with open('.'/ach_file.filename) as file:
             contents = file.read()
@@ -747,32 +805,101 @@ class TestACH(TestCase):
 
     def test_multi_batch2(self):
         target = [
-                '101 0910000191900918292YYYYYYTTTTA094101WELLS FARGO            TRULITE WSG LLC                ',
-                '5200TRULITE WSG LLC                     1900918292CCDINVOICES  yyyyyyYYYYYY   1091000010000001',
-				'6220710000398172904027       0000000100123456         GLASS SOURCE            0091000010000001',
-				'6220710000398172904027       0000037118246855         GLASS SOURCE            0091000010000002',
-				'62207100001324584196         0000000299987654         SUPER SILICA SANDS      0091000010000003',
-				'820000000300213000070000000000000000000375171900918292                         091000010000001',
-                '5200TRULITE WSG LLC                     1900918292CCDSUPPLIES  yyyyyyYYYYYY   1091000010000002',
-				'622043000096426159872245841960000000795192837         WAX ON WAX OFF          0091000010000001',
-				'6221250001059154876          0000000025579135         ACME GLASS AND COFFEE   0091000010000002',
-				'820000000200168000190000000000000000000008201900918292                         091000010000002',
-				'9000002000002000000050038100026000000000000000000038337                                       ',
+                '101 1928374659753102468YYYYYYTTTTA094101COOLER BANK            REALLY AWESOME COMPANY         ',
+                '5200RAC CO INC LLC                      8642013579CCDINVOICES  yyyyyyYYYYYY   1864213570000001',
+                '6220710000398172904027       0000000100123456         GLASS SOURCE            0864213570000001',
+                '6220710000398172904027       0000037118246855         GLASS SOURCE            0864213570000002',
+                '62207100001324584196         0000000299987654         SUPER SILICA SANDS      0864213570000003',
+                '820000000300213000070000000000000000000375178642013579                         864213570000001',
+                '5200RAC CO INC LLC                      8642013579CCDSUPPLIES  yyyyyyYYYYYY   1864213570000002',
+                '622043000096426159872245841960000000795192837         WAX ON WAX OFF          0864213570000001',
+                '6221250001059154876          0000000025579135         ACME GLASS AND COFFEE   0864213570000002',
+                '820000000200168000190000000000000000000008208642013579                         864213570000002',
+                '9000002000002000000050038100026000000000000000000038337                                       ',
                 ]
 
 
-        ach_file = self.ACHStore.get_achfile(self.company_name, self.company_id, self.file_id)
+        ach_file = ACHFile(MockOE(), self.ACHStore)
         today = ach_file.today
         time = ach_file.time
-        next_business_day = FederalHoliday.next_business_day(today, 2)
+        payment_date = FederalHoliday.next_business_day(today, 3)
         target[0] = target[0].replace('YYYYYY', today.strftime('%y%m%d')).replace('TTTT', time.strftime('%H%M'))
-        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
-        target[6] = target[6].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', next_business_day.strftime('%y%m%d'))
-        ach_file.add_payment(ACHPayment(*self.vendors[0]))
-        ach_file.add_payment(ACHPayment(*self.vendors[1]))
-        ach_file.add_payment(ACHPayment(*self.vendors[2]))
-        ach_file.add_payment(ACHPayment(*self.vendors[3]))
-        ach_file.add_payment(ACHPayment(*self.vendors[4]))
+        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date.strftime('%y%m%d'))
+        target[6] = target[6].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date.strftime('%y%m%d'))
+        ach_file.add_payment(ACHPayment(*self.vendors[0] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[1] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[2] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[3] + (payment_date,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[4] + (payment_date,)))
+        ach_file.save_at('.')
+        with open('.'/ach_file.filename) as file:
+            contents = file.read()
+        lines = contents.split('\n')
+        for should_be, found in zip(target, lines):
+            self.assertEqual(should_be, found)
+
+    def test_multi_batch_by_date(self):
+        target = [
+                '101 1928374659753102468YYYYYYTTTTA094101COOLER BANK            REALLY AWESOME COMPANY         ',
+                '5200RAC CO INC LLC                      8642013579CCDINVOICES  yyyyyyYYYYYY   1864213570000001',
+                '6220710000398172904027       0000000100123456         GLASS SOURCE            0864213570000001',
+                '6220710000398172904027       0000037118246855         GLASS SOURCE            0864213570000002',
+                '62207100001324584196         0000000299987654         SUPER SILICA SANDS      0864213570000003',
+                '820000000300213000070000000000000000000375178642013579                         864213570000001',
+                '5200RAC CO INC LLC                      8642013579CCDINVOICES  yyyyyyYYYYYY   1864213570000002',
+                '622043000096426159872245841960000000795192837         WAX ON WAX OFF          0864213570000001',
+                '820000000100043000090000000000000000000007958642013579                         864213570000002',
+                '9000002000001000000040025600016000000000000000000038312                                       ',
+                ]
+
+        ach_file = ACHFile(MockOE(), self.ACHStore)
+        today = ach_file.today
+        time = ach_file.time
+        payment_date1 = FederalHoliday.next_business_day(today, 3)
+        payment_date2 = FederalHoliday.next_business_day(payment_date1, 2)
+        target[0] = target[0].replace('YYYYYY', today.strftime('%y%m%d')).replace('TTTT', time.strftime('%H%M'))
+        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date1.strftime('%y%m%d'))
+        target[6] = target[6].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date2.strftime('%y%m%d'))
+        ach_file.add_payment(ACHPayment(*self.vendors[0] + (payment_date1,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[1] + (payment_date1,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[2] + (payment_date1,)))
+        ach_file.add_payment(ACHPayment(*('invoices',) + self.vendors[3][1:] + (payment_date2,)))
+        ach_file.save_at('.')
+        with open('.'/ach_file.filename) as file:
+            contents = file.read()
+        lines = contents.split('\n')
+        for should_be, found in zip(target, lines):
+            self.assertEqual(should_be, found)
+
+    def test_multi_batch2_by_date(self):
+        target = [
+                '101 1928374659753102468YYYYYYTTTTA094101COOLER BANK            REALLY AWESOME COMPANY         ',
+                '5200RAC CO INC LLC                      8642013579CCDINVOICES  yyyyyyYYYYYY   1864213570000001',
+                '6220710000398172904027       0000000100123456         GLASS SOURCE            0864213570000001',
+                '6220710000398172904027       0000037118246855         GLASS SOURCE            0864213570000002',
+                '62207100001324584196         0000000299987654         SUPER SILICA SANDS      0864213570000003',
+                '820000000300213000070000000000000000000375178642013579                         864213570000001',
+                '5200RAC CO INC LLC                      8642013579CCDINVOICES  yyyyyyYYYYYY   1864213570000002',
+                '622043000096426159872245841960000000795192837         WAX ON WAX OFF          0864213570000001',
+                '6221250001059154876          0000000025579135         ACME GLASS AND COFFEE   0864213570000002',
+                '820000000200168000190000000000000000000008208642013579                         864213570000002',
+                '9000002000002000000050038100026000000000000000000038337                                       ',
+                ]
+
+
+        ach_file = ACHFile(MockOE(), self.ACHStore)
+        today = ach_file.today
+        time = ach_file.time
+        payment_date1 = FederalHoliday.next_business_day(today, 3)
+        payment_date2 = FederalHoliday.next_business_day(payment_date1, 2)
+        target[0] = target[0].replace('YYYYYY', today.strftime('%y%m%d')).replace('TTTT', time.strftime('%H%M'))
+        target[1] = target[1].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date1.strftime('%y%m%d'))
+        target[6] = target[6].replace('yyyyyy', today.strftime('%b %d').upper()).replace('YYYYYY', payment_date2.strftime('%y%m%d'))
+        ach_file.add_payment(ACHPayment(*self.vendors[0] + (payment_date1,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[1] + (payment_date1,)))
+        ach_file.add_payment(ACHPayment(*self.vendors[2] + (payment_date1,)))
+        ach_file.add_payment(ACHPayment(*('invoices',) + self.vendors[3][1:] + (payment_date2,)))
+        ach_file.add_payment(ACHPayment(*('invoices',) + self.vendors[4][1:] + (payment_date2,)))
         ach_file.save_at('.')
         with open('.'/ach_file.filename) as file:
             contents = file.read()
@@ -789,14 +916,177 @@ class Test_suppress(TestCase):
     def test_exact_exception(self):
         with suppress(TypeError):
             len(5)
+        with self.assertRaises(AttributeError):
+            with suppress(TypeError):
+                None.not_here
 
     def test_multiple_exception_args(self):
         with suppress(ZeroDivisionError, TypeError):
             len(5)
+        with suppress(ZeroDivisionError, TypeError):
+            5 / 0
+        with self.assertRaises(AttributeError):
+            with suppress(ZeroDivisionError, TypeError):
+                None.not_here
 
     def test_exception_hierarchy(self):
         with suppress(LookupError):
             'Hello'[50]
+
+class Test_xrange(TestCase):
+
+    def test_int_iter_forwards(self):
+        self.assertEqual(
+                list(range(10)),
+                list(xrange(10)))
+        self.assertEqual(
+                list(range(0, 10)),
+                list(xrange(0, 10)))
+        self.assertEqual(
+                list(range(0, 10, 1)),
+                list(xrange(0, 10, 1)))
+        self.assertEqual(
+                list(range(0, 10, 1)),
+                list(xrange(0, count=10)))
+        self.assertEqual(
+                list(range(0, 10, 1)),
+                list(xrange(10, step=lambda s, i, v: v+1)))
+        self.assertEqual(
+                list(range(0, 10, 1)),
+                list(xrange(0, 10, step=lambda s, i, v: v+1)))
+        self.assertEqual(
+                list(range(5, 15)),
+                list(xrange(5, count=10)))
+        self.assertEqual(
+                list(range(-10, 0)),
+                list(xrange(-10, 0)))
+        self.assertEqual(
+                list(range(-9, 1)),
+                list(xrange(-9, 1)))
+        self.assertEqual(
+                list(range(-20, 20, 1)),
+                list(xrange(-20, 20, 1)))
+        self.assertEqual(
+                list(range(-20, 20, 2)),
+                list(xrange(-20, 20, 2)))
+        self.assertEqual(
+                list(range(-20, 20, 3)),
+                list(xrange(-20, 20, 3)))
+        self.assertEqual(
+                list(range(-20, 20, 4)),
+                list(xrange(-20, 20, 4)))
+        self.assertEqual(
+                list(range(-20, 20, 5)),
+                list(xrange(-20, 20, 5)))
+
+    def test_int_iter_backwards(self):
+        self.assertEqual(
+                list(range(9, -1, -1)),
+                list(xrange(9, -1, -1)))
+        self.assertEqual(
+                list(range(9, -9, -1)),
+                list(xrange(9, -9, -1)))
+        self.assertEqual(
+                list(range(9, -9, -2)),
+                list(xrange(9, -9, -2)))
+        self.assertEqual(
+                list(range(9, -9, -3)),
+                list(xrange(9, -9, -3)))
+        self.assertEqual(
+                list(range(9, 0, -1)),
+                list(xrange(9, 0, -1)))
+        self.assertEqual(
+                list(range(9, -1, -1)),
+                list(xrange(9, step=-1, count=10)))
+
+    def test_int_containment(self):
+        robj = xrange(10)
+        for i in range(10):
+            self.assertTrue(i in robj)
+        self.assertFalse(-1 in robj)
+        self.assertFalse(10 in robj)
+        self.assertFalse(5.23 in robj)
+
+    def test_float_iter(self):
+        floats = [float(i) for i in range(100)]
+        self.assertEqual(
+                floats,
+                list(xrange(100.0)))
+        self.assertEqual(
+                floats,
+                list(xrange(0, 100.0)))
+        self.assertEqual(
+                floats,
+                list(xrange(0, 100.0, 1.0)))
+        self.assertEqual(
+                floats,
+                list(xrange(100.0, step=lambda s, i, v: v + 1.0)))
+        self.assertEqual(
+                floats,
+                list(xrange(100.0, step=lambda s, i, v: s + i * 1.0)))
+        self.assertEqual(
+                floats,
+                list(xrange(0.0, count=100)))
+        self.assertEqual(
+                [0.3, 0.6],
+                list(xrange(0.3, 0.9, 0.3)))
+        self.assertEqual(
+                [0.4, 0.8],
+                list(xrange(0.4, 1.2, 0.4)))
+
+    def test_float_iter_backwards(self):
+        floats = [float(i) for i in range(99, -1, -1)]
+        self.assertEqual(
+                floats,
+                list(xrange(99, -1, -1)))
+        self.assertEqual(
+                floats,
+                list(xrange(99, step=lambda s, i, v: v - 1.0, count=100)))
+        self.assertEqual(
+                [0.6, 0.3],
+                list(xrange(0.6, 0.0, -0.3)))
+        self.assertEqual(
+                [0.8, 0.4]
+                , list(xrange(0.8, 0.0, -0.4)))
+
+    def test_float_containment(self):
+        robj = xrange(100000000.0)
+        for i in [float(i) for i in range(10000)]:
+            self.assertTrue(i in robj)
+        self.assertFalse(0.000001 in robj)
+        self.assertFalse(100000000.0 in robj)
+        self.assertFalse(50.23 in robj)
+
+    def test_date_iter(self):
+        ONE_DAY = datetime.timedelta(1)
+        ONE_WEEK = datetime.timedelta(7)
+        robj = xrange(datetime.date(2014, 1, 1), step=ONE_DAY, count=31)
+        day1 = datetime.date(2014, 1, 1)
+        riter = iter(robj)
+        try:
+            datetime.timedelta(7) / datetime.timedelta(1)
+            containment = True
+        except TypeError:
+            containment = False
+        for i in range(31):
+            day = day1 + i * ONE_DAY
+            rday = next(riter)
+            self.assertEqual(day, rday)
+            if containment:
+                self.assertTrue(day in robj)
+            else:
+                self.assertRaises(TypeError, robj.__contains__, day)
+        self.assertRaises(StopIteration, next, riter)
+        if containment:
+            self.assertFalse(day + ONE_DAY in robj)
+        else:
+            self.assertRaises(TypeError, robj.__contains__, day + ONE_DAY)
+
+    def test_fraction_iter(self):
+        from fractions import Fraction as F
+        f = xrange(F(5, 10), count=3)
+        self.assertEqual([F(5, 10), F(15, 10), F(25, 10)], list(f))
+
 
 if __name__ == '__main__':
     Run()
