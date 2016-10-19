@@ -1,9 +1,11 @@
 #!/usr/local/bin/python
-import sys, getpass, shlex, subprocess, re, os
+import sys, getpass, shlex, subprocess, re, os, logging
 import bbxfile
 from bbxfile import BBxFile, getfilename, TableError, MissingTableError, UnknownTableError
 
 from VSS.path import Path
+
+_logger = logging.getLogger(__name__)
 
 execfile('/etc/openerp/fnx.fis.conf')
 
@@ -146,7 +148,12 @@ def fisData (table, keymatch=None, subset=None, filter=None):
     DATACACHE[key] = table, mtime
     return table
 
-tables = parse_FIS_Schema(SCHEMA)
+try:
+    tables = parse_FIS_Schema(SCHEMA)
+except IOError:
+    _logger.error('unable to parse FIS Schema, unable to access FIS data')
+    tables = []
+
 bbxfile.tables = tables
 
 #tables['NVTY1']['fields'][77]
