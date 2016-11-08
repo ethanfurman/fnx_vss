@@ -152,7 +152,13 @@ try:
     tables = parse_FIS_Schema(SCHEMA)
 except IOError:
     _logger.error('unable to parse FIS Schema, unable to access FIS data')
-    tables = []
+
+    class tables(object):
+        def __repr__(self):
+            return 'FIS schema unavailable; no access to FIS data'
+        def __getitem__(self, name):
+            raise Exception('FIS data has not been installed')
+    tables = tables()
 
 bbxfile.tables = tables
 
