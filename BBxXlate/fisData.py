@@ -74,7 +74,7 @@ def parse_FIS_Schema(source):
             if not rest:
                 last_letter = chr(ord(last_letter) + 1)
                 fieldmask, fieldvar = '', last_letter + 'n$'
-                if fielddesc.strip('()').lower() != 'open':
+                if fielddesc.strip('()').lower() == 'open':
                     fieldvar = 'Fld%02d' % int(fieldnum)
             else:
                 if '#' in rest[-1]:
