@@ -345,13 +345,19 @@ class BBxFile(object):
     def get_subset(self, ky):
         if not self.subset:
             raise ValueError('subset not defined')
-        match = self.subset % ky
+        if '%' in self.subset and ky:
+            match = self.subset % ky
+        elif '%' not in self.subset and not ky:
+            match = self.subset
+        else:
+            raise ValueError('ky is required when using %-interpolation')
+        print('using match of %r' % match)
         rv = []
         for key, rec in self.records.items():
             if not key.replace('\xff', ''):
                 # skipping weird record
                 continue
-            if key.startswith(match):
+            if key.startswith(match) or re.match(match, key):
                 rv.append((key, rec))
         return rv
 
