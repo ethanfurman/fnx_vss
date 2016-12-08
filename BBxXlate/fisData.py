@@ -127,6 +127,8 @@ def fisData (table, keymatch=None, subset=None, filter=None):
     if table_id is None:
         table_id = tables[table]['name']
     tablename = tables[table_id]['name']
+    if tablename.startswith('CNVZ'):
+        tablename = tablename[:4]
     key = table_id, keymatch, subset, filter
     datafile = getfilename(DATA/CID+tablename)
     mtime = os.stat(datafile).st_mtime
