@@ -7,6 +7,7 @@ from VSS.path import Path
 from VSS.utils import LazyAttr as lazy
 import logging
 import os
+import re
 import string
 import subprocess
 
