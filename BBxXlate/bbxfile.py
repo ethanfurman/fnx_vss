@@ -132,7 +132,11 @@ class BBxRec(object):
                 varidx = self.datamap.index(var)
             except ValueError:
                 raise ValueError('%s is not a valid field' % var)
-            val = self.rec[varidx]
+            # intention: ignore missing trailing fields
+            try:
+                val = self.rec[varidx]
+            except IndexError:
+                continue
             if sub:
                 sub = sub[:-1]
                 first,last = [ int(x) for x in sub.split(",") ]
@@ -144,7 +148,8 @@ class BBxRec(object):
                 _logger.error('<%s::%s> unable to convert %r to %s, data lost' % (self.filename, r+m, val, cls.__name__))
                 result.append(cls())
         if single:
-            return result[0]
+            # again, gloss over missing fields
+            return result and result[0] or ''
         return result
 
     def __setitem__(self, ref, newval):
@@ -263,7 +268,6 @@ class BBxFile(object):
             try:
                 if (
                     len(ky) != fieldlengths[0] or
-                    len(rec) < len(fieldlengths) or
                     any(len(field) != length for field, length, name in
                         zip(rec, fieldlengths, datamap) if name in fixedLengthFields
                         ) or
