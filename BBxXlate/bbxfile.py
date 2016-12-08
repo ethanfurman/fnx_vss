@@ -33,12 +33,14 @@ def asc(strval):                    ##USED in bbxfile
     else:
         return 256L*(asc(strval[:-1]))+ord(strval[-1])
 
+# injected from fisData
+tables = None
 
 def applyfieldmap(record, fieldmap):
     if fieldmap == None:
         return record
     elif type(fieldmap) != type({}):
-        raise FieldMapTypeError("FieldMap must be a dictionary of fieldindex[.startpos.endpos]:fieldname")
+        raise TableError("fieldmap must be a dictionary of fieldindex[.startpos.endpos]:fieldname")
     retval = {}
     fieldmapkeys = fieldmap.keys()
     fieldmapkeys.sort()
@@ -128,7 +130,7 @@ class BBxRec(object):
                 var, sub = (r+"(").split("(")[:2]
             try:
                 varidx = self.datamap.index(var)
-            except ValueError, err:
+            except ValueError:
                 raise ValueError('%s is not a valid field' % var)
             val = self.rec[varidx]
             if sub:
@@ -154,7 +156,7 @@ class BBxRec(object):
             var, sub = (ref+"(").split("(")[:2]
         try:
             varidx = self.datamap.index(var)
-        except ValueError, err:
+        except ValueError:
             raise ValueError('%s is not a valid field' % var)
         val = self.rec[varidx]
         if sub:
@@ -271,19 +273,15 @@ class BBxFile(object):
             except:
                 raise UnknownTableError
             rec = BBxRec(rec, datamap, fieldlist, record_filename)
-            kept = False
             if filter:
                 if filter(rec):
                     records[ky] = rec
-                    kept = True
             elif leader is trailer is None and keymatch is not None:
                 if keymatch == ky:
                     records[ky] = rec
-                    kept = True
             elif leader is None or ky.startswith(leader):
                 if trailer is None or ky.endswith(trailer):
                     records[ky] = rec
-                    kept = True
         self.records = records
         self.datamap = datamap
         self.fieldlist = fieldlist
@@ -438,7 +436,7 @@ Notes:  The entire file is read into memory.
     keychainkeycount = 0
     keychainkeys = {}
     if filetype == 6:           # MKEYED
-        blockingfactor = ord(data[116])
+        ord(data[116])
         for fblock in range(0,len(data),blocksize):         # sniff out a key block...
             if data[fblock] != '\0' \
               and data[fblock+1] == '\0' \
