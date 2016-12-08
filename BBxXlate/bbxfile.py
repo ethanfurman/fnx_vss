@@ -264,7 +264,7 @@ class BBxFile(object):
             if last_ps != -1:
                 trailer = keymatch[last_ps+2:]     # skip the %s ;)
         fieldlengths = BBVarLength(datamap, fieldlist)
-        fixedLengthFields = set([fld for fld in fieldlist if '$' in fld and field[-1] != '$'])
+        fixedLengthFields = set([fld[1] for fld in fieldlist if '$' in fld[3] and fld[3][-1] != '$'])
         for ky, rec in getfile(srcefile).items():
             try:
                 if (
