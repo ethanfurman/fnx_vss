@@ -1,11 +1,12 @@
 #!/usr/local/bin/python
-import sys, getpass, shlex, subprocess, re, os, logging
+import os, logging
 import bbxfile
-from bbxfile import BBxFile, getfilename, TableError, MissingTableError, UnknownTableError
-
-from VSS.path import Path
+from bbxfile import BBxFile, getfilename
 
 _logger = logging.getLogger(__name__)
+
+# set later via execfile
+CID = DATA = NUMERICAL_FIELDS_AS_TEXT = PROBLEM_TABLES = SCHEMA = None
 
 execfile('/etc/openerp/fnx.fis.conf')
 
