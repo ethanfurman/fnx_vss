@@ -2,11 +2,12 @@
 import os, logging
 import bbxfile
 from bbxfile import BBxFile, getfilename
-
+from VSS.path import Path
 _logger = logging.getLogger(__name__)
 
 # set later via execfile
-CID = DATA = NUMERICAL_FIELDS_AS_TEXT = PROBLEM_TABLES = SCHEMA = None
+CID = NUMERICAL_FIELDS_AS_TEXT = PROBLEM_TABLES = None
+DATA = SCHEMA = Path()
 
 execfile('/etc/openerp/fnx.fis.conf')
 
