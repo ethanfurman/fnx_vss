@@ -77,7 +77,8 @@ def parse_FIS_Schema(source):
                 last_letter = chr(ord(last_letter) + 1)
                 fieldmask, fieldvar = '', last_letter + 'n$'
                 if fielddesc.strip('()').lower() == 'open':
-                    fieldvar = 'Fld%02d' % int(fieldnum)
+                    # ignore line -- this fixes offset issues in 74, not sure about 5, 44, nor 147
+                    continue
             else:
                 if '#' in rest[-1]:
                     fieldmask = rest.pop()
