@@ -16,7 +16,7 @@ def _get_row_col(self, row_col):
     if isinstance(row_col, (int, long)):
         return self.row(row_col)
     else:
-        row, col = row_col, only_col
+        row, col = row_col
         return self.cell(row, col)
 xlrd.sheet.Sheet.__getitem__ = _get_row_col
 del _get_row_col

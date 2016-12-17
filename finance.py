@@ -1,17 +1,15 @@
 from __future__ import with_statement
 
 from itertools import groupby
-from VSS.path import Path
+from antipathy import Path
+from enum import Enum, IntEnum
 from VSS.time_machine import PropertyDict
-from VSS.utils import translator, one_day, xrange, AutoEnum, IntEnum, Month, Weekday, Table, Date, Time, days_per_month
+from VSS.utils import translator, one_day, xrange, Table, Date, Time, days_per_month
+from VSS.constants import *
 
 # ACHStore keeps track of which ACH files have been transmitted, and the name of the next ACH file
 # ACHPayment stores one payment from TRU to a vendor
 # ACHFile takes the payments and makes a WFB achfile for transmission
-
-module = globals()
-Month.export_to(module)
-Weekday.export_to(module)
 
 class ACHError(Exception):
     "generic ACH error"
@@ -105,7 +103,6 @@ class ACHFile(object):
         ref_date = self.today.strftime('%b %d').upper()
         lines = self.lines
         batches = 0
-        total_blocks = 0
         total_entries = 0
         total_hash = 0
         total_debit = 0

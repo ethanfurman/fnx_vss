@@ -1,9 +1,7 @@
 import os
 import md5
 
-import BBxCmds
-import BBxFuncs
-from fxFNs import hexdump, dec, hta
+from fxFNs import dec, hta
 
 problemPgms = []
 dupPgms = {}

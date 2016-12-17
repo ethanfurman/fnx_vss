@@ -2,7 +2,7 @@
 import os, logging
 import bbxfile
 from bbxfile import BBxFile, getfilename
-from VSS.path import Path
+from antipathy import Path
 _logger = logging.getLogger(__name__)
 
 # set later via execfile

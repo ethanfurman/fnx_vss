@@ -2,9 +2,8 @@ from __future__ import with_statement
 
 from itertools import groupby
 from VSS.address import any_digits
-from VSS.BBxXlate.bbxfile import BBxFile
-from VSS.utils import currency, one_day, text_to_date
-from VSS import AutoEnum
+from VSS.utils import currency, text_to_date
+from VSS.constants import AutoEnum
 
 GL_ACCT_REC = '1100-00'
 GL_CASH = '1000-15'
@@ -254,7 +253,7 @@ class Batch(object):
             return False
         if isinstance(inv, ARInvoice):
             inv = inv.actual_inv_num
-        return inv in [inv.actual_inv_num for inv in self.transactions]
+        return inv in [invoice.actual_inv_num for invoice in self.transactions]
 
     def __repr__(self):
         return "Batch:  check %r for %r on %r, %d transactions" % (self.ck_nbr, self.ck_amt, self.ck_date, len(self.transactions))
@@ -340,7 +339,7 @@ class Batch(object):
                     'transcription error',
                     GL_DISCOUNTS
                     )
-            self.add_invoice(invoice, adjustment, excellent)
+            self.add_invoice(invoice, adjustment, Status.excellent)
         elif adjustment < 0:
             self._distribute_discount(adjustment)
         if not self.is_balanced:
@@ -348,7 +347,7 @@ class Batch(object):
 
     @property
     def is_balanced(self):
-        return self.balance == 0 
+        return self.balance == 0
 
     @property
     def total_discount(self):
@@ -445,7 +444,7 @@ class CashReceipt(object):
             discount = currency(self.discount)
             apply = currency(self.apply)
             date = self.date.strftime('%m-%d-%y')
-            return '%6s %s %9s %10s' % (self.number, self.date, discount, apply)
+            return '%6s %s %9s %10s' % (self.number, date, discount, apply)
 
     class Check(object):
         def __init__(self, number, date, amount, s, batch_date):

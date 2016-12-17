@@ -1,4 +1,5 @@
-from VSS.utils import translator, AutoEnum, tuples
+from VSS.constants import AutoEnum
+from VSS.utils import translator, tuples, Memory
 import re
 
 spelled_out_numbers = set(['ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN'])
@@ -23,6 +24,10 @@ has_lower = translator(keep="abcdefghijklmnopqrstuvwxyz")
 has_upper = translator(keep="ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 has_alpha = translator(keep="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
+prefixi = [
+    'MR', 'MRS', 'MS', 'DR', 'REV', 'MISTER', 'MISSES', 'MISS', 'DOCTOR', 'REVEREND',
+    'BROTHER', 'SISTER', 'BR', 'SR',
+    ]
 
 mixed_case_names = {
     'aj'        : 'AJ',
@@ -723,7 +728,7 @@ usps_street_suffix_common = {
     'CRT'        :  'COURT',
     'CT'         :  'COURT',
     'COURTS'     :  'COURTS',
-    'CT'         :  'COURTS',
+    'CTS'        :  'COURTS',
     'COVE'       :  'COVE',
     'CV'         :  'COVE',
     'COVES'      :  'COVES',
@@ -1601,7 +1606,6 @@ def normalize_address_line(line):
     if not line.strip():
         return line, ''
     lines = []
-    orig_line = line
     line = ' '.join(line.replace(',',' ').replace('.',' ').replace('-',' ').strip().upper().split())
     if 'POBOX' in pobox(line):
         x = line.index('X')

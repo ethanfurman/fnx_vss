@@ -3,7 +3,7 @@ Bbx File utilities.
 """
 
 from stat import ST_MTIME
-from VSS.path import Path
+from antipathy import Path
 from VSS.utils import LazyAttr as lazy
 import logging
 import os

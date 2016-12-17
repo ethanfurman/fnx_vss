@@ -1,19 +1,13 @@
 from __future__ import with_statement
+from collections import OrderedDict
 from copy import deepcopy
-from datetime import timedelta
-from itertools import groupby
-from VSS import Table, Month, Weekday, days_per_month, AutoEnum, IntEnum
-from VSS.BBxXlate.bbxfile import BBxFile
-from VSS.path import Path
-from VSS.utils import currency, one_day, bb_text_to_date, text_to_date, text_to_time, xrange, Date, DateTime, Time
-from VSS.finance import ACHPayment, ACHStore, ACH_ETC, ACHError, Customer
-from VSS.time_machine import OrderedDict, PropertyDict
+from VSS.utils import currency, bb_text_to_date, text_to_date, text_to_time
+from dbf import DateTime, Time
 try:
     next
 except NameError:
     from .dbf import next, property
 
-one_day = timedelta(1)
 
 def Int(text):
     '''return `text` converted into pennies ($ is allowed)'''
@@ -160,7 +154,7 @@ class OutboundReportTrailer(object):
 
 class OutboundReportIterator(object):
     def __init__(self, filename):
-        self._data = [l.strip() for l in open(filename).readlines()]
+        self._data = data = [l.strip() for l in open(filename).readlines()]
         self.header = OutboundReportHeader(data[0])
         self.trailer = OutboundReportTrailer(data[-1])
         self._data = data[1:-1]
@@ -177,7 +171,7 @@ class OutboundReportIterator(object):
         self._pointer += 1
         return OutboundReportDetail(self._data[current])
     next = __next__
-    def reset():
+    def reset(self):
         self._pointer = 0
 
 
@@ -227,7 +221,6 @@ class IFTRecord(tuple):
         return tuple.__new__(cls, tuple(args))
     def __getattr__(self, name):
         search_name = name.lower()
-        rec_type = self[0]
         try:
             index = self.fields.index(search_name)
         except IndexError:
@@ -308,7 +301,7 @@ class RMFFRecord(tuple):
                 try:
                     args[index] = func(args[index])
                 except IndexError:
-                    args.append(None) 
+                    args.append(None)
         return tuple.__new__(cls, tuple(args))
     def __getattr__(self, name):
         search_name = name.lower()
@@ -537,7 +530,7 @@ class RMFlatFileIterator(object):
         self._pointer += 1
         return RMFFRecord(self._data[current])
     next = __next__
-    def reset():
+    def reset(self):
         self._pointer = 0
 
 class RmPayment(object):
@@ -716,7 +709,7 @@ class RMBatch(object):
 
 class RMFlatFile(object):
     "create an object that represents the RM files downloaded from WFB"
-    
+
     def __init__(self, filename):
         """Return payments from filename"""
 
@@ -768,7 +761,7 @@ class RMFlatFile(object):
     @property
     def batches(self):
         return deepcopy(self._batches)
-    
+
     @property
     def effective_date(self):
         if self.file_creation_time > Time(5, 00):

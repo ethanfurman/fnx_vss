@@ -4,8 +4,9 @@ from __future__ import division, print_function, with_statement
 
 import openerplib
 from VSS.time_machine import PropertyDict
-from VSS.path import Path
 
+# constants that will be replaced by VSS.conf
+FILE_PATHS = None
 execfile('/etc/openerp/VSS.conf')
 
 # format of employee dbf file
@@ -202,7 +203,7 @@ class OpenERPcsv(object):
                     encap = False
                 elif ch == '"':
                     raise ValueError(
-                            'invalid char following ": <%s> (should be comma or double-quote)\n%r\n%s^' 
+                            'invalid char following ": <%s> (should be comma or double-quote)\n%r\n%s^'
                             % (ch, line, ' ' * i)
                             )
                 else:

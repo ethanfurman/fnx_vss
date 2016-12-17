@@ -132,8 +132,8 @@ if __name__ == '__main__':
 
     #funcs = dir()
     #test = 1
-    #hexstring = "3132334142436162635a7a"
-    #ascstring = "123ABCabcZz"
+    hexstring = "3132334142436162635a7a"
+    ascstring = "123ABCabcZz"
     #
     #for func in funcs:
     #       if func[0] <> '_':

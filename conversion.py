@@ -38,19 +38,18 @@ creates the scripts that will create the py, xml, and final csv files -- this
 allows for human interaction before that final step to change names of fields,
 etc., if necessary."""
 
-import os, sys, shlex, shutil, stat, subprocess, re, dbf, csv
+import os, shlex, stat, subprocess, re, dbf
 from collections import defaultdict
 from datetime import date, datetime, time
-from VSS.path import Path
+from antipathy import Path
 from string import uppercase, lowercase, digits
-from VSS import Table
+from VSS.utils import Table, translator
 from VSS.openerp import OpenERPcsv, EmbeddedNewlineError
 from VSS.time_machine import BiDict, PropertyDict
-from VSS.utils import LazyAttr, Missing, translator
 csv_line = OpenERPcsv._convert_line; del OpenERPcsv
 
 from VSS.xl import open_workbook
-from VSS.xl.xlrd import XL_CELL_TEXT, XL_CELL_NUMBER, XL_CELL_DATE, XL_CELL_BOOLEAN, XL_CELL_ERROR, XL_CELL_BLANK, xldate_as_tuple
+from VSS.xl.xlrd import XL_CELL_TEXT, XL_CELL_NUMBER, XL_CELL_DATE, XL_CELL_BOOLEAN, XL_CELL_BLANK, xldate_as_tuple
 
 integer = int, long
 string = str, unicode
@@ -94,12 +93,12 @@ class DataStore(object):
         "closes all dbf tables -- for testing only"
         for _, obj in yo.tables.items():
             obj.dbf.close()
-    
+
     def _open(yo):
         "opens all dbf tables -- for testing only"
         for _, obj in yo.tables.items():
             obj.dbf.open()
-    
+
     def _create_py(yo):
         lines = []
         table_names = yo.table_names.keys()
@@ -278,8 +277,6 @@ class DataStore(object):
             field_types = yo.tables[oe_sheet].field_types = defaultdict(set)
             dbf_file = yo.folder/"%s_%s_stage1.dbf" % (yo.basename, oe_sheet)
             yo.tables[oe_sheet].dbf_fields = BiDict()
-            dbf_fields = []
-            field_names = dict()
             with Table(
                     xl_sheet,
                     ["f%d M" % i for i in range(sheet.ncols)],
@@ -392,7 +389,7 @@ class DataStore(object):
             os.chmod(filename, stat.S_IRWXU)
         else:
             print 'Skipping creation of %s' % filename
-    
+
 class Stage1(object):
     "stage 1 --> data normalization --> stage 2"
     def __init__(yo):
@@ -560,7 +557,7 @@ class Stage2(object):
                             yo.log(
                                     dbf.recno(record),
                                     rel.src_field_name,
-                                    record[rel.src_field], 
+                                    record[rel.src_field],
                                     "link not found in %s" % rel.tgt_table_name,
                                     )
         return dropped

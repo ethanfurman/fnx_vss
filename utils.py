@@ -2,27 +2,16 @@ from __future__ import absolute_import, with_statement
 
 import __builtin__
 import binascii
-import datetime
-import htmlentitydefs
+import dbf
+import inspect
 import random
-import re
-import smtplib
 import string
 import sys
-import syslog
-from datetime import date, timedelta
-from decimal import Decimal
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email.Encoders import encode_base64
-from email import email
-from enum import Enum, IntEnum
+import threading
+from datetime import timedelta
 from math import floor
-from scription import mail
 from socket import socket, AF_INET, SOCK_DGRAM
-from VSS import dbf
-from VSS.dbf import DateTime, Date, Time, baseinteger, basestring
+from dbf import Date, Time, baseinteger, basestring
 from VSS.time_machine import Sentinel, simplegeneric
 
 one_day = timedelta(1)
@@ -56,150 +45,6 @@ def Table(fn, *args, **kwds):
 def days_per_month(year):
     return (dbf.days_per_month, dbf.days_per_leap_month)[dbf.is_leapyear(year)]
 
-
-class AutoEnum(Enum):
-    """
-    Automatically numbers enum members starting from 1.
-    Includes support for a custom docstring per member.
-    """
-
-    __last_number__ = 0
-
-    def __new__(cls, *args):
-        """Ignores arguments (will be handled in __init__."""
-        value = cls.__last_number__ + 1
-        cls.__last_number__ = value
-        obj = object.__new__(cls)
-        obj._value_ = value
-        return obj
-
-    def __init__(self, *args):
-        """Can handle 0 or 1 argument; more requires a custom __init__.
-        0  = auto-number w/o docstring
-        1  = auto-number w/ docstring
-        2+ = needs custom __init__
-        """
-        if len(args) == 1 and isinstance(args[0], (str, unicode)):
-            self.__doc__ = args[0]
-        elif args:
-            raise TypeError('%s not dealt with -- need custom __init__' % (args,))
-
-    def __index__(self):
-        return self.value
-
-    def __int__(self):
-        return self.value
-
-    def __ge__(self, other):
-        if self.__class__ is other.__class__:
-            return self.value >= other.value
-        return NotImplemented
-
-    def __gt__(self, other):
-        if self.__class__ is other.__class__:
-            return self.value > other.value
-        return NotImplemented
-
-    def __le__(self, other):
-        if self.__class__ is other.__class__:
-            return self.value <= other.value
-        return NotImplemented
-
-    def __lt__(self, other):
-        if self.__class__ is other.__class__:
-            return self.value < other.value
-        return NotImplemented
-
-    @classmethod
-    def export(cls, namespace):
-        for name, member in cls.__members__.items():
-            if name == member.name:
-                namespace[name] = member
-    export_to = export
-
-
-class IndexEnum(Enum):
-
-    def __index__(self):
-        return self.value
-
-    def __int__(self):
-        return self.value
-
-    def __ge__(self, other):
-        if self.__class__ is other.__class__:
-            return self.value >= other.value
-        return NotImplemented
-
-    def __gt__(self, other):
-        if self.__class__ is other.__class__:
-            return self.value > other.value
-        return NotImplemented
-
-    def __le__(self, other):
-        if self.__class__ is other.__class__:
-            return self.value <= other.value
-        return NotImplemented
-
-    def __lt__(self, other):
-        if self.__class__ is other.__class__:
-            return self.value < other.value
-        return NotImplemented
-
-    @classmethod
-    def export(cls, namespace):
-        for name, member in cls.__members__.items():
-            if name == member.name:
-                namespace[name] = member
-    export_to = export
-
-class Weekday(AutoEnum):
-    __order__ = 'MONDAY TUESDAY WEDNESDAY THURSDAY FRIDAY SATURDAY SUNDAY'
-    MONDAY = ()
-    TUESDAY = ()
-    WEDNESDAY = ()
-    THURSDAY = ()
-    FRIDAY = ()
-    SATURDAY = ()
-    SUNDAY = ()
-    @classmethod
-    def from_date(cls, date):
-        return cls(date.isoweekday())
-    def next(self, day):
-        """Return number of days needed to get from self to day."""
-        if self == day:
-            return 7
-        delta = day - self
-        if delta < 0:
-            delta += 7
-        return delta
-    def last(self, day):
-        """Return number of days needed to get from self to day."""
-        if self == day:
-            return -7
-        delta = day - self
-        if delta > 0:
-            delta -= 7
-        return delta
-
-
-class Month(AutoEnum):
-    __order__ = 'JANUARY FEBRUARY MARCH APRIL MAY JUNE JULY AUGUST SEPTEMBER OCTOBER NOVEMBER DECEMBER'
-    JANUARY = ()
-    FEBRUARY = ()
-    MARCH = ()
-    APRIL = ()
-    MAY = ()
-    JUNE = ()
-    JULY = ()
-    AUGUST = ()
-    SEPTEMBER = ()
-    OCTOBER = ()
-    NOVEMBER = ()
-    DECEMBER = ()
-    @classmethod
-    def from_date(cls, date):
-        return cls(date.month)
 
 def all_equal(iterator, test=None):
     '''if `test is None` do a straight equality test'''
@@ -340,19 +185,14 @@ class xrange(object):
                         type(stop))
         if epsilon is None:
             try:
-                epsilon = .0000001 * step
-                if not isinstance(epsilon, type(step)):
+                epsilon = .5 * step
+                if not isinstance(epsilon, ref):
                     raise TypeError
             except TypeError:
                 try:
-                    epsilon = type(step)(0)
+                    epsilon = ref(0)
                 except Exception:
                     pass
-        if count is None:
-            try:
-                stop = stop - epsilon
-            except TypeError:
-                pass
         self.start = self.init_start = start
         self.stop = stop
         self.step = step
@@ -361,58 +201,32 @@ class xrange(object):
 
     def __contains__(self, value):
         start, stop, step = self.start, self.stop, self.step
-        count, epsilon = self.count, self.epsilon
+        count = self.count
         if callable(step):
             raise TypeError(
                     "range with step %r does not support containment checks" %
                     step)
         try:
-            distance = round((value - start) / step)
+            value % step
         except TypeError:
             raise TypeError(
                     "range of %s with step %s does not support "
                     "containment checks" % (type(start), type(step)))
-        if epsilon is None:
-            if start == value:
-                return True
-            if stop > start:
-                if start == value:
-                    return False
-                elif stop is not None and stop <= value:
-                    return False
-                elif count is not None and distance >= count:
-                    return False
-            else:
-                if start < value:
-                    return False
-                elif stop is not None and stop >= value:
-                    return False
-                elif count is not None and distance >= count:
-                    return False
-            target = start + distance * step
-            if target == value:
-                return True
-        else:
-            if start - epsilon <= value <= start + epsilon:
-                return True
-            if step > type(step)(0):
-                if start + epsilon > value:
-                    return False
-                elif stop is not None and stop - epsilon <= value:
-                    return False
-                elif count is not None and distance >= count:
-                    return False
-            else:
-                if start + epsilon < value:
-                    return False
-                elif stop is not None and stop - epsilon >= value:
-                    return False
-                elif count is not None and distance >= count:
-                    return False
-            target = start + distance * step
-            if target - epsilon <= value <= target + epsilon:
-                return True
-        return False
+        if stop is None:
+            stop = start + (step * count)
+        if stop == start:
+            return False
+        if start < stop and not start <= value < stop:
+            return False
+        elif stop < start and not stop >= value > stop:
+            return False
+        try:
+            distance = value - start
+            return distance % step == 0.0
+        except TypeError:
+            raise TypeError(
+                    "range of %s with step %s does not support "
+                    "containment checks" % (type(start), type(step)))
 
     def __iter__(self):
         start = self.start
@@ -420,6 +234,9 @@ class xrange(object):
         step = self.step
         count = self.count
         epsilon = self.epsilon
+        if stop is not None and epsilon is not None:
+            stop -= epsilon
+        value = None
         i = -1
         while 'more values to yield':
             i += 1
@@ -897,10 +714,28 @@ class ProgressBar(object):
         yo.progress(yo.current_count)
 
 _var_sentinel = Sentinel('no value')
-def var(value=_var_sentinel, _storage=[]):
-   if value is not _var_sentinel:
-      _storage[:] = [value]
-   return _storage[0]
+def var(value=_var_sentinel, _storage=threading.local()):
+    if value is not _var_sentinel:
+        _storage.value = value
+    else:
+        value = _storage.value
+    return value
+
+class Pocket(object):
+    '''container to save values from intermediate expressions'''
+    pocket = threading.local()
+    pocket.stack = list()
+
+    @classmethod
+    def pop(cls):
+        return cls.pocket.stack.pop()
+
+    @classmethod
+    def push(cls, *args):
+        cls.pocket.stack.append(args)
+        return args
+
+
 
 def xml_quote(string):
     if any(ch in string for ch in (' ','<','>',"'")):

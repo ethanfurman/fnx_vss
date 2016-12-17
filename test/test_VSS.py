@@ -6,18 +6,17 @@ import sys
 sys.path.insert(0, '../..')
 
 from tempfile import mkstemp
-from types import MethodType
 from unittest import TestCase, main as Run
 import datetime
 
-from VSS import Table
+from VSS.utils import Table, xrange, all_equal
 from VSS.address import cszk, normalize_address
-from VSS.dbf import Date, Time
+from dbf import Date
 from VSS.finance import FederalHoliday, ACHStore, ACHPayment, ACHFile, ACH_ETC, Customer
 from VSS.time_machine import suppress
-from VSS.trulite import ARInvoice, ARAgingLine, ar_open_invoices, ar_invoices, Batch
-from VSS.utils import xrange, all_equal
-from VSS.wellsfargo import RmInvoice, RmPayment, RMFFRecord, RMFlatFile, Int
+from VSS.trulite import ARAgingLine, ar_open_invoices, ar_invoices
+from VSS.wellsfargo import RmInvoice, RmPayment, RMFFRecord, Int
+import __builtin__
 
 globals().update(Customer.__members__)
 
@@ -653,7 +652,7 @@ class TestACH(TestCase):
         self.assertRaises(ValueError, ACHFile, MockOE(), self.ACHStore)
 
     def test_empty_file(self):
-        filen = ACHFile(MockOE(), self.ACHStore)
+        ACHFile(MockOE(), self.ACHStore)
         with self.store:
             self.assertEqual(self.store[-1], (self.today, 'A'))
 
@@ -1002,7 +1001,7 @@ class Test_xrange(TestCase):
     def test_int_containment(self):
         robj = xrange(10)
         for i in range(10):
-            self.assertTrue(i in robj)
+            self.assertTrue(i in robj, '%d not in %r' % (i, robj))
         self.assertFalse(-1 in robj)
         self.assertFalse(10 in robj)
         self.assertFalse(5.23 in robj)
@@ -1050,11 +1049,11 @@ class Test_xrange(TestCase):
                 , list(xrange(0.8, 0.0, -0.4)))
 
     def test_float_containment(self):
-        robj = xrange(100000000.0)
-        for i in [float(i) for i in range(10000)]:
-            self.assertTrue(i in robj)
+        robj = xrange(1000000000.0)
+        for i in (float(i) for i in __builtin__.xrange(0, 1000000000, 100000)):
+            self.assertTrue(i in robj, '%s not in %r' % (i, robj))
         self.assertFalse(0.000001 in robj)
-        self.assertFalse(100000000.0 in robj)
+        self.assertFalse(1000000000.0 in robj)
         self.assertFalse(50.23 in robj)
 
     def test_date_iter(self):
@@ -1064,7 +1063,7 @@ class Test_xrange(TestCase):
         day1 = datetime.date(2014, 1, 1)
         riter = iter(robj)
         try:
-            datetime.timedelta(7) / datetime.timedelta(1)
+            ONE_WEEK / ONE_DAY
             containment = True
         except TypeError:
             containment = False
