@@ -137,6 +137,7 @@ class BBxRec(object):
             try:
                 val = self.rec[varidx]
             except IndexError:
+                result.append(cls())
                 continue
             if sub:
                 sub = sub[:-1]
@@ -149,8 +150,7 @@ class BBxRec(object):
                 _logger.error('<%s::%s> unable to convert %r to %s, data lost' % (self.filename, r+m, val, cls.__name__))
                 result.append(cls())
         if single:
-            # again, gloss over missing fields
-            return result and result[0] or ''
+            return result[0]
         return result
 
     def __setitem__(self, ref, newval):
@@ -356,7 +356,6 @@ class BBxFile(object):
             match = self.subset
         else:
             raise ValueError('ky is required when using %-interpolation')
-        print('using match of %r' % match)
         rv = []
         for key, rec in self.records.items():
             if not key.replace('\xff', ''):
