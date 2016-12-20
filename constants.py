@@ -1,4 +1,8 @@
-from enum import Enum
+from enum import Enum, IntEnum
+
+__all__ = [
+        'Enum', 'IntEnum', 'AutoEnum', 'IndexEnum', 'Weekday', 'Month',
+        ]
 
 class AutoEnum(Enum):
     """
@@ -147,5 +151,5 @@ class Month(AutoEnum):
 Month.export_to(globals())
 
 
-__all__ = ['AutoEnum', 'IndexEnum', 'Month', 'Weekday'] + list(Month.__members__)+ list(Weekday.__members__)
+__all__ += list(Month.__members__) + list(Weekday.__members__)
 
