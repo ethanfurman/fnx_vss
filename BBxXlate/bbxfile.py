@@ -58,7 +58,7 @@ def applyfieldmap(record, fieldmap):
     return retval
 
 
-def unicode_strip(text):
+def unicode_strip(text=u''):
     return unicode(text).strip()
 
 def Int(text=''):
