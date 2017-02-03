@@ -431,9 +431,15 @@ def fix_date(text, format='mdy'):
     if len(text) != 6:
         return None
     if format == 'mdy':
-        yyyy, mm, dd = int(text[4:], 16)-160+2000, int(text[:2]), int(text[2:4])
+        yyyy, mm, dd = text[4:], text[:2], text[2:4]
     elif format == 'ymd':
-        yyyy, mm, dd = int(text[:2], 16)-160+2000, int(text[2:4]), int(text[4:])
+        yyyy, mm, dd = text[:2], text[2:4], text[4:]
+    try:
+        yyyy = int(yyyy) + 1900
+    except ValueError:
+        yyyy = int(yyyy, 16) - 160 + 2000
+    mm = int(mm)
+    dd = int(dd)
     return Date(yyyy, mm, dd)
 
 
