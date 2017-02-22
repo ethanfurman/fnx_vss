@@ -255,7 +255,7 @@ class BBxFile(object):
         datamap = [xx.strip() for xx in datamap]
         leader = trailer = None
         if rectype:
-            token, start, stop = rectype
+            tokens, start, stop = rectype
         if keymatch:
             first_ps = keymatch.find('%s')
             last_ps = keymatch.rfind('%s')
@@ -272,7 +272,7 @@ class BBxFile(object):
                     any(len(field) != length for field, length, name in
                         zip(rec, fieldlengths, datamap) if name in fixedLengthFields
                         ) or
-                    rectype and ky[start:stop] != token
+                    rectype and ky[start:stop] not in tokens
                     ):
                         continue    # record is not a match for this table
             except:

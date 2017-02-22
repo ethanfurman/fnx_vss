@@ -110,15 +110,29 @@ def parse_FIS_Schema(source):
             fields.append(["f%s_%s" % (filenum,fieldnum), fielddesc, fieldsize, fieldvar, sizefrom(fieldmask)])
             desc = fielddesc.replace(' ','').replace('-','=').lower()
             if (fieldvar.startswith(iolist[0])
-            and desc.startswith(('key','keygroup','keytyp','rectype','recordtype'))
+            and desc.startswith(('key','keygroup','keytyp','rectype','recordtype','type'))
             and desc.count('=') == 1):
-                token = fielddesc.replace('-','=').split('=')[1].strip().strip('\'"')
-                start, length = fieldvar.split('(')[1].strip(')').split(',')
-                start, length = int(start) - 1, int(length)
-                if len(token) < length:
-                    length = len(token)
-                stop = start + length
-                # or TABLES[name] . . .
+                if desc.startswith('type') and '"' not in desc and "'" not in desc:
+                    continue
+                    # can try the below when we have records in 152
+                    #
+                    # start, length = fieldvar.split('(')[1].strip(')').split(',')
+                    # start, length = int(start) - 1, int(length)
+                    # if 'blank' in desc:
+                    #     token = ' ' * length
+                    # else:
+                    #     token = fielddesc.replace('-','=').split('=')[1].strip('\'" ')
+                    #     if ' OR ' in token:
+                    #         token = tuple([t.strip('\' "') for t in token.split(' OR ')])
+                else:
+                    token = fielddesc.replace('-','=').split('=')[1].strip().strip('\'"')
+                    start, length = fieldvar.split('(')[1].strip(')').split(',')
+                    start, length = int(start) - 1, int(length)
+                    if len(token) < length:
+                        length = len(token)
+                    stop = start + length
+                if not isinstance(token, tuple):
+                    token = (token, )
                 TABLES[table_id]['key'] = token, start, stop
     return TABLES
 
