@@ -442,6 +442,13 @@ def fix_date(text, format='mdy'):
     dd = int(dd)
     return Date(yyyy, mm, dd)
 
+def date(year, month=None, day=None):
+    if not year:
+        return dbf.Date(None)
+    elif isinstance(year, basestring):
+        return text_to_date(year)
+    else:
+        return dbf.Date(year, month, day)
 
 def get_local_ip(target):
     "get local ip address needed to talk to target"
