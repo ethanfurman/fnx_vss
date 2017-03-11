@@ -1,7 +1,7 @@
 #!/usr/local/bin/python
 import os, logging
 import bbxfile
-from bbxfile import BBxFile, getfilename
+from bbxfile import BBxFile, getfilename, TableError
 from antipathy import Path
 _logger = logging.getLogger(__name__)
 
@@ -147,7 +147,11 @@ def fisData (table, keymatch=None, subset=None, filter=None):
     if tablename.startswith('CNVZ'):
         tablename = tablename[:4]
     key = table_id, keymatch, subset, filter
-    datafile = getfilename(DATA/CID+tablename)
+    try:
+        datafile = getfilename(DATA/CID+tablename)
+    except TableError, exc:
+        exc.filename = CID+tablename
+        raise
     mtime = os.stat(datafile).st_mtime
     if key in DATACACHE:
         table, old_mtime = DATACACHE[key]

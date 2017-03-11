@@ -9,7 +9,7 @@ import logging
 import os
 import re
 import string
-import subprocess
+# import subprocess
 
 _logger = logging.getLogger('BBx')
 
@@ -250,53 +250,63 @@ def BBVarLength(datamap, fieldlist):
 class BBxFile(object):
 
     def __init__(self, srcefile, datamap, fieldlist, keymatch=None, subset=None, filter=None, rectype=None, name=None, desc=None, _cache_key=None):
-        record_filename = srcefile.split('/')[-1]
-        records = {}
-        datamap = [xx.strip() for xx in datamap]
-        leader = trailer = None
-        if rectype:
-            tokens, start, stop = rectype
-        if keymatch:
-            first_ps = keymatch.find('%s')
-            last_ps = keymatch.rfind('%s')
-            if first_ps != -1:
-                leader = keymatch[:first_ps]
-            if last_ps != -1:
-                trailer = keymatch[last_ps+2:]     # skip the %s ;)
-        fieldlengths = BBVarLength(datamap, fieldlist)
-        fixedLengthFields = set([fld[1] for fld in fieldlist if '$' in fld[3] and fld[3][-1] != '$'])
-        for ky, rec in getfile(srcefile).items():
-            try:
-                if (
-                    len(ky) != fieldlengths[0] or
-                    any(len(field) != length for field, length, name in
-                        zip(rec, fieldlengths, datamap) if name in fixedLengthFields
-                        ) or
-                    rectype and ky[start:stop] not in tokens
-                    ):
-                        continue    # record is not a match for this table
-            except:
-                raise UnknownTableError
-            rec = BBxRec(rec, datamap, fieldlist, record_filename)
-            if filter:
-                if filter(rec):
-                    records[ky] = rec
-            elif leader is trailer is None and keymatch is not None:
-                if keymatch == ky:
-                    records[ky] = rec
-            elif leader is None or ky.startswith(leader):
-                if trailer is None or ky.endswith(trailer):
-                    records[ky] = rec
-        self.records = records
-        self.datamap = datamap
-        self.fieldlist = fieldlist
-        self.keymatch  = keymatch
-        self.subset  = subset
-        self.rectype = rectype
-        self.name = name
-        self.desc= desc
-        self.filename = srcefile
-        self._cache_key = _cache_key
+        try:
+            record_filename = srcefile.split('/')[-1]
+            records = {}
+            datamap = [xx.strip() for xx in datamap]
+            leader = trailer = None
+            if rectype:
+                tokens, start, stop = rectype
+            if keymatch:
+                first_ps = keymatch.find('%s')
+                last_ps = keymatch.rfind('%s')
+                if first_ps != -1:
+                    leader = keymatch[:first_ps]
+                if last_ps != -1:
+                    trailer = keymatch[last_ps+2:]     # skip the %s ;)
+            fieldlengths = BBVarLength(datamap, fieldlist)
+            fixedLengthFields = set([fld[1] for fld in fieldlist if '$' in fld[3] and fld[3][-1] != '$'])
+            corrupted = 0
+            for ky, rec in getfile(srcefile).items():
+                try:
+                    if (
+                        len(ky) != fieldlengths[0] or
+                        any(len(field) != length for field, length, name in
+                            zip(rec, fieldlengths, datamap) if name in fixedLengthFields
+                            ) or
+                        rectype and ky[start:stop] not in tokens
+                        ):
+                            continue    # record is not a match for this table
+                except:
+                    raise UnknownTableError()
+                rec = BBxRec(rec, datamap, fieldlist, record_filename)
+                # verify ky is present in record
+                if ky != rec.rec[0]:
+                    corrupted += 1
+                    continue
+                if filter:
+                    if filter(rec):
+                        records[ky] = rec
+                elif leader is trailer is None and keymatch is not None:
+                    if keymatch == ky:
+                        records[ky] = rec
+                elif leader is None or ky.startswith(leader):
+                    if trailer is None or ky.endswith(trailer):
+                        records[ky] = rec
+            self.records = records
+            self.datamap = datamap
+            self.fieldlist = fieldlist
+            self.keymatch  = keymatch
+            self.subset  = subset
+            self.rectype = rectype
+            self.name = name
+            self.desc= desc
+            self.filename = srcefile
+            self._cache_key = _cache_key
+            self.corrupted = corrupted
+        except TableError, exc:
+            exc.filename = srcefile
+            raise
 
     @lazy
     def field_widths(self):
@@ -393,10 +403,7 @@ def getfilename(target):
     template = target.path / target.base[:5] + '*'
     files = Path.glob(template)
     if not files:
-        subprocess.call(['tar', '--directory', '/FIS/data', '--wildcards', '-xf', target.path/'FIS_data.tar.gz', target.base[:5]+'*'])
-        files = Path.glob(template)
-        if not files:
-            raise MissingTableError('unable to find any files matching %s' % template)
+        raise MissingTableError('unable to find any files matching %s' % template)
     possibles = []
     for file in files:
         if len(file.base) in (5, 6):
@@ -409,10 +416,10 @@ def getfilename(target):
 
 def getfile(filename, fieldmap=None):
     """
-Read BBx Mkeyed, Direct or Indexed file and return it as a dictionary.
+    Read BBx Mkeyed, Direct or Indexed file and return it as a dictionary.
 
-Format: target = getfile([src_dir]filename [,fieldmap = {0:'field 0 name',3:'field 3 name'})
-Notes:  The entire file is read into memory.
+    Format: target = getfile([src_dir]filename [,fieldmap = {0:'field 0 name',3:'field 3 name'})
+    Notes:  The entire file is read into memory.
         Returns None on error opening file.
     """
 
@@ -421,7 +428,7 @@ Notes:  The entire file is read into memory.
         data = fh.read()
         fh.close()
     except:
-        raise Exception("File not found or read/permission error: %s") % (filename, )
+        raise Exception("File not found or read/permission error: %s" % (filename, ))
 
     #hexdump(data)
     #raise "Breaking..."
