@@ -271,6 +271,7 @@ class BBxFile(object):
                 try:
                     if (
                         len(ky) != fieldlengths[0] or
+                        not ((len(datamap) - 2) <= len(rec) <= (len(datamap) + 2)) or
                         any(len(field) != length for field, length, name in
                             zip(rec, fieldlengths, datamap) if name in fixedLengthFields
                             ) or
