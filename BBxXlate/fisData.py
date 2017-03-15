@@ -48,6 +48,8 @@ def parse_FIS_Schema(source):
         elif line.startswith('FC'):
             skip_table = False
             name = line[2:9].strip()
+            # possible adjust name
+            name = name_overrides.get(name, name)
             parts = line[9:].rsplit(" (", 1)
             desc = parts[0].strip()
             last_letter = chr(ord('A') - 1)
@@ -170,6 +172,10 @@ def fisData (table, keymatch=None, subset=None, filter=None):
             )
     DATACACHE[key] = table, mtime
     return table
+
+name_overrides = {
+    'ORDER': 'ORDERM',
+    }
 
 try:
     tables = parse_FIS_Schema(SCHEMA)
