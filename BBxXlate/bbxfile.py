@@ -401,10 +401,13 @@ class BBxFile(object):
 
 
 def getfilename(target):
-    template = target.path / target.base[:5] + '*'
+    template = target.path / target.base
     files = Path.glob(template)
     if not files:
-        raise MissingTableError('unable to find any files matching %s' % template)
+        template = target.path / target.base + '*'
+        files = Path.glob(template)
+        if not files:
+            raise MissingTableError('unable to find any files matching %s' % template)
     possibles = []
     for file in files:
         if len(file.base) in (5, 6):

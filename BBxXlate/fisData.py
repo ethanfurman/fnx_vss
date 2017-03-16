@@ -1,4 +1,5 @@
 #!/usr/local/bin/python
+from __future__ import print_function
 import os, logging
 import bbxfile
 from bbxfile import BBxFile, getfilename, TableError
@@ -32,6 +33,7 @@ def parse_FIS_Schema(source):
     contents = open(source).readlines()
     TABLES = {}
     skip_table = False
+    duplicates = set()
     for line in contents:
         line = line.rstrip()
         if not line:
@@ -48,8 +50,6 @@ def parse_FIS_Schema(source):
         elif line.startswith('FC'):
             skip_table = False
             name = line[2:9].strip()
-            # possible adjust name
-            name = name_overrides.get(name, name)
             parts = line[9:].rsplit(" (", 1)
             desc = parts[0].strip()
             last_letter = chr(ord('A') - 1)
@@ -58,16 +58,19 @@ def parse_FIS_Schema(source):
                     # skip duplicate tables
                     skip_table = True
                     continue
-                fields = TABLES.setdefault(name, {'name':name, 'desc':desc, 'filenum':None, 'fields':[], 'iolist':[], 'key':None})['fields']
+                fields = TABLES.setdefault(name, {'name':name, 'desc':desc, 'filename':name_overrides.get(name[:4],name[:4]), 'filenum':None, 'fields':[], 'iolist':[], 'key':None})['fields']
                 iolist = TABLES[name]['iolist']
                 table_id = name
                 filenum = ''
             else:
                 filenum = int(parts[1].split()[0])
-                fields = TABLES.setdefault(filenum, {'name':name, 'desc':desc, 'filenum':filenum, 'fields':[], 'iolist':[], 'key':None})['fields']
+                fields = TABLES.setdefault(filenum, {'name':name, 'desc':desc, 'filename':name_overrides.get(name[:4],name[:4]), 'filenum':filenum, 'fields':[], 'iolist':[], 'key':None})['fields']
 
                 if name in TABLES:
                     del TABLES[name]    # only allow names if there aren't any duplicates
+                    duplicates.add(name)
+                elif name in duplicates:
+                    pass
                 else:
                     TABLES[name] = TABLES[filenum]
                 iolist = TABLES[filenum]['iolist']
@@ -146,13 +149,12 @@ def fisData (table, keymatch=None, subset=None, filter=None):
     if table_id is None:
         table_id = tables[table]['name']
     tablename = tables[table_id]['name']
-    if tablename.startswith('CNVZ'):
-        tablename = tablename[:4]
+    filename = tables[table_id]['filename']
     key = table_id, keymatch, subset, filter
     try:
-        datafile = getfilename(DATA/CID+tablename)
+        datafile = getfilename(DATA/CID+filename)
     except TableError, exc:
-        exc.filename = CID+tablename
+        exc.filename = CID+filename
         raise
     mtime = os.stat(datafile).st_mtime
     if key in DATACACHE:
@@ -174,7 +176,7 @@ def fisData (table, keymatch=None, subset=None, filter=None):
     return table
 
 name_overrides = {
-    'ORDER': 'ORDERM',
+    'RDER': 'RDERM',
     }
 
 try:
@@ -197,3 +199,22 @@ bbxfile.tables = tables
 
 #vendors = fisData(65,keymatch='10%s')
 #vendors['000099']['Gn$']
+
+
+if __name__ == '__main__':
+    from antipathy import Path
+    import sys
+    if len(sys.argv) < 2:
+        raise SystemExit('company letter required')
+    leader = sys.argv[1]
+    for i in range(400):
+        table = tables.get(i)
+        if not table:
+            continue
+        bundle = tables[i]
+        name = bundle['name']
+        filename = bundle['filename']
+        print('looking for %3d - %-9r: ' % (i, name), end='')
+        matches = Path.glob('/FIS/data/%s%s' % (leader, filename))
+        matches = [p.split('/')[-1] for p in matches]
+        print(', '.join(matches))
