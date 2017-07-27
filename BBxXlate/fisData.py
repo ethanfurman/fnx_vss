@@ -1,6 +1,7 @@
 #!/usr/local/bin/python
 from __future__ import print_function
 import os, logging
+import sys, getpass, shlex, subprocess, re, os, logging
 import bbxfile
 from bbxfile import BBxFile, getfilename, TableError
 from antipathy import Path
