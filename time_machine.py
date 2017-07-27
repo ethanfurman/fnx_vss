@@ -7,6 +7,8 @@ __all__ = [
 class Sentinel(object):
     def __init__(yo, text):
         yo.text = text
+    def __repr__(yo):
+        return '<%s>' % yo.text
     def __str__(yo):
         return "Sentinel: <%s>" % yo.text
 
