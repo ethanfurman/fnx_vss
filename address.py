@@ -1357,6 +1357,7 @@ usps_street_suffix_abbr = {
     'VILLE'      :  'VL',
     'VISTA'      :  'VIS',
     'WALK'       :  'WALK',
+    'WALKS'      :  'WALKS',
     'WALL'       :  'WALL',
     'WAY'        :  'WAY',
     'WAYS'       :  'WAYS',
