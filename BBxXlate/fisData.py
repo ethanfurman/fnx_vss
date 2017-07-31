@@ -176,10 +176,6 @@ def fisData (table, keymatch=None, subset=None, filter=None):
     DATACACHE[key] = table, mtime
     return table
 
-name_overrides = {
-    'RDER': 'RDERM',
-    }
-
 try:
     tables = parse_FIS_Schema(SCHEMA)
 except IOError:
