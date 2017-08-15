@@ -1,7 +1,6 @@
 #!/usr/local/bin/python
 from __future__ import print_function
 import os, logging
-import sys, getpass, shlex, subprocess, re, os, logging
 import bbxfile
 from bbxfile import BBxFile, getfilename, TableError
 from antipathy import Path
@@ -10,8 +9,6 @@ _logger = logging.getLogger(__name__)
 # set later via execfile
 CID = NUMERICAL_FIELDS_AS_TEXT = PROBLEM_TABLES = None
 DATA = SCHEMA = Path()
-
-execfile('/etc/openerp/fnx.fis.conf')
 
 def sizefrom(mask):
     if not(mask): return ""
@@ -176,19 +173,34 @@ def fisData (table, keymatch=None, subset=None, filter=None):
     DATACACHE[key] = table, mtime
     return table
 
-try:
-    tables = parse_FIS_Schema(SCHEMA)
-except IOError:
-    _logger.error('unable to parse FIS Schema, unable to access FIS data')
+def setup(config):
+    # SCHEMA = Path("/FIS/WholeHerb_FIS_SCHEMA")
+    # DATA = Path("/FIS/whc_data")
+    # PROBLEM_TABLES = ('FCCORE')
+    # NUMERICAL_FIELDS_AS_TEXT = set([])
+    # CID = 'S'
+    # name_overrides = {'RDER': 'RDERM', 'CSMS':'CSMSM'}
+    global tables, SCHEMA, DATA, PROBLEM_TABLES, NUMERICAL_FIELDS_AS_TEXT, CID, name_overrides
+    ns = {'Path': Path}
+    execfile(config, ns)
+    SCHEMA = ns['SCHEMA']
+    DATA = ns['DATA']
+    PROBLEM_TABLES = ns['PROBLEM_TABLES']
+    NUMERICAL_FIELDS_AS_TEXT = ns['NUMERICAL_FIELDS_AS_TEXT']
+    CID = ns['CID']
+    name_overrides = ns['name_overrides']
+    try:
+        tables = parse_FIS_Schema(SCHEMA)
+    except IOError:
+        _logger.error('unable to parse FIS Schema, unable to access FIS data')
 
-    class tables(object):
-        def __repr__(self):
-            return 'FIS schema unavailable; no access to FIS data'
-        def __getitem__(self, name):
-            raise Exception('FIS data has not been installed')
-    tables = tables()
-
-bbxfile.tables = tables
+        class tables(object):
+            def __repr__(self):
+                return 'FIS schema unavailable; no access to FIS data'
+            def __getitem__(self, name):
+                raise Exception('FIS data has not been installed')
+        tables = tables()
+    bbxfile.tables = tables
 
 #tables['NVTY1']['fields'][77]
 
@@ -201,9 +213,11 @@ bbxfile.tables = tables
 if __name__ == '__main__':
     from antipathy import Path
     import sys
-    if len(sys.argv) < 2:
-        raise SystemExit('company letter required')
-    leader = sys.argv[1]
+    if len(sys.argv) < 3:
+        raise SystemExit('config file and company letter required')
+    config = sys.argv[1]
+    setup(config)
+    leader = sys.argv[2]
     for i in range(400):
         table = tables.get(i)
         if not table:
