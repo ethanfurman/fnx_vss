@@ -202,6 +202,9 @@ def setup(config):
         tables = tables()
     bbxfile.tables = tables
 
+if 'VIRTUAL_ENV' in os.environ:
+    setup('%s/config/fnx.fis.conf' % os.environ['VIRTUAL_ENV'])
+
 #tables['NVTY1']['fields'][77]
 
 #NVTY = fisData(135,keymatch="%s101000    101**")
