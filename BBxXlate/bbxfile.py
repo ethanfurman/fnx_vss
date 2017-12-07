@@ -366,7 +366,7 @@ class BBxFile(object):
         elif '%' not in self.subset and not ky:
             match = self.subset
         else:
-            raise ValueError('ky is required when using %-interpolation')
+            raise ValueError('ky is required when using %-interpolation, and absent otherwise')
         rv = []
         for key, rec in self.records.items():
             if not key.replace('\xff', ''):
