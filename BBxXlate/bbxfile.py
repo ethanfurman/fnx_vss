@@ -164,26 +164,6 @@ class BBxRec(object):
             return result[0]
         return result
 
-    def __setitem__(self, ref, newval):
-        if isinstance(ref, (int, long)):
-            ref = self.fieldlist[ref][3]
-        if ref in self.datamap:
-            var, sub = ref, ''
-        else:
-            var, sub = (ref+"(").split("(")[:2]
-        try:
-            varidx = self.datamap.index(var)
-        except ValueError:
-            raise ValueError('%s is not a valid field' % var)
-        val = self.rec[varidx]
-        if sub:
-            sub = sub[:-1]
-            first,last = [ int(x) for x in sub.split(",") ]
-            val = val[first-1:first+last-1]
-            self.rec[varidx][first-1:first+last-1] = newval
-        else:
-            self.rec[varidx] = newval
-
     def __repr__(self):
         return repr(self.rec)
 
