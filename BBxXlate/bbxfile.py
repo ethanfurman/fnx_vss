@@ -194,7 +194,7 @@ class BBxRec(object):
         for i, row in enumerate(self.fieldlist):
             name, spec = row[1:4:2]
             current_field = spec.split('(')[0]
-            if current_field != last_field or current_field.lower() == 'i':
+            if current_field != last_field or not current_field.endswith('$'):
                 field_num += 1
                 last_field = current_field
                 display_field_num = '%2d' % field_num
