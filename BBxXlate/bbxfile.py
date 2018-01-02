@@ -2,6 +2,7 @@
 Bbx File utilities.
 """
 
+from collections import OrderedDict
 from stat import ST_MTIME
 from antipathy import Path
 from VSS.utils import LazyAttr as lazy
@@ -252,7 +253,7 @@ class BBxFile(object):
     def __init__(self, srcefile, datamap, fieldlist, keymatch=None, subset=None, filter=None, rectype=None, name=None, desc=None, _cache_key=None):
         try:
             record_filename = srcefile.split('/')[-1]
-            records = {}
+            records = OrderedDict()
             datamap = [xx.strip() for xx in datamap]
             leader = trailer = None
             if rectype:
