@@ -140,9 +140,10 @@ def parse_FIS_Schema(source):
     return TABLES
 
 
-DATACACHE = {}
 
-def fisData (table, keymatch=None, subset=None, filter=None):
+def fisData (table, keymatch=None, subset=None, filter=None, data_path=None):
+    if data_path is None:
+        data_path = DATA
     table_id = tables[table]['filenum']
     if table_id is None:
         table_id = tables[table]['name']
@@ -154,11 +155,6 @@ def fisData (table, keymatch=None, subset=None, filter=None):
     except TableError, exc:
         exc.filename = CID+filename
         raise
-    mtime = os.stat(datafile).st_mtime
-    if key in DATACACHE:
-        table, old_mtime = DATACACHE[key]
-        if old_mtime == mtime:
-            return table
     description = tables[table_id]['desc']
     datamap = tables[table_id]['iolist']
     fieldlist = tables[table_id]['fields']
@@ -170,7 +166,6 @@ def fisData (table, keymatch=None, subset=None, filter=None):
             fieldlist=fieldlist, name=tablename,
             desc=description, _cache_key=key,
             )
-    DATACACHE[key] = table, mtime
     return table
 
 def setup(config):
