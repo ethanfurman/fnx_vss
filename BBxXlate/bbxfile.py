@@ -95,6 +95,16 @@ class BBxRec(object):
                 fieldlist.append(None, '', None, fieldvar, None)
         self.fieldlist = fieldlist
 
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.rec == other.rec
+        return NotImplemented
+
+    def __ne__(self, other):
+        if isinstance(other, self.__class__):
+            return self.rec != other.rec
+        return NotImplemented
+
     def __getitem__(self, ref):
         if isinstance(ref, (int, long)):
             ref, mask = self.fieldlist[ref][3:5]
