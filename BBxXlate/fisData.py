@@ -144,6 +144,8 @@ def parse_FIS_Schema(source):
 def fisData (table, keymatch=None, subset=None, filter=None, data_path=None):
     if data_path is None:
         data_path = DATA
+    else:
+        data_path = Path(data_path)
     table_id = tables[table]['filenum']
     if table_id is None:
         table_id = tables[table]['name']
@@ -151,7 +153,7 @@ def fisData (table, keymatch=None, subset=None, filter=None, data_path=None):
     filename = tables[table_id]['filename']
     key = table_id, keymatch, subset, filter
     try:
-        datafile = getfilename(DATA/CID+filename)
+        datafile = getfilename(data_path/CID+filename)
     except TableError, exc:
         exc.filename = CID+filename
         raise
