@@ -640,18 +640,39 @@ class copy_argspec(object):
 
 
 class LazyAttr(object):
-    "doesn't create object until actually accessed"
-    def __init__(yo, func=None, doc=None):
-        yo.fget = func
-        yo.__doc__ = doc or func.__doc__
-    def __call__(yo, func):
-        yo.fget = func
-    def __get__(yo, instance, owner):
+    "doesn't create instance object until actually accessed from an instance"
+    def __init__(self, func=None, doc=None, name=None):
+        self.fget = func
+        self.__doc__ = doc or func.__doc__
+        self.name = name
+    def __call__(self, func):
+        self.fget = func
+    def __get__(self, instance, owner):
         if instance is None:
-            return yo
-        result =  yo.fget(instance)
-        setattr(instance, yo.fget.__name__, result)
+            return self
+        if self.name is not None:
+            result = self.fget()
+        else:
+            result = self.fget(instance)
+        setattr(instance, self.name or self.fget.__name__, result)
         return result
+
+class LazyClassAttr(object):
+    "doesn't create class object until actually accessed"
+    def __init__(self, func=None, doc=None, name=None):
+        self.fget = func
+        self.__doc__ = doc or func.__doc__
+        self.name = name
+    def __call__(self, func):
+        self.fget = func
+    def __get__(self, instance, owner):
+        if instance is None or self.name is not None:
+            result = self.fget()
+        else:
+            result = self.fget(instance)
+        setattr(owner, self.name or self.fget.__name__, result)
+        return result
+
 
 class Open(object):
     builtin_open = open
