@@ -425,8 +425,10 @@ def fix_phone(text):
     return '%s.%s.%s' % (data[:3], data[3:6], data[6:]) + ext
 
 
-def fix_date(text, format='mdy'):
-    '''takes mmddyy (with yy in hex (A0 = 2000)) and returns a Date'''
+def fix_date(text, format='mdy', delta_year=0):
+    '''takes mmddyy (with yy in hex (A0 = 2000)) and returns a Date
+    
+    delta is the number of years to add/subtract from the final date'''
     text = text.strip()
     if len(text) != 6:
         return None
@@ -440,7 +442,7 @@ def fix_date(text, format='mdy'):
         yyyy = int(yyyy, 16) - 160 + 2000
     mm = int(mm)
     dd = int(dd)
-    return Date(yyyy, mm, dd)
+    return Date(yyyy, mm, dd).replace(delta_year=delta_year)
 
 def date(year, month=None, day=None):
     if not year:
