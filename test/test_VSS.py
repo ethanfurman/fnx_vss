@@ -10,13 +10,16 @@ from unittest import TestCase, main as Run
 import datetime
 
 from VSS.utils import Table, xrange, all_equal
-from VSS.address import cszk, normalize_address
+from VSS.address import cszk, normalize_address, NameCase, NameCaseReversed
 from dbf import Date
 from VSS.finance import FederalHoliday, ACHStore, ACHPayment, ACHFile, ACH_ETC, Customer
 from VSS.time_machine import suppress
 from VSS.trulite import ARAgingLine, ar_open_invoices, ar_invoices
 from VSS.wellsfargo import RmInvoice, RmPayment, RMFFRecord, Int
 import __builtin__
+
+import VSS.address
+print VSS.address.__file__
 
 globals().update(Customer.__members__)
 
@@ -190,7 +193,6 @@ norm_tests = (
     ('819 VALLEY NORTH RD ROOM 3',      '819 VALLEY NORTH RD RM 3'),
     )
 
-
 class TestNormalizeAddress(TestCase):
     """
     Test the normalize address function.
@@ -201,6 +203,45 @@ class TestNormalizeAddress(TestCase):
 
 for i in range(len(norm_tests)):
     setattr(TestNormalizeAddress, 'test_%02d' % i, lambda self, i=i: self.do_test(i))
+
+
+name_tests = (
+    ('ethan furman',                    'Ethan Furman'),
+    ('ethan allen furman',              'Ethan Allen Furman'),
+    ('EthaN de furman',                 'Ethan de Furman'),
+    ('ethan FURMAN iv',                 'Ethan Furman IV'),
+    )
+
+class TestNameCase(TestCase):
+    """
+    Test the NameCase function.
+    """
+
+    def do_test(self, i):
+        self.assertEqual(NameCase(name_tests[i][0]), name_tests[i][1])
+
+for i in range(len(name_tests)):
+    setattr(TestNameCase, 'test_%02d' % i, lambda self, i=i: self.do_test(i))
+
+
+name_tests_reversed = (
+    ('ethan furman',                    'Furman, Ethan'),
+    ('ethan allen furman',              'Furman, Ethan Allen'),
+    ('EthaN de furman',                 'de Furman, Ethan'),
+    ('ethan FURMAN iv',                 'Furman IV, Ethan'),
+    )
+
+class TestNameCaseReversed(TestCase):
+    """
+    Test the NameCase function.
+    """
+
+    def do_test(self, i):
+        self.assertEqual(NameCaseReversed(name_tests_reversed[i][0]), name_tests_reversed[i][1])
+
+for i in range(len(name_tests)):
+    setattr(TestNameCaseReversed, 'test_%02d' % i, lambda self, i=i: self.do_test(i))
+
 
 aging_line_tests = (
     (('005002	FORDERER CORNICE WORKS   	053113	557521:2433.50/VARIAN	1-INVCE	475214	1100-00	2917	0'),

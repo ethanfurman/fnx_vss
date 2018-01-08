@@ -1709,7 +1709,20 @@ def NameCase(*names):
     '''names should already be stripped of whitespace'''
     if not any(names):
         return names
+    else:
+        return _names(names)
+
+@tuples
+def NameCaseReversed(*names):
+    '''names should already be stripped of whitespace'''
+    if not any(names):
+        return names
+    else:
+        return _names(names, last_name_first=True)
+
+def _names(names, last_name_first=False):
     final = []
+    last_name = 1
     for name in names:
         pieces = name.lower().split()
         result = []
@@ -1719,8 +1732,9 @@ def NameCase(*names):
                 piece = '-'.join(NameCase(piece).split())
             elif alpha_num(piece) in ('i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'):
                 piece = piece.upper()
+                last_name += 1
             elif piece in ('and', 'de', 'del', 'der', 'el', 'la', 'van', 'of'):
-                pass
+                last_name += 1
             elif piece[:2] == 'mc':
                 piece = 'Mc' + piece[2:].title()
             else:
@@ -1736,7 +1750,10 @@ def NameCase(*names):
             result[0] = result[0].title()
         if result[-1] == result[-1].lower():
             result[-1] = result[-1].title()
-        final.append(' '.join(result))
+        if last_name_first:
+            final.append(' '.join(result[-last_name:]) + ', ' + ' '.join(result[:-last_name]))
+        else:
+            final.append(' '.join(result))
     return final
 
 
