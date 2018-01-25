@@ -16,6 +16,12 @@ from VSS.time_machine import Sentinel, simplegeneric
 
 one_day = timedelta(1)
 
+def nested_property(func):
+    "make defining properties simpler (from Mike Muller) [fget, fset, fdel]"
+    names = dict([(n, f) for n, f in func().items() if n in ('fset', 'fget', 'fdel')])
+    names['doc'] = func.__doc__
+    return property(**names)
+
 def Table(fn, *args, **kwds):
     'default to Clipper, Char, Logical, etc'
     data_types = {
