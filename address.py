@@ -1698,7 +1698,7 @@ class PostalCode(object):
         return bool(yo.code)
 
     def __repr__(yo):
-        return repr(yo.code)
+        return "Postal(%r)" % (yo.code, )
 
     def __str__(yo):
         return yo.code
