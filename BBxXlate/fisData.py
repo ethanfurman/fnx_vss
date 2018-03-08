@@ -144,8 +144,10 @@ DATACACHE = {}
 
 def fisData (table, keymatch=None, subset=None, filter=None, data_path=None):
     if data_path is None:
+        use_cache = True
         data_path = DATA
     else:
+        use_cache = False
         data_path = Path(data_path)
     table_id = tables[table]['filenum']
     if table_id is None:
@@ -159,7 +161,7 @@ def fisData (table, keymatch=None, subset=None, filter=None, data_path=None):
         exc.filename = CID+filename
         raise
     mtime = os.stat(datafile).st_mtime
-    if key in DATACACHE:
+    if use_cache and key in DATACACHE:
         table, old_mtime = DATACACHE[key]
         if old_mtime == mtime:
             return table
@@ -174,7 +176,8 @@ def fisData (table, keymatch=None, subset=None, filter=None, data_path=None):
             fieldlist=fieldlist, name=tablename,
             desc=description, _cache_key=key,
             )
-    DATACACHE[key] = table, mtime
+    if use_cache:
+        DATACACHE[key] = table, mtime
     return table
 
 def setup(config):
