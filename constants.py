@@ -110,6 +110,15 @@ class Weekday(AutoEnum):
     SATURDAY = ()
     SUNDAY = ()
     @classmethod
+    def from_abbr(cls, abbr):
+        abbr = abbr.upper()
+        if abbr in ('', 'T'):
+            raise ValueError('unknown abbreviation: %r' % (abbr, ))
+        for day in cls:
+            if day.name.startswith(abbr):
+                return day
+        raise ValueError('unknown abbreviation: %r' % (abbr, ))
+    @classmethod
     def from_date(cls, date):
         return cls(date.isoweekday())
     def next(self, day):
