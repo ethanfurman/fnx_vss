@@ -392,10 +392,10 @@ class BBxFile(object):
 
 
 def getfilename(target):
-    template = target.path / target.base
+    template = target.dirname / target.base
     files = Path.glob(template)
     if not files:
-        template = target.path / target.base + '*'
+        template = target.dirname / target.base + '*'
         files = Path.glob(template)
         if not files:
             raise MissingTableError('unable to find any files matching %s' % template)
@@ -498,11 +498,11 @@ def getfile(filename, fieldmap=None):
         raise Exception("UnknownFileTypeError: %s" % (filetype))
     return keychainkeys
 
-# if __name__ == '__main__':
-#     import time
-    #print "Starting..."
-    #for fn in ("ICIMF0","GMCMF0","GMAFF0","GMCFF0"):   # "ICCXF0",
-    #    start = time.time()
-    #    print fn, len(getfile(fn)), time.time()-start
+if __name__ == '__main__':
+    import time
+    print "Starting..."
+    for fn in ("/FIS/data/ORDERM","/FIS/data/ORDER","/FIS/data/ONVTY"):   # "ICCXF0",
+        start = time.time()
+        print fn, len(getfile(fn)), time.time()-start
     #start = time.time()
     #print "ICCXXF", len(open(r'C:\Zope\v2.4\Extensions\WSGSourceData\ICCXXF', 'rb').read()), time.time()-start
