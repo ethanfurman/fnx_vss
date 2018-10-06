@@ -22,6 +22,26 @@ def nested_property(func):
     names['doc'] = func.__doc__
     return property(**names)
 
+def hrtd(td):
+    "human readable time delta"
+    seconds = td.total_seconds()
+    days, seconds = divmod(seconds, 60*60*24)
+    hours, seconds = divmod(seconds, 60*60)
+    minutes, seconds = divmod(seconds, 60)
+    if seconds:
+        minutes += 1
+    res = []
+    if days:
+        res.append('%d days' % days)
+    if hours:
+        res.append('%d hours' % hours)
+    if minutes:
+        if minutes != 1:
+            res.append('%d minutes' % minutes)
+        else:
+            res.append('%d minute' % minutes)
+    return ', '.join(res)
+
 def Table(fn, *args, **kwds):
     'default to Clipper, Char, Logical, etc'
     data_types = {
