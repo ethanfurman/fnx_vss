@@ -181,8 +181,8 @@ def fisData (table, keymatch=None, subset=None, filter=None, data_path=None):
     return table
 
 def setup(config):
-    # SCHEMA = Path("/FIS/WholeHerb_FIS_SCHEMA")
-    # DATA = Path("/FIS/whc_data")
+    # SCHEMA = Path("/opt/FIS/WholeHerb_FIS_SCHEMA")
+    # DATA = Path("/opt/FIS/whc_data")
     # PROBLEM_TABLES = ('FCCORE')
     # NUMERICAL_FIELDS_AS_TEXT = set([])
     # CID = 'S'
@@ -199,7 +199,7 @@ def setup(config):
     try:
         tables = parse_FIS_Schema(SCHEMA)
     except IOError:
-        _logger.error('unable to parse FIS Schema, unable to access FIS data')
+        _logger.exception('unable to parse FIS Schema, unable to access FIS data')
 
         class tables(object):
             def __repr__(self):
@@ -236,6 +236,6 @@ if __name__ == '__main__':
         name = bundle['name']
         filename = bundle['filename']
         print('looking for %3d - %-9r: ' % (i, name), end='')
-        matches = Path.glob('/FIS/data/%s%s' % (leader, filename))
+        matches = Path.glob('/opt/FIS/data/%s%s' % (leader, filename))
         matches = [p.split('/')[-1] for p in matches]
         print(', '.join(matches))
