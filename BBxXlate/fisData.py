@@ -199,7 +199,12 @@ def setup(config):
     try:
         tables = parse_FIS_Schema(SCHEMA)
     except IOError:
+        _logger.error("unable to parse FIS Schema")
+        _logger.error("uid: %r, gid: %r, euid: %r, egid: %r" %
+                (os.getuid(), os.getgid(), os.geteuid(), os.getegid()))
+        _logger.error("args: %r" % (sys.argv, ))
         _logger.exception('unable to parse FIS Schema, unable to access FIS data')
+        raise
 
         class tables(object):
             def __repr__(self):
@@ -209,8 +214,7 @@ def setup(config):
         tables = tables()
     bbxfile.tables = tables
 
-if 'VIRTUAL_ENV' in os.environ:
-    setup('%s/config/fnx.fis.conf' % os.environ['VIRTUAL_ENV'])
+setup('%s/config/fnx.fis.conf' % os.environ['VIRTUAL_ENV'])
 
 #tables['NVTY1']['fields'][77]
 
