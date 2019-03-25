@@ -240,7 +240,7 @@ def BBVarLength(datamap, fieldlist):
 
 class BBxFile(object):
 
-    def __init__(self, srcefile, datamap, fieldlist, keymatch=None, subset=None, filter=None, rectype=None, name=None, desc=None, _cache_key=None):
+    def __init__(self, srcefile, datamap, fieldlist, keymatch=None, subset=None, filter=None, rectype=None, name=None, desc=None, _cache_key=None, raw=False):
         try:
             record_filename = srcefile.split('/')[-1]
             records = OrderedDict()
@@ -259,18 +259,19 @@ class BBxFile(object):
             fixedLengthFields = set([fld[1] for fld in fieldlist if '$' in fld[3] and fld[3][-1] != '$'])
             corrupted = 0
             for ky, rec in getfile(srcefile).items():
-                try:
-                    if (
-                        len(ky) != fieldlengths[0] or
-                        not ((len(datamap) - 2) <= len(rec) <= (len(datamap) + 2)) or
-                        any(len(field) != length for field, length, name in
-                            zip(rec, fieldlengths, datamap) if name in fixedLengthFields
-                            ) or
-                        rectype and ky[start:stop] not in tokens
-                        ):
-                            continue    # record is not a match for this table
-                except:
-                    raise UnknownTableError()
+                if not raw:
+                    try:
+                        if (
+                            len(ky) != fieldlengths[0] or
+                            not ((len(datamap) - 2) <= len(rec) <= (len(datamap) + 2)) or
+                            any(len(field) != length for field, length, name in
+                                zip(rec, fieldlengths, datamap) if name in fixedLengthFields
+                                ) or
+                            rectype and ky[start:stop] not in tokens
+                            ):
+                                continue    # record is not a match for this table
+                    except:
+                        raise UnknownTableError()
                 rec = BBxRec(rec, datamap, fieldlist, record_filename)
                 # verify ky is present in record
                 if ky != rec.rec[0]:

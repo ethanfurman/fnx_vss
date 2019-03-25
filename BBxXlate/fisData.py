@@ -142,7 +142,7 @@ def parse_FIS_Schema(source):
 
 DATACACHE = {}
 
-def fisData (table, keymatch=None, subset=None, filter=None, data_path=None):
+def fisData (table, keymatch=None, subset=None, filter=None, data_path=None, raw=False):
     if data_path is None:
         use_cache = True
         data_path = DATA
@@ -154,7 +154,7 @@ def fisData (table, keymatch=None, subset=None, filter=None, data_path=None):
         table_id = tables[table]['name']
     tablename = tables[table_id]['name']
     filename = tables[table_id]['filename']
-    key = table_id, keymatch, subset, filter
+    key = table_id, keymatch, subset, filter, raw
     try:
         datafile = getfilename(data_path/CID+filename)
     except TableError, exc:
@@ -175,6 +175,7 @@ def fisData (table, keymatch=None, subset=None, filter=None, data_path=None):
             filter=filter, rectype=rectype,
             fieldlist=fieldlist, name=tablename,
             desc=description, _cache_key=key,
+            raw=raw,
             )
     if use_cache:
         DATACACHE[key] = table, mtime
