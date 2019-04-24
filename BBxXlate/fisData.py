@@ -4,10 +4,11 @@ import os, logging
 import bbxfile
 from bbxfile import BBxFile, getfilename, TableError
 from antipathy import Path
+import sys
 _logger = logging.getLogger(__name__)
 
 # set later via execfile
-CID = NUMERICAL_FIELDS_AS_TEXT = PROBLEM_TABLES = None
+CID = NUMERICAL_FIELDS_AS_TEXT = PROBLEM_TABLES = SELF_TEST = None
 DATA = SCHEMA = Path()
 
 def sizefrom(mask):
@@ -53,6 +54,8 @@ def parse_FIS_Schema(source):
             last_letter = chr(ord('A') - 1)
             if parts[1].startswith('at '):
                 if name in TABLES:
+                    if SELF_TEST:
+                        print('skipping duplicate table in schema: %s' % (name, ))
                     # skip duplicate tables
                     skip_table = True
                     continue
@@ -67,6 +70,8 @@ def parse_FIS_Schema(source):
                 if name in TABLES:
                     del TABLES[name]    # only allow names if there aren't any duplicates
                     duplicates.add(name)
+                    if SELF_TEST:
+                        print('adding table %s as %d only' % (name, filenum))
                 elif name in duplicates:
                     pass
                 else:
@@ -142,7 +147,7 @@ def parse_FIS_Schema(source):
 
 DATACACHE = {}
 
-def fisData (table, keymatch=None, subset=None, filter=None, data_path=None, raw=False):
+def fisData (table, keymatch=None, subset=None, filter=None, data_path=None, raw=False, nulls_only=False):
     if data_path is None:
         use_cache = True
         data_path = DATA
@@ -175,7 +180,7 @@ def fisData (table, keymatch=None, subset=None, filter=None, data_path=None, raw
             filter=filter, rectype=rectype,
             fieldlist=fieldlist, name=tablename,
             desc=description, _cache_key=key,
-            raw=raw,
+            raw=raw, nulls_only=nulls_only,
             )
     if use_cache:
         DATACACHE[key] = table, mtime
@@ -226,21 +231,89 @@ setup('%s/config/fnx.fis.conf' % os.environ['VIRTUAL_ENV'])
 
 
 if __name__ == '__main__':
+    """
+    Display record counts for all tables in specified file
+    missing/corrupted records.
+    """
+    SELF_TEST = True
     from antipathy import Path
-    import sys
-    if len(sys.argv) < 3:
-        raise SystemExit('config file and company letter required')
-    config = sys.argv[1]
-    setup(config)
-    leader = sys.argv[2]
-    for i in range(400):
-        table = tables.get(i)
-        if not table:
-            continue
-        bundle = tables[i]
-        name = bundle['name']
-        filename = bundle['filename']
-        print('looking for %3d - %-9r: ' % (i, name), end='')
-        matches = Path.glob('/opt/FIS/data/%s%s' % (leader, filename))
-        matches = [p.split('/')[-1] for p in matches]
-        print(', '.join(matches))
+    from scription import *
+    report = echo
+    virtual_env = os.environ.get('VIRTUAL_ENV')
+    config = '%s/config/fnx.fis.conf' % os.environ['VIRTUAL_ENV']
+    ns = {'Path': Path}
+    execfile(config, ns)
+    DATA = ns['DATA']
+    CID = ns['CID']
+    print('schema: %s' % (SCHEMA, ))
+    print('data:   %s' % (DATA, ))
+    print('CID:    %s' % (CID, ))
+    missing_tables = {}
+
+    updated_data = {}
+    lost_data = {}
+
+    @Command(
+            file=Spec('show all tables in FILE(s)', MULTI, type=unicode.upper),
+            table=Spec('only show TABLE(s)', MULTI, type=unicode.upper),
+            raw=Spec('include all TABLE records in FILE', FLAG),
+            nulls_only=Spec('only include null records', FLAG),
+            )
+    @Alias('fisdata.py')
+    def self_test(file, table, raw, nulls_only):
+        "display info about selected files"
+        print('file: %r\ntable: %r\nraw: %r\nnulls-only: %r' % (file, table, raw, nulls_only))
+        global tables
+        int_keys = []
+        str_keys = []
+        target_tables = table
+        for k in sorted(tables.keys()):
+            if isinstance(k, basestring):
+                str_keys.append(k)
+            elif isinstance(k, (int, long)):
+                int_keys.append(k)
+            else:
+                raise ValueError('invalid key type: %r is %r' % (k, type(k)))
+        if file:
+            extra_tables = tuple(t for t in str_keys if t.startswith(file))
+            if not extra_tables:
+                error('no tables matching %s' % ', '.join(file))
+                if not target_tables:
+                    abort()
+            target_tables += extra_tables
+        print('target tables: %r' % (target_tables, ))
+        last_file = None
+        last_total = 0
+        for n in str_keys:
+            if target_tables and n not in target_tables:
+                continue
+            if last_file != n[:4]:
+                if last_file is not None:
+                    echo('  ', '-' * 30)
+                    echo('   total: %d records' % last_total)
+                last_total = 0
+                last_file = n[:4]
+                echo(last_file, border='flag')
+            table = tables.get(n)
+            if not table:
+                print('%s is empty' % (table, ))
+                continue
+            bundle = tables[n]
+            name = bundle['name']
+            filename = bundle['filename']
+            matches = Path.glob('%s/%s%s' % (DATA, CID, filename))
+            matches = [p.split('/')[-1] for p in matches]
+            if not matches:
+                missing_tables.setdefault(filename, []).append(name)
+                continue
+            test_table = fisData(n, raw=raw, nulls_only=nulls_only)
+            last_total += len(test_table)
+            echo('   %s: %d records' % (n, len(test_table)))
+        echo('  ', '-' * 30)
+        echo('   total: %d records' % last_total)
+        if missing_tables:
+            print('=======\nMISSING\n=======\nfile : tables\n-------------')
+            for filename, tables in sorted(missing_tables.items()):
+                print('%-5s: %s' % (filename, ', '.join(tables)))
+
+Main()

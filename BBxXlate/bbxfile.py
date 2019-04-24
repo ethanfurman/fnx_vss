@@ -1,16 +1,16 @@
 """
 Bbx File utilities.
 """
+from __future__ import print_function
 
+from antipathy import Path
 from collections import OrderedDict
 from stat import ST_MTIME
-from antipathy import Path
 from VSS.utils import LazyAttr as lazy
 import logging
 import os
 import re
 import string
-# import subprocess
 
 _logger = logging.getLogger('BBx')
 
@@ -240,7 +240,7 @@ def BBVarLength(datamap, fieldlist):
 
 class BBxFile(object):
 
-    def __init__(self, srcefile, datamap, fieldlist, keymatch=None, subset=None, filter=None, rectype=None, name=None, desc=None, _cache_key=None, raw=False):
+    def __init__(self, srcefile, datamap, fieldlist, keymatch=None, subset=None, filter=None, rectype=None, name=None, desc=None, _cache_key=None, raw=False, nulls_only=False):
         try:
             record_filename = srcefile.split('/')[-1]
             records = OrderedDict()
@@ -258,21 +258,28 @@ class BBxFile(object):
             fieldlengths = BBVarLength(datamap, fieldlist)
             fixedLengthFields = set([fld[1] for fld in fieldlist if '$' in fld[3] and fld[3][-1] != '$'])
             corrupted = 0
-            for ky, rec in getfile(srcefile).items():
+            for ky, rec in getfile(srcefile, nulls_only=nulls_only).items():
                 if not raw:
-                    try:
-                        if (
-                            len(ky) != fieldlengths[0] or
-                            not ((len(datamap) - 2) <= len(rec) <= (len(datamap) + 2)) or
-                            any(len(field) != length for field, length, name in
-                                zip(rec, fieldlengths, datamap) if name in fixedLengthFields
-                                ) or
-                            rectype and ky[start:stop] not in tokens
-                            ):
-                                continue    # record is not a match for this table
-                    except:
-                        raise UnknownTableError()
+                    if nulls_only:
+                        if rectype and ky[start:stop] not in tokens:
+                            continue
+                    else:
+                        try:
+                            if (
+                                len(ky) != fieldlengths[0] or
+                                not ((len(datamap) - 2) <= len(rec) <= (len(datamap) + 2)) or
+                                any(len(field) != length for field, length, name in
+                                    zip(rec, fieldlengths, datamap) if name in fixedLengthFields
+                                    ) or
+                                rectype and ky[start:stop] not in tokens
+                                ):
+                                    continue    # record is not a match for this table
+                        except:
+                            raise UnknownTableError()
                 rec = BBxRec(rec, datamap, fieldlist, record_filename)
+                if nulls_only:
+                    records[ky] = rec
+                    continue
                 # verify ky is present in record
                 if ky != rec.rec[0]:
                     corrupted += 1
@@ -410,7 +417,7 @@ def getfilename(target):
     return target
 
 
-def getfile(filename, fieldmap=None):
+def getfile(filename, fieldmap=None, nulls_only=False):
     """
     Read BBx Mkeyed, Direct or Indexed file and return it as a dictionary.
 
@@ -440,12 +447,15 @@ def getfile(filename, fieldmap=None):
             key_map[fields[0]] = fields
         return key_map
 
+
     # handle normal case of Business Basic file
     blocksize = 512
     reclen = int(asc(data[13:15]))
     reccount = int(asc(data[9:13]))
     keylen = ord(data[8])
     filetype = ord(data[7])
+    report('filetype: %r' % (filetype, ))
+    empty_records = 0
     keychainkeycount = 0
     keychainkeys = {}
     if filetype == 6:           # MKEYED
@@ -460,30 +470,65 @@ def getfile(filename, fieldmap=None):
                     keychainkey =  string.split(data[thiskey:thiskey+keylen],'\0',1)[0]
                     keychainrecblkptr = int(asc(data[thiskey+keylen:thiskey+keylen+3]) / 2)
                     keychainrecbyteptr = int(256*(asc(data[thiskey+keylen:thiskey+keylen+3]) % 2) + ord(data[thiskey+keylen+3]))
-                    keychainrec = string.split(data[keychainrecblkptr*512+keychainrecbyteptr:keychainrecblkptr*512+keychainrecbyteptr+reclen],'\n')[:-1]
-                    # Note:  The trailing [:-1] on the preceeding line is to chop off trailing nulls.  This could lose data in a packed record
-                    if keychainrec:
-                        keychainrec[0] = keychainkey
+                    keychainrec = string.split(data[keychainrecblkptr*512+keychainrecbyteptr:keychainrecblkptr*512+keychainrecbyteptr+reclen],'\n')
+                    tail = keychainrec[-1]
+                    if tail != '\x00' * len(tail):
+                        lost_data[filename] = tail
+                    if nulls_only:
+                        if len(keychainrec) == 1:
+                            keychainkeys[keychainkey] = keychainrec
+                    # Note:  this is designed to chop off trailing nulls, but could lose data in a packed record
+                    keychainrec.pop()
+                    if not keychainrec:
+                        empty_records += 1
+                    else:
+                        if keychainrec[0] != keychainkey:
+                            updated_data[filename] = keychainrec[0], keychainkey
+                            keychainrec[0] = keychainkey
                         keychainrec = applyfieldmap(keychainrec, fieldmap)
                         keychainkeys[keychainkey] = keychainrec
     elif filetype == 2:         # DIRECT
+        seen_keys = set()
         keysperblock = ord(data[62])
+        report('keys per block: %r' % keysperblock)
         #x#keyareaoffset = ord(data[50])+1
         keyareaoffset = int(asc(data[49:51]))+1
+        report('key area offset: %r' % keyareaoffset)
         keyptrsize = ord(data[56])
+        report('key ptr size: %r' % keyptrsize)
         nextkeyptr = int(asc(data[24:27]))
+        report('next key ptr: %r' % nextkeyptr)
         netkeylen = keylen
+        report('net key len: %r' % netkeylen)
         keylen = netkeylen + 3*keyptrsize
+        report('key len: %r' % keylen)
         dataareaoffset = keyareaoffset + reccount / keysperblock + 1
+        report('data area offset: %r' % dataareaoffset)
         while nextkeyptr > 0:
+            if nextkeyptr in seen_keys:
+                report('CYCLE DETECTED')
+                break
+            else:
+                seen_keys.add(nextkeyptr)
             lastkeyinblock = not(nextkeyptr % keysperblock)
             thiskeyptr = (keyareaoffset + (nextkeyptr/keysperblock) - lastkeyinblock)*blocksize + (((nextkeyptr % keysperblock)+(lastkeyinblock*keysperblock))-1)*keylen
             keychainkey = string.split(data[thiskeyptr:thiskeyptr+netkeylen],'\0',1)[0]
             thisdataptr = dataareaoffset*blocksize + (nextkeyptr-1)*reclen
-            keychainrec = string.split(data[thisdataptr:thisdataptr+reclen],'\n')[:-1]
-            # Note:  The trailing [:-1] on the preceeding line is to chop off trailing nulls.  This could lose data in a packed record
-            if keychainrec:
-                keychainrec[0] = keychainkey
+            keychainrec = string.split(data[thisdataptr:thisdataptr+reclen],'\n')
+            tail = keychainrec[-1]
+            if tail != '\x00' * len(tail):
+                lost_data[filename] = tail
+            if nulls_only:
+                if len(keychainrec) == 1:
+                    keychainkeys[keychainkey] = keychainrec
+            # Note:  this is designed to chop off trailing nulls, but could lose data in a packed record
+            keychainrec.pop()
+            if not keychainrec:
+                empty_records += 1
+            elif not nulls_only:
+                if keychainrec[0] != keychainkey:
+                    updated_data[filename] = keychainrec[0], keychainkey
+                    keychainrec[0] = keychainkey
                 keychainrec = applyfieldmap(keychainrec, fieldmap)
                 keychainkeys[keychainkey] = keychainrec
             nextkeyptr = int(asc(data[thiskeyptr+netkeylen:thiskeyptr+netkeylen+keyptrsize]))
@@ -496,14 +541,68 @@ def getfile(filename, fieldmap=None):
             keychainkeycount = keychainkeycount + 1
     else:
         #hexdump(data)
-        raise Exception("UnknownFileTypeError: %s" % (filetype))
+        raise UnknownFileTypeError(filetype)
+    report('%d records expected' % reccount)
+    report('%d useful records found' % len(keychainkeys))
+    report('%d empty records found' % empty_records)
+    report('------------------------\n%d total records\n------------------------' % (len(keychainkeys)+empty_records))
+    if updated_data:
+        report('%d records with updated keys  (e.g. %r)' % (len(updated_data), updated_data.values()[0]))
+    if lost_data:
+        report('%d records with lost data  (e.g. %r)' % (len(lost_data), lost_data.values()[0]))
+
     return keychainkeys
 
-if __name__ == '__main__':
-    import time
-    print "Starting..."
-    for fn in ("/FIS/data/ORDERM","/FIS/data/ORDER","/FIS/data/ONVTY"):   # "ICCXF0",
-        start = time.time()
-        print fn, len(getfile(fn)), time.time()-start
-    #start = time.time()
-    #print "ICCXXF", len(open(r'C:\Zope\v2.4\Extensions\WSGSourceData\ICCXXF', 'rb').read()), time.time()-start
+class UnknownFileTypeError(Exception):
+    pass
+
+updated_data = {}
+lost_data = {}
+
+if __name__ != '__main__':
+    def report(*args, **kwds):
+        return
+else:
+    from scription import *
+    report = echo
+
+    config = '%s/config/fnx.fis.conf' % os.environ['VIRTUAL_ENV']
+    ns = {'Path': Path}
+    execfile(config, ns)
+    DATA = ns['DATA']
+    CID = ns['CID']
+
+    @Command(
+            file=Spec('file file(s) to examine', MULTI, type=unicode.upper),
+            type=Spec('storage type to process', OPTION, type=int),
+            )
+    @Alias('bbxfile.py')
+    def self_test(file, type):
+        "display info about selected files"
+        if file:
+            data = [DATA/CID+f for f in file]
+        else:
+            data = DATA.glob(CID+'*')
+
+        for file in sorted(data):
+            if type:
+                with open(file,'rb') as fh:
+                    data = fh.read(8)
+                if asc(data[7]) != type:
+                    continue
+            echo(file, border='flag')
+            updated_data.clear()
+            lost_data.clear()
+            try:
+                getfile(file)
+            except UnknownFileTypeError:
+                echo('UNKNOWN TYPE')
+            echo()
+
+    Main()
+    # print("Starting...")
+    # for fn in ("/FIS/data/ORDERM","/FIS/data/ORDER","/FIS/data/ONVTY"):   # "ICCXF0",
+    #     start = time.time()
+    #     print(fn, len(getfile(fn)), time.time()-start)
+    # #start = time.time()
+    # #print "ICCXXF", len(open(r'C:\Zope\v2.4\Extensions\WSGSourceData\ICCXXF', 'rb').read()), time.time()-start
