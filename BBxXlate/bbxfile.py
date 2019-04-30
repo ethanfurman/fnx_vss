@@ -259,11 +259,38 @@ class BBxFile(object):
             fixedLengthFields = set([fld[1] for fld in fieldlist if '$' in fld[3] and fld[3][-1] != '$'])
             corrupted = 0
             for ky, rec in getfile(srcefile).items():
+                if ky.startswith('10YER'):
+                    # this shows only four records coming from getfile()
+                    pass
                 if not raw:
+                    # attempt to weed out records for other logical tables
                     try:
+                        # if ky == '100801051  ':
+                        #     if len(ky) != fieldlengths[0]:
+                        #         print 'ky too short: %r vs %r' % (len(ky), fieldlengths[0])
+                        #     # elif not ((len(datamap) -2) <= len(rec) <= (len(datamap) + 2)):
+                        #     #     print 'record wrong size:  %r <= %r <= %r\n%r' % (
+                        #     #     (len(datamap) -2), len(rec), (len(datamap) + 2), rec,
+                        #     #     )
+                        #     elif any(
+                        #             len(field) != length
+                        #             for field, length, name in
+                        #                 zip(rec, fieldlengths, datamap)
+                        #             if name in fixedLengthFields
+                        #         ):
+                        #         print 'at least one field is the wrong size:\n%s' % '\n'.join([
+                        #             '%s  -  %s  -  %s' % (field, length, name)
+                        #             for field, length, name in
+                        #                 zip(rec, fieldlengths, datamap)
+                        #             if name in fixedLengthFields and len(field) != length
+                        #             ])
+                        #     elif rectype and ky[start:stop] not in tokens:
+                        #         print 'mismach between rectype %r, ky %r and tokens %r' % (
+                        #             rectype, ky[start:stop], tokens,
+                        #             )
                         if (
                             len(ky) != fieldlengths[0] or
-                            not ((len(datamap) - 2) <= len(rec) <= (len(datamap) + 2)) or
+                            # not ((len(datamap) - 2) <= len(rec) <= (len(datamap) + 2)) or
                             any(len(field) != length for field, length, name in
                                 zip(rec, fieldlengths, datamap) if name in fixedLengthFields
                                 ) or
