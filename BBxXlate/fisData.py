@@ -316,4 +316,4 @@ if __name__ == '__main__':
             for filename, tables in sorted(missing_tables.items()):
                 print('%-5s: %s' % (filename, ', '.join(tables)))
 
-Main()
+    Main()
