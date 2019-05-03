@@ -259,9 +259,6 @@ class BBxFile(object):
             fixedLengthFields = set([fld[1] for fld in fieldlist if '$' in fld[3] and fld[3][-1] != '$'])
             corrupted = 0
             for ky, rec in getfile(srcefile, nulls_only=nulls_only).items():
-                if ky.startswith('10YER'):
-                    # this shows only four records coming from getfile()
-                    pass
                 if not raw:
                     if nulls_only:
                         if rectype and ky[start:stop] not in tokens:
