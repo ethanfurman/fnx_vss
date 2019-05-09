@@ -1704,6 +1704,7 @@ class PostalCode(object):
         return yo.code
 
 
+@tuples
 def NameCase(*names):
     '''names should already be stripped of whitespace'''
     if not any(names):
