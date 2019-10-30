@@ -357,7 +357,7 @@ class BBxFile(object):
         except KeyError:
             return sentinel
 
-    def get_subset(self, ky):
+    def get_subset(self, ky=None):
         if not self.subset:
             raise ValueError('subset not defined')
         if '%' in self.subset and ky:
