@@ -160,10 +160,11 @@ def fisData (table, keymatch=None, subset=None, filter=None, data_path=None, raw
     tablename = tables[table_id]['name']
     filename = tables[table_id]['filename']
     key = table_id, keymatch, subset, filter, raw
+    diskname = file_overrides.get(CID+filename, CID+filename)
     try:
-        datafile = getfilename(data_path/CID+filename)
+        datafile = getfilename(data_path/diskname)
     except TableError, exc:
-        exc.filename = CID+filename
+        exc.filename = diskname
         raise
     mtime = os.stat(datafile).st_mtime
     if use_cache and key in DATACACHE:
@@ -193,7 +194,7 @@ def setup(config):
     # NUMERICAL_FIELDS_AS_TEXT = set([])
     # CID = 'S'
     # name_overrides = {'RDER': 'RDERM', 'CSMS':'CSMSM'}
-    global tables, SCHEMA, DATA, PROBLEM_TABLES, NUMERICAL_FIELDS_AS_TEXT, CID, name_overrides
+    global tables, SCHEMA, DATA, PROBLEM_TABLES, NUMERICAL_FIELDS_AS_TEXT, CID, name_overrides, file_overrides
     ns = {'Path': Path}
     execfile(config, ns)
     SCHEMA = ns['SCHEMA']
@@ -202,6 +203,7 @@ def setup(config):
     NUMERICAL_FIELDS_AS_TEXT = ns['NUMERICAL_FIELDS_AS_TEXT']
     CID = ns['CID']
     name_overrides = ns['name_overrides']
+    file_overrides = ns['file_overrides']
     try:
         tables = parse_FIS_Schema(SCHEMA)
     except IOError:
