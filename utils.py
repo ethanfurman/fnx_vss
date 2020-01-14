@@ -470,7 +470,7 @@ def fix_date(text, format='mdy', delta_year=0):
     dd = int(dd)
     # auto-back day to inside month if needed
     original_exception = None
-    for dd in range(dd, 27, -1):
+    for dd in range(dd, min(dd-1, 27), -1):
         try:
             return Date(yyyy, mm, dd).replace(delta_year=delta_year)
         except Exception as exc:
@@ -479,7 +479,6 @@ def fix_date(text, format='mdy', delta_year=0):
             continue
     else:
         raise original_exception
-
 
 def date(year, month=None, day=None):
     if not year:
