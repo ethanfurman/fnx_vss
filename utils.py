@@ -468,7 +468,18 @@ def fix_date(text, format='mdy', delta_year=0):
         yyyy = int(yyyy, 16) - 160 + 2000
     mm = int(mm)
     dd = int(dd)
-    return Date(yyyy, mm, dd).replace(delta_year=delta_year)
+    # auto-back day to inside month if needed
+    original_exception = None
+    for dd in range(dd, 27, -1):
+        try:
+            return Date(yyyy, mm, dd).replace(delta_year=delta_year)
+        except Exception as exc:
+            if original_exception is None:
+                original_exception = exc
+            continue
+    else:
+        raise original_exception
+
 
 def date(year, month=None, day=None):
     if not year:
