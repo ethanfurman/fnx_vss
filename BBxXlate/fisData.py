@@ -147,7 +147,7 @@ def parse_FIS_Schema(source):
 
 DATACACHE = {}
 
-def fisData (table, keymatch=None, subset=None, filter=None, data_path=None, raw=False, nulls_only=False):
+def fisData (table, keymatch=None, subset=None, rematch=None, filter=None, data_path=None, raw=False, nulls_only=False):
     if data_path is None:
         use_cache = True
         data_path = DATA
@@ -159,7 +159,7 @@ def fisData (table, keymatch=None, subset=None, filter=None, data_path=None, raw
         table_id = tables[table]['name']
     tablename = tables[table_id]['name']
     filename = tables[table_id]['filename']
-    key = table_id, keymatch, subset, filter, raw
+    key = table_id, keymatch, rematch, subset, filter, raw
     diskname = file_overrides.get(CID+filename, CID+filename)
     try:
         datafile = getfilename(data_path/diskname)
@@ -177,7 +177,7 @@ def fisData (table, keymatch=None, subset=None, filter=None, data_path=None, raw
     rectype = tables[table_id]['key']
     table = BBxFile(
             datafile, datamap,
-            keymatch=keymatch, subset=subset,
+            keymatch=keymatch, subset=subset, rematch=rematch,
             filter=filter, rectype=rectype,
             fieldlist=fieldlist, name=tablename,
             desc=description, _cache_key=key,

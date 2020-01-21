@@ -240,7 +240,7 @@ def BBVarLength(datamap, fieldlist):
 
 class BBxFile(object):
 
-    def __init__(self, srcefile, datamap, fieldlist, keymatch=None, subset=None, filter=None, rectype=None, name=None, desc=None, _cache_key=None, raw=False, nulls_only=False):
+    def __init__(self, srcefile, datamap, fieldlist, keymatch=None, rematch=None, subset=None, filter=None, rectype=None, name=None, desc=None, _cache_key=None, raw=False, nulls_only=False):
         try:
             record_filename = srcefile.split('/')[-1]
             records = OrderedDict()
@@ -287,10 +287,18 @@ class BBxFile(object):
                 if filter:
                     if filter(rec):
                         records[ky] = rec
+                elif rematch is not None:
+                    if not rematch.startswith('^'):
+                        rematch = '^' + rematch
+                    if not rematch.endswith('$'):
+                        rematch = rematch + '$'
+                    if re.match(rematch, ky):
+                        records[ky] = rec
                 elif leader is trailer is None and keymatch is not None:
                     if keymatch == ky:
                         records[ky] = rec
                 elif leader is None or ky.startswith(leader):
+                    # must be final clause
                     if trailer is None or ky.endswith(trailer):
                         records[ky] = rec
             self.records = records
