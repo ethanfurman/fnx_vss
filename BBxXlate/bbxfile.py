@@ -5,6 +5,7 @@ from __future__ import print_function
 
 from antipathy import Path
 from collections import OrderedDict
+from scription import Var
 from stat import ST_MTIME
 from VSS.utils import LazyAttr as lazy
 import logging
@@ -241,9 +242,11 @@ def BBVarLength(datamap, fieldlist):
 class BBxFile(object):
 
     def __init__(self, srcefile, datamap, fieldlist, keymatch=None, rematch=None, subset=None, filter=None, rectype=None, name=None, desc=None, _cache_key=None, raw=False, nulls_only=False):
+        match = Var(re.match)
         try:
             record_filename = srcefile.split('/')[-1]
             records = OrderedDict()
+            rekeys = {}
             datamap = [xx.strip() for xx in datamap]
             leader = trailer = None
             if rectype:
@@ -292,8 +295,13 @@ class BBxFile(object):
                         rematch = '^' + rematch
                     if not rematch.endswith('$'):
                         rematch = rematch + '$'
-                    if re.match(rematch, ky):
+                    if match(rematch, ky):
                         records[ky] = rec
+                        rekey = match().groups()
+                        if rekey:
+                            if len(rekey) == 1:
+                                [rekey] = rekey
+                            rekeys[rekey] = rec
                 elif leader is trailer is None and keymatch is not None:
                     if keymatch == ky:
                         records[ky] = rec
@@ -302,6 +310,7 @@ class BBxFile(object):
                     if trailer is None or ky.endswith(trailer):
                         records[ky] = rec
             self.records = records
+            self.rekeys = rekeys
             self.datamap = datamap
             self.fieldlist = fieldlist
             self.keymatch  = keymatch
@@ -329,7 +338,7 @@ class BBxFile(object):
 
     def __getitem__(self, ky):
         ky = self._normalize_key(ky)
-        return self.records[ky]
+        return self.records.get(ky) or self.rekeys[ky]
 
     def __iter__(self):
         """
@@ -570,7 +579,7 @@ if __name__ != '__main__':
     def report(*args, **kwds):
         return
 else:
-    from scription import *
+    from scription import Alias, Command, Spec, echo, MULTI, OPTION, Main
     report = echo
 
     config = '%s/config/fnx.fis.conf' % os.environ['VIRTUAL_ENV']
