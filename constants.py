@@ -1,4 +1,4 @@
-from enum import Enum, IntEnum
+from aenum import Enum, IntEnum
 
 __all__ = [
         'Enum', 'IntEnum', 'AutoEnum', 'IndexEnum', 'Weekday', 'Month',

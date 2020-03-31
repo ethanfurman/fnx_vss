@@ -2,7 +2,7 @@ from __future__ import with_statement
 
 from itertools import groupby
 from antipathy import Path
-from enum import Enum, IntEnum
+from aenum import Enum, IntEnum
 from VSS.time_machine import PropertyDict
 from VSS.utils import translator, one_day, xrange, Table, Date, Time, days_per_month
 from VSS.constants import *
