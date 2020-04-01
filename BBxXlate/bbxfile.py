@@ -299,6 +299,7 @@ class BBxFile(object):
                         records[ky] = rec
                         rekey = match().groups()
                         if rekey:
+                            rekey = tuple(k.strip() for k in rekey)
                             if len(rekey) == 1:
                                 [rekey] = rekey
                             rekeys.setdefault(rekey, []).append(rec)
