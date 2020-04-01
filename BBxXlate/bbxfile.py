@@ -301,7 +301,7 @@ class BBxFile(object):
                         if rekey:
                             if len(rekey) == 1:
                                 [rekey] = rekey
-                            rekeys[rekey] = rec
+                            rekeys.setdefault(rekey, []).append(rec)
                 elif leader is trailer is None and keymatch is not None:
                     if keymatch == ky:
                         records[ky] = rec
@@ -338,7 +338,13 @@ class BBxFile(object):
 
     def __getitem__(self, ky):
         ky = self._normalize_key(ky)
-        return self.records.get(ky) or self.rekeys[ky]
+        res = self.records.get(ky)
+        if not res:
+            res = self.rekeys.get(ky)
+            if not res:
+                raise KeyError(ky)
+            res = res[0]
+        return res
 
     def __iter__(self):
         """
@@ -373,6 +379,13 @@ class BBxFile(object):
             return self[ky]
         except KeyError:
             return sentinel
+
+    def get_rekey(self, ky, sentinel=None):
+        if not self.rekeys:
+            raise ValueError('no re key specified when table loaded')
+        ky = self._normalize_key(ky)
+        res = self.rekeys.get(ky)
+        return res or sentinel
 
     def get_subset(self, ky=None):
         if not self.subset:
