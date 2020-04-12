@@ -315,7 +315,7 @@ class BBxFile(object):
             self.datamap = datamap
             self.fieldlist = fieldlist
             self.keymatch  = keymatch
-            self.subset  = subset
+            self.subset = subset
             self.rectype = rectype
             self.name = name
             self.desc= desc
@@ -381,12 +381,12 @@ class BBxFile(object):
         except KeyError:
             return sentinel
 
-    def get_rekey(self, ky, sentinel=None):
+    def get_rekey(self, ky):
         if not self.rekeys:
             raise ValueError('no re key specified when table loaded')
         ky = self._normalize_key(ky)
         res = self.rekeys.get(ky)
-        return res or sentinel
+        return res
 
     def get_subset(self, ky=None):
         if not self.subset:
