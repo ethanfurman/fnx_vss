@@ -134,7 +134,7 @@ def translator(frm='', to='', delete='', keep=None, strip=_trans_sentinel, compr
             s = s.translate(uni_table)
             if keep is not None:
                 for chr in set(s) - set(keep):
-                    uni_table[ord(chr)] = replacement
+                    uni_table[ord(chr)] = ord(replacement)
                 s = s.translate(uni_table)
         else:
             s = s.translate(bytes_trans, delete)
