@@ -1,11 +1,14 @@
 from __future__ import absolute_import, with_statement
 
-import __builtin__
+try:
+    import __builtin__ as builtins
+except ModuleNotFoundError:
+    import builtins
+
 import binascii
 import dbf
 import inspect
 import random
-import string
 import sys
 import threading
 from datetime import timedelta
@@ -15,6 +18,7 @@ from dbf import Date, Time, baseinteger, basestring
 from VSS.time_machine import Sentinel, simplegeneric
 
 one_day = timedelta(1)
+
 
 def nested_property(func):
     "make defining properties simpler (from Mike Muller) [fget, fset, fdel]"
@@ -107,37 +111,33 @@ def currency(number):
     return number
 
 _trans_sentinel = Sentinel('no strip argument')
-def translator(frm='', to='', delete='', keep=None, strip=_trans_sentinel, compress=False):
-    replacement = None
+def translator(frm=u'', to=u'', delete=u'', keep=u'', strip=_trans_sentinel, compress=False):
+    # delete and keep are mutually exclusive
+    if delete and keep:
+        raise ValueError('cannot specify both keep and delete')
+    replacement = replacement_ord = None
     if len(to) == 1:
-        if frm == '':
+        if frm == u'':
             replacement = to
-            to = ''
+            replacement_ord = ord(to)
+            to = u''
         else:
             to = to * len(frm)
-    bytes_trans = string.maketrans(frm, to)
-    if keep is not None:
-        allchars = string.maketrans('', '')
-        delete = allchars.translate(allchars, keep.translate(allchars, delete)+frm)
-        if replacement is not None:
-            frm = delete
-            to = replacement * len(delete)
-            delete = ''
-            bytes_trans = string.maketrans(frm, to)
-    uni_table = {}
-    for src, dst in zip(frm, to):
-        uni_table[ord(src)] = ord(dst)
-    for chr in delete:
-        uni_table[ord(chr)] = None
+    if len(to) != len(frm):
+        raise ValueError('frm and to should be equal lengths (or to should be a single character)')
+    uni_table = dict(
+            (ord(f), ord(t))
+            for f, t in zip(frm, to)
+            )
+    for ch in delete:
+        uni_table[ord(ch)] = None
     def translate(s):
-        if isinstance(s, unicode):
-            s = s.translate(uni_table)
-            if keep is not None:
-                for chr in set(s) - set(keep):
-                    uni_table[ord(chr)] = ord(replacement)
-                s = s.translate(uni_table)
-        else:
-            s = s.translate(bytes_trans, delete)
+        if isinstance(s, bytes):
+            s = s.decode('latin1')
+        if keep:
+            for chr in set(s) - set(keep):
+                uni_table[ord(chr)] = replacement_ord
+        s = s.translate(uni_table)
         if strip is not _trans_sentinel:
             s = s.strip(strip)
         if replacement and compress:
@@ -596,7 +596,7 @@ def text_to_date(text, format='ymd'):
                 yyyy, mm, dd = int(text[:4]), int(text[4:6]), int(text[6:])
             elif format == 'mdy':
                 mm, dd, yyyy = int(text[:2]), int(text[2:4]), int(text[4:])
-    except Exception, exc:
+    except Exception as exc:
         if exc.args:
             arg0 = exc.args[0] + '\n'
         else:
@@ -669,7 +669,7 @@ class copy_argspec(object):
                 {'signature':signature, 'tgt_func':'tgt_func'}
                    )
         evaldict = {'tgt_func' : tgt_func}
-        exec new_func in evaldict
+        exec(new_func, evaldict)
         wrapped = evaldict['_wrapper_']
         wrapped.__name__ = name
         wrapped.__doc__ = self.src_doc
