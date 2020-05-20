@@ -22,7 +22,7 @@ try:
     basestring
 except NameError:
     # only a problem on Python 3.1
-    basestring = unicode
+    basestring = str
 
 
 try:
