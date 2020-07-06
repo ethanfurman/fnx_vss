@@ -123,7 +123,7 @@ class BBxRec(object):
                     mask = fld[4]
                     break
             else:
-                raise ValueError('%s is not a valid field' % ref)
+                raise ValueError('%r is not a valid field' % ref)
             ref = [ref]
             masks = [mask]
             single = True
@@ -144,7 +144,7 @@ class BBxRec(object):
             try:
                 varidx = self.datamap.index(var)
             except ValueError:
-                raise ValueError('%s is not a valid field' % var)
+                raise ValueError('%r is not a valid field' % var)
             # intention: ignore missing trailing fields
             try:
                 val = self.rec[varidx]
@@ -159,7 +159,7 @@ class BBxRec(object):
                 result.append(cls(val))
             except Exception:
                 # _logger.error(repr(self))
-                _logger.error('<%s::%s> unable to convert %r to %s, data lost' % (self.filename, r+m, val, cls.__name__))
+                _logger.error('<%s::%s> unable to convert %r to %r, data lost' % (self.filename, r+m, val, cls.__name__))
                 result.append(cls())
         if single:
             return result[0]
@@ -437,7 +437,7 @@ def getfilename(target):
         template = target.dirname / target.base + '*'
         files = Path.glob(template)
         if not files:
-            raise MissingTableError('unable to find any files matching %s' % template)
+            raise MissingTableError('unable to find any files matching %r' % template)
     possibles = []
     for file in files:
         if len(file.base) in (5, 6):
@@ -462,7 +462,7 @@ def getfile(filename, fieldmap=None, nulls_only=False):
         data = fh.read()
         fh.close()
     except:
-        raise Exception("File not found or read/permission error: %s" % (filename, ))
+        raise Exception("File not found or read/permission error: %r" % (filename, ))
 
     #hexdump(data)
     #raise "Breaking..."
