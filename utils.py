@@ -2,8 +2,10 @@ from __future__ import absolute_import, with_statement
 
 try:
     import __builtin__ as builtins
+    from itertools import izip_longest as zip_longest
 except ModuleNotFoundError:
     import builtins
+    from itertools import zip_longest
 
 import binascii
 import dbf
@@ -569,6 +571,15 @@ def grouped(it, size):
     if result:
         yield tuple(result)
 
+def grouped_by_column(it, size):
+    'yield chunks of it in groups of size columns'
+    if size < 1:
+        raise ValueError('size must be greater than 0 (not %r)' % size)
+    elements = list(it)
+    iters = []
+    for i in range(size):
+        iters.append(elements[i::size])
+    return zip_longest(*iters, fillvalue='')
 
 def text_to_date(text, format='ymd'):
     '''(yy)yymmdd'''
