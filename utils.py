@@ -577,8 +577,11 @@ def grouped_by_column(it, size):
         raise ValueError('size must be greater than 0 (not %r)' % size)
     elements = list(it)
     iters = []
-    for i in range(size):
-        iters.append(elements[i::size])
+    rows, remainder = divmod(len(elements), size)
+    if remainder:
+        rows += 1
+    for column in grouped(elements, rows):
+        iters.append(column)
     return zip_longest(*iters, fillvalue='')
 
 def text_to_date(text, format='ymd'):
