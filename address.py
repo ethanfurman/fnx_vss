@@ -8,8 +8,8 @@ building_subs = set([
     '#','APARTMENT','APT','BLDG','BUILDING','CONDO','FL','FLR','FLOOR','LOT','LOWER','NO','NUM','NUMBER',
     'RM','ROOM','SLIP','SLP','SPACE','SP','SPC','STE','SUITE','TRLR','UNIT','UPPER',
     ])
-caps_okay = set(['UCLA', 'OHSU', 'IBM', 'LLC', 'USA', 'NASA'])
-lower_okay = set(['dba', 'c/o', 'attn'])
+caps_okay = set(['UCLA', 'OHSU', 'IBM', 'LLC', 'USA', 'NSA', 'NASA','UCSC'])
+lower_okay = set(['dba', 'c/o', 'attn','dba:','attn:'])
 
 alpha_num = translator(delete='.,:_#')
 non_alpha_num = translator(delete="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,-")
@@ -532,8 +532,9 @@ def cszk(line1, line2):
       returns street, city, state, zip, country; but state is only
       populated if country is US or CA
     """
-    line1 = re.sub(r'\b[A-Z]\.[A-Z]\.[^A-Z]', lambda s: s.group().replace('.',''), line1.upper())
-    line2 = re.sub(r'\b[A-Z]\.[A-Z]\.[^A-Z]', lambda s: s.group().replace('.',''), line2.upper())
+    orig_line1, orig_line2 = line1, line2
+    line1 = re.sub(r'\b[A-Z]\.[A-Z]\.[^A-Z]?', lambda s: s.group().replace('.',''), line1.upper())
+    line2 = re.sub(r'\b[A-Z]\.[A-Z]\.[^A-Z]?', lambda s: s.group().replace('.',''), line2.upper())
     line1, line2 = Sift(line1.replace('.',' ').replace(',',' '), line2.replace('.',' ').replace(',',' '))
     line1 = ' '.join(line1.split())
     line2 = ' '.join(line2.split())
@@ -616,10 +617,20 @@ def cszk(line1, line2):
             if kountry in us_ca_state_abbr:
                 state = us_ca_state_abbr[kountry]
                 country = ''
+        # finally, if we have state but still no country, it's us
+        if state and not country:
+            country = 'UNITED STATES'
+        if country.isdigit() or country in ('US', 'USA', 'USOA', 'UNITED STATES', 'UNITED STATES OF AMERICA'):
+            country = 'UNITED STATES'
         if pieces:
             city = (' '.join(pieces) + ' ' + city).strip(', ')
             pieces[:] = []
-        if city : # early bail
+        # if we have no state, it's a foreign address
+        # but if we also have no country, it's garbage
+        if not state and not country:
+            # return what we started with (line2 ends up in city)
+            return orig_line1, orig_line2, '', '', ''
+        elif city : # early bail
             street, line1 = line1, ''
             return street, city, state, postal, country
         else:
@@ -1743,14 +1754,16 @@ def _names(names, last_name_first=False):
                 possible = mixed_case_names.get(piece, None)
                 if possible is not None:
                     piece = possible
-                else:
+                elif vowels(piece):
                     piece = piece.title()
                     if piece[-2:].startswith("'"):
                         piece = piece[:-1] + piece[-1].lower()
+                else:
+                    piece = piece.upper()
             result.append(piece)
-        if result[0] == result[0].lower():
+        if result and result[0] == result[0].lower():
             result[0] = result[0].title()
-        if result[-1] == result[-1].lower():
+        if result and result[-1] == result[-1].lower():
             result[-1] = result[-1].title()
         if last_name_first:
             final.append(' '.join(result[-last_name:]) + ', ' + ' '.join(result[:-last_name]))
@@ -1767,25 +1780,61 @@ def AddrCase(*fields):
     for field in fields:
         result = []
         for word in field.split():
+            if has_lower(word):
+                # don't touch words that have lower-cased letters
+                result.append(word)
+                continue
             uppered = word.upper()
             if uppered in ('N','NW','W','SW','S','SE','E','NE','PO','PMB','US'):
                 result.append(uppered)
-            elif word[:-2].isdigit() and word[-2:].lower() in ('st','nd','rd','th'):
-                result.append(word.lower())
-            elif has_alpha(word) and has_digits(word) or non_alpha_num(word):
-                result.append(word)
+            elif uppered[:-2].isdigit() and uppered[-2:] in ('ST','ND','RD','TH'):
+                result.append(uppered.lower())
+            elif (  has_alpha(uppered) and has_digits(uppered)
+                    or non_alpha_num(uppered)
+                    or uppered[:1] == 'Y' and not vowels(uppered[1:])
+                    or not vowels(uppered)
+                ):
+                result.append(uppered)
             elif uppered[:2] == 'MC':
                 result.append('Mc' + uppered[2:].title())
             else:
-                result.append(word.title())
+                result.append(uppered.title())
         final.append(' '.join(result))
     return final
 
 
 @tuples
 def BsnsCase(*fields):
+    # pieces coming in should have been `smart-upper`d
     if not any(fields):
         return fields
+    def case_word(word, last_word=None):
+        word = word.replace('-',' ')
+        lowered = word.lower()
+        if word in caps_okay:
+            return word
+        elif lowered in lower_okay:
+            return word
+        elif lowered == 'a' and last_word is None:
+            return word
+        elif lowered in ('a','an','and','at','of','in','the','to') and last_word not in ('&','and'):
+            return lowered
+        elif lowered[:2] == 'mc':
+            return 'Mc' + lowered[2:].title()
+        elif len(word) < 3 or len(word) == 3 and not vowels(word):
+            return word
+        elif word != word.title() and (has_lower(word) and has_upper(word) or has_digits(word)):
+            # maintain the strange casing
+            return word
+        else:
+            number, suffix = lowered[:-2], lowered[-2:]
+            if number.isdigit() and suffix in ('st','nd','rd','th'):
+                word = word[:-2].title() + suffix
+            else:
+                word = word.title()
+                if word[-2:].startswith("'"):
+                    word = word[:-1] + word[-1].lower()
+            return word
     final = []
     for name in fields:
         pieces = name.split()
@@ -1795,31 +1844,16 @@ def BsnsCase(*fields):
         mixed = []
         last_piece = ''
         for piece in pieces:
-            #if has_lower(piece):
-            #    return name
-            lowered = piece.lower()
-            if piece in caps_okay:
-                mixed.append(piece)
-            elif lowered in lower_okay:
-                piece = lowered
-                mixed.append(piece)
-            elif lowered in ('a','an','and','of','the','at') and last_piece not in ('&','and'):
-                mixed.append(lowered)
-            elif lowered[:2] == 'mc':
-                mixed.append('Mc' + lowered[2:].title())
-            elif len(piece) == 2 and not vowels(piece):
-                mixed.append(piece)
+            if '-' in piece:
+                syls = piece.split('-')
+                word = []
+                for syl in syls:
+                    word.append(case_word(syl))
+                last_piece = '-'.join(word)
             else:
-                number, suffix = lowered[:-2], lowered[-2:]
-                if number.isdigit() and suffix in ('st','nd','rd','th'):
-                    piece = piece[:-2].title() + suffix
-                else:
-                    piece = piece.title()
-                    if piece[-2:].startswith("'"):
-                        piece = piece[:-1] + piece[-1].lower()
-                mixed.append(piece)
-            last_piece = piece
-        if mixed[0].lower() == mixed[0] and (mixed[0] not in lower_okay and mixed[0][-2:] not in ('st','nd','rd','th')):
+                last_piece = case_word(piece, last_piece)
+            mixed.append(last_piece)
+        if mixed and mixed[0].lower() == mixed[0] and (mixed[0] not in lower_okay and mixed[0][-2:] not in ('st','nd','rd','th')):
             mixed[0] = mixed[0].title()
         final.append(' '.join(mixed))
     return final
