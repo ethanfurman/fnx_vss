@@ -172,18 +172,56 @@ def unabbreviate(text, abbr):
     return ' '.join(final)
 
 
+
 def tuples(func):
+    # function returns same type as was passed in (list, tuple, basestring only)
+    # ensures `func` receives a tuple
     def wrapper(*args):
-        if len(args) == 1 and not isinstance(args[0], basestring):
+        if len(args) > 1:
+            data_type = tuple
+        elif len(args) == 1 and not isinstance(args[0], basestring):
             args = args[0]
-        result = tuple(func(*args))
-        if len(result) == 1:
-            result = result[0]
-        return result
-    #wrapper.__name__ = func.__name___
+            data_type = type(args)
+            args = tuple(args)
+        elif len(args) == 1:
+            data_type = type(args[0])
+        else:
+            data_type = tuple
+        result = func(*args)
+        # result could be: basestring, tuple, list
+        # data_type could be: basestring, tuple, list
+        # if r is basestring and dt is basestring -> r
+        # if r is basestring and dt is tuple/list -> dt((r, ))
+        # if r is len(1) tuple/list and dt is basestring -> r[0]
+        # if r is len(n) tuple/list and dt is basestring -> raise
+        # if r is tuple/list and dt is tuple/list -> dt(r)
+        if isinstance(result, basestring) and issubclass(data_type, basestring):
+            return result
+        elif isinstance(result, basestring):
+            return data_type((result, ))
+        elif issubclass(data_type, basestring) and len(result) == 1:
+            return result[0]
+        elif issubclass(data_type, basestring):
+            # too much returned
+            raise TypeError('%s return %r items as %r (max allowed: 1)' % (func.__name__, len(result), result))
+        else:
+            return data_type(result)
+    wrapper.__name__ = getattr(func, '__name___', None) or getattr(func, 'func_name', 'tuples')
     wrapper.__doc__ = func.__doc__
     return wrapper
 
+    # old decorator
+    # def tuples(func):
+    #     def wrapper(*args):
+    #     if len(args) == 1 and not isinstance(args[0], basestring):
+    #         args = args[0]
+    #     result = tuple(func(*args))
+    #     if len(result) == 1:
+    #         result = result[0]
+    #     return result
+    #     #wrapper.__name__ = func.__name___
+    #     wrapper.__doc__ = func.__doc__
+    #     return wrapper
 
 class xrange(object):
     '''
@@ -402,6 +440,8 @@ phone = translator(delete=' -().etET')
 
 def fix_phone(text):
     text = str(text) # convert numbers to digits
+    if not text.strip('0'):
+        return ''
     text = text.strip()
     data = phone(text)
     if not data:
@@ -724,6 +764,8 @@ class LazyClassAttr(object):
             result = self.fget(instance)
         setattr(owner, self.name or self.fget.__name__, result)
         return result
+    def __set_name__(self, ownerclass, name):
+        self.name = name
 
 
 class Open(object):
