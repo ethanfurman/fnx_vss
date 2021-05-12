@@ -154,8 +154,9 @@ def fisData (table, keymatch=None, subset=None, rematch=None, filter=None, data_
     else:
         use_cache = False
         data_path = Path(data_path)
-    table_id = tables[table]['filenum']
+    table_id = filenum = tables[table]['filenum']
     if table_id is None:
+        filenum = None
         table_id = tables[table]['name']
     tablename = tables[table_id]['name']
     filename = tables[table_id]['filename']
@@ -179,7 +180,7 @@ def fisData (table, keymatch=None, subset=None, rematch=None, filter=None, data_
             datafile, datamap,
             keymatch=keymatch, subset=subset, rematch=rematch,
             filter=filter, rectype=rectype,
-            fieldlist=fieldlist, name=tablename,
+            fieldlist=fieldlist, name=tablename, file_number=filenum,
             desc=description, _cache_key=key,
             raw=raw, nulls_only=nulls_only,
             )

@@ -241,7 +241,8 @@ def BBVarLength(datamap, fieldlist):
 
 class BBxFile(object):
 
-    def __init__(self, srcefile, datamap, fieldlist, keymatch=None, rematch=None, subset=None, filter=None, rectype=None, name=None, desc=None, _cache_key=None, raw=False, nulls_only=False):
+    def __init__(self, srcefile, datamap, fieldlist, keymatch=None, rematch=None, subset=None, filter=None, rectype=None, name=None, file_number=None, desc=None, _cache_key=None, raw=False, nulls_only=False):
+        self.number = file_number
         match = Var(re.match)
         try:
             record_filename = srcefile.split('/')[-1]
