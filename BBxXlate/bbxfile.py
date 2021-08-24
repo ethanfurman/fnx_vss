@@ -12,6 +12,7 @@ import logging
 import os
 import re
 import string
+import warnings
 
 _logger = logging.getLogger('BBx')
 
@@ -352,6 +353,11 @@ class BBxFile(object):
         """
         iterates through the records (all records kept during __init__, ignores subsequent keymatch settings, etc.)
         """
+        warnings.warn(
+                "BBxFile: default iteration will be changing to keys",
+                DeprecationWarning,
+                stacklevel=2,
+                )
         return iter(self.records.values())
 
     def __len__(self):

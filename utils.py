@@ -437,6 +437,7 @@ class Memory(object):
             return value
 
 phone = translator(delete=' -().etET')
+ext = translator(delete=' -().extEXT')
 
 def fix_phone(text):
     text = str(text) # convert numbers to digits
