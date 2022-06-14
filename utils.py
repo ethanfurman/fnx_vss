@@ -136,10 +136,10 @@ def translator(frm=u'', to=u'', delete=u'', keep=u'', strip=_trans_sentinel, com
     def translate(s):
         if isinstance(s, bytes):
             s = s.decode('latin1')
+        s = s.translate(uni_table)
         if keep:
             for chr in set(s) - set(keep):
                 uni_table[ord(chr)] = replacement_ord
-        s = s.translate(uni_table)
         if strip is not _trans_sentinel:
             s = s.strip(strip)
         if replacement and compress:
