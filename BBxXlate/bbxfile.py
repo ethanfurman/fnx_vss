@@ -244,6 +244,7 @@ class BBxFile(object):
 
     def __init__(self, srcefile, datamap, fieldlist, keymatch=None, rematch=None, subset=None, filter=None, rectype=None, name=None, file_number=None, desc=None, _cache_key=None, raw=False, nulls_only=False):
         self.number = file_number
+        self.field_lens = set()
         match = Var(re.match)
         try:
             record_filename = srcefile.split('/')[-1]
@@ -261,7 +262,12 @@ class BBxFile(object):
                 if last_ps != -1:
                     trailer = keymatch[last_ps+2:]     # skip the %s ;)
             fieldlengths = BBVarLength(datamap, fieldlist)
-            fixedLengthFields = set([fld[1] for fld in fieldlist if '$' in fld[3] and fld[3][-1] != '$'])
+            fixedLengthFields = set()
+            for fld in fieldlist:
+                name = fld[3]
+                if '$' in name and name[-1] != '$':
+                    name = name.split('$')[0] + '$'
+                    fixedLengthFields.add(name)
             corrupted = 0
             for ky, rec in getfile(srcefile, nulls_only=nulls_only).items():
                 if not raw:
@@ -272,7 +278,6 @@ class BBxFile(object):
                         try:
                             if (
                                 len(ky) != fieldlengths[0] or
-                                not ((len(datamap) - 2) <= len(rec) <= (len(datamap) + 2)) or
                                 any(len(field) != length for field, length, name in
                                     zip(rec, fieldlengths, datamap) if name in fixedLengthFields
                                     ) or
@@ -281,6 +286,7 @@ class BBxFile(object):
                                     continue    # record is not a match for this table
                         except:
                             raise UnknownTableError()
+                self.field_lens.add(len(rec))
                 rec = BBxRec(rec, datamap, fieldlist, record_filename)
                 if nulls_only:
                     records[ky] = rec
