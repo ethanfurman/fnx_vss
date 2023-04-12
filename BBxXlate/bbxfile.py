@@ -24,6 +24,7 @@ class UnknownTableError(TableError):
 
 class MissingTableError(TableError):
     'unable to find table file'
+    template = None
 
 
 def asc(strval):                    ##USED in bbxfile
@@ -243,6 +244,9 @@ def BBVarLength(datamap, fieldlist):
 class BBxFile(object):
 
     def __init__(self, srcefile, datamap, fieldlist, keymatch=None, rematch=None, subset=None, filter=None, rectype=None, name=None, file_number=None, desc=None, _cache_key=None, raw=False, nulls_only=False):
+        self.name = name
+        self.desc= desc
+        self.filename = srcefile
         self.number = file_number
         self.field_lens = set()
         match = Var(re.match)
@@ -252,8 +256,15 @@ class BBxFile(object):
             rekeys = {}
             datamap = [xx.strip() for xx in datamap]
             leader = trailer = None
+            acceptable = lambda x: True
             if rectype:
-                tokens, start, stop = rectype
+                tokens, start, stop, comparison = rectype
+                if comparison == '=':
+                    acceptable = lambda x: x[start:stop] in tokens
+                elif comparison == '!=':
+                    acceptable = lambda x: x[start:stop] not in tokens
+                else:
+                    raise ValueError('unknown comparison %r in %r' % (comparison, srcefile))
             if keymatch:
                 first_ps = keymatch.find('%s')
                 last_ps = keymatch.rfind('%s')
@@ -272,18 +283,13 @@ class BBxFile(object):
             for ky, rec in getfile(srcefile, nulls_only=nulls_only).items():
                 if not raw:
                     if nulls_only:
-                        if rectype and ky[start:stop] not in tokens:
+                        if not acceptable(ky):
+                        # if rectype and ky[start:stop] not in tokens:
                             continue
                     else:
                         try:
-                            if (
-                                len(ky) != fieldlengths[0] or
-                                any(len(field) != length for field, length, name in
-                                    zip(rec, fieldlengths, datamap) if name in fixedLengthFields
-                                    ) or
-                                rectype and ky[start:stop] not in tokens
-                                ):
-                                    continue    # record is not a match for this table
+                            if len(ky) != fieldlengths[0] or not acceptable(ky):
+                                continue    # record is not a match for this table
                         except:
                             raise UnknownTableError()
                 self.field_lens.add(len(rec))
@@ -325,11 +331,10 @@ class BBxFile(object):
             self.keymatch  = keymatch
             self.subset = subset
             self.rectype = rectype
-            self.name = name
-            self.desc= desc
-            self.filename = srcefile
+            self.fixed_length_fields = fixedLengthFields
             self._cache_key = _cache_key
             self.corrupted = corrupted
+            self.key_length = fieldlengths[0]
         except TableError, exc:
             exc.filename = srcefile
             raise
@@ -450,7 +455,9 @@ def getfilename(target):
         template = target.dirname / target.base + '*'
         files = Path.glob(template)
         if not files:
-            raise MissingTableError('unable to find any files matching %r' % template)
+            exc = MissingTableError('unable to find any files matching %r' % template)
+            exc.template = template
+            raise exc
     possibles = []
     for file in files:
         if len(file.base) in (5, 6):
