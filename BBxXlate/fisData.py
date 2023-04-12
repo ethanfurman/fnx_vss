@@ -4,6 +4,8 @@ import os, logging
 import bbxfile
 from bbxfile import BBxFile, getfilename, TableError
 from antipathy import Path
+from scription import Var
+import re
 import sys
 _logger = logging.getLogger(__name__)
 
@@ -78,8 +80,12 @@ def parse_FIS_Schema(source):
                     TABLES[name] = TABLES[filenum]
                 iolist = TABLES[filenum]['iolist']
                 table_id = filenum
+            field_seq = 0
         else:   # should start with a field number...
+            field_seq += 1
             fieldnum, fielddesc, fieldsize, rest = slicendice(line, 10, 50, 56)
+            if fieldnum != '*':
+                fieldnum = field_seq
             rest = rest.split()
             if not rest:
                 last_letter = chr(ord(last_letter) + 1)
@@ -115,10 +121,11 @@ def parse_FIS_Schema(source):
             if not basevar in iolist:
                 iolist.append(basevar)
             fieldsize = int(fieldsize) if fieldsize else 0
-            fields.append(["f%s_%s" % (filenum,fieldnum), fielddesc, fieldsize, fieldvar, sizefrom(fieldmask)])
+            if fieldnum != '*':
+                fields.append(["f%s_%s" % (filenum,fieldnum), fielddesc, fieldsize, fieldvar, sizefrom(fieldmask)])
             desc = fielddesc.replace(' ','').replace('-','=').lower()
             if (fieldvar.startswith(iolist[0])
-            and desc.startswith(('key','keygroup','keytyp','rectype','recordtype','type'))
+            and desc.startswith(('key','keygroup','keytyp','rectype','recordtype','sequencekey','type'))
             and desc.count('=') == 1):
                 if desc.startswith('type') and '"' not in desc and "'" not in desc:
                     continue
@@ -133,17 +140,22 @@ def parse_FIS_Schema(source):
                     #     if ' OR ' in token:
                     #         token = tuple([t.strip('\' "') for t in token.split(' OR ')])
                 else:
-                    token = fielddesc.replace('-','=').split('=')[1].strip().strip('\'"')
+                    # token = fielddesc.replace('-','=').split('=')[1].strip().strip('\'"')
+                    comparison, token = key_spec(fielddesc).groups()
+                    token = token.strip('\'" ')
                     start, length = fieldvar.split('(')[1].strip(')').split(',')
                     start, length = int(start) - 1, int(length)
+                    if token.lower() == 'blank':
+                        token = ' ' * length
                     if len(token) < length:
                         length = len(token)
                     stop = start + length
                 if not isinstance(token, tuple):
                     token = (token, )
-                TABLES[table_id]['key'] = token, start, stop
+                TABLES[table_id]['key'] = token, start, stop, comparison
     return TABLES
 
+key_spec = Var(lambda haystack: re.search(".*(!?=)(.*)", haystack))
 
 DATACACHE = {}
 
