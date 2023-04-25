@@ -64,6 +64,7 @@ def parse_FIS_Schema(source):
                 fields = TABLES.setdefault(name, {'name':name, 'desc':desc, 'filename':name_overrides.get(name[:4],name[:4]), 'filenum':None, 'fields':[], 'iolist':[], 'key':None})['fields']
                 iolist = TABLES[name]['iolist']
                 table_id = name
+                filenum = ''
             else:
                 filenum = int(parts[1].split()[0])
                 fields = TABLES.setdefault(filenum, {'name':name, 'desc':desc, 'filename':name_overrides.get(name[:4],name[:4]), 'filenum':filenum, 'fields':[], 'iolist':[], 'key':None})['fields']
