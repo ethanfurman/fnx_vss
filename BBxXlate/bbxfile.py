@@ -290,6 +290,8 @@ class BBxFile(object):
                         try:
                             if len(ky) != fieldlengths[0] or not acceptable(ky):
                                 continue    # record is not a match for this table
+                        except TypeError:
+                            continue
                         except:
                             raise UnknownTableError()
                 self.field_lens.add(len(rec))
