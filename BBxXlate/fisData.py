@@ -35,6 +35,7 @@ def parse_FIS_Schema(source):
     TABLES = {}
     skip_table = False
     duplicates = set()
+    table_count = 0
     for line in contents:
         line = line.rstrip()
         if not line:
@@ -42,6 +43,7 @@ def parse_FIS_Schema(source):
         if skip_table and line[:1] == ' ':
             continue
         elif line[:1] == 'F' and line[1:2] != 'C':
+            table_count += 1
             skip_table = True
             continue
         elif line[:15].strip() == '':
@@ -54,32 +56,34 @@ def parse_FIS_Schema(source):
             parts = line[9:].rsplit(" (", 1)
             desc = parts[0].strip()
             last_letter = chr(ord('A') - 1)
+            table_count += 1
             if parts[1].startswith('at '):
-                if name in TABLES:
-                    if SELF_TEST:
-                        print('skipping duplicate table in schema: %s' % (name, ))
-                    # skip duplicate tables
-                    skip_table = True
-                    continue
-                fields = TABLES.setdefault(name, {'name':name, 'desc':desc, 'filename':name_overrides.get(name[:4],name[:4]), 'filenum':None, 'fields':[], 'iolist':[], 'key':None})['fields']
-                iolist = TABLES[name]['iolist']
-                table_id = name
-                filenum = ''
+                filenum = table_count
+                # if name in TABLES:
+                #     if SELF_TEST:
+                #         print('skipping duplicate table in schema: %s' % (name, ))
+                #     # skip duplicate tables
+                #     skip_table = True
+                #     continue
+                # fields = TABLES.setdefault(name, {'name':name, 'desc':desc, 'filename':name_overrides.get(name[:4],name[:4]), 'filenum':None, 'fields':[], 'iolist':[], 'key':None})['fields']
+                # iolist = TABLES[name]['iolist']
+                # table_id = name
             else:
                 filenum = int(parts[1].split()[0])
-                fields = TABLES.setdefault(filenum, {'name':name, 'desc':desc, 'filename':name_overrides.get(name[:4],name[:4]), 'filenum':filenum, 'fields':[], 'iolist':[], 'key':None})['fields']
-
-                if name in TABLES:
-                    del TABLES[name]    # only allow names if there aren't any duplicates
-                    duplicates.add(name)
-                    if SELF_TEST:
-                        print('adding table %s as %d only' % (name, filenum))
-                elif name in duplicates:
-                    pass
-                else:
-                    TABLES[name] = TABLES[filenum]
-                iolist = TABLES[filenum]['iolist']
-                table_id = filenum
+            if filenum != table_count:
+                print('table count and file number are out of sync at %s - %s' % (filenum, name))
+            fields = TABLES.setdefault(filenum, {'name':name, 'desc':desc, 'filename':name_overrides.get(name[:4],name[:4]), 'filenum':filenum, 'fields':[], 'iolist':[], 'key':None})['fields']
+            if name in TABLES:
+                del TABLES[name]    # only allow names if there aren't any duplicates
+                duplicates.add(name)
+                if SELF_TEST:
+                    print('adding table %s as %d only' % (name, filenum))
+            elif name in duplicates:
+                pass
+            else:
+                TABLES[name] = TABLES[filenum]
+            iolist = TABLES[filenum]['iolist']
+            table_id = filenum
             field_seq = 0
         else:   # should start with a field number...
             field_seq += 1
