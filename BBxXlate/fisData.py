@@ -4,14 +4,21 @@ import os, logging
 import bbxfile
 from bbxfile import BBxFile, getfilename, TableError
 from antipathy import Path
-from scription import Var
+from scription import Var, OrmFile
 import re
 import sys
 _logger = logging.getLogger(__name__)
+config = OrmFile(Path('%s/config/fnx.ini' % os.environ['VIRTUAL_ENV']), types={'_path':Path})
+SELF_TEST = False
 
-# set later via execfile
-CID = NUMERICAL_FIELDS_AS_TEXT = PROBLEM_TABLES = SELF_TEST = None
-DATA = SCHEMA = Path()
+CID = config.fis_imports.cid
+NUMERICAL_FIELDS_AS_TEXT = config.fis_imports.numerical_fields_as_text
+PROBLEM_TABLES = config.fis_imports.problem_tables
+DATA = config.fis_imports.data
+SCHEMA = config.fis_imports.schema
+FILE_OVERRIDES = config.fis_imports.file_overrides
+NAME_OVERRIDES = config.fis_imports.name_overrides
+
 
 def sizefrom(mask):
     if not(mask): return ""
@@ -61,13 +68,13 @@ def parse_FIS_Schema(source):
                     # skip duplicate tables
                     skip_table = True
                     continue
-                fields = TABLES.setdefault(name, {'name':name, 'desc':desc, 'filename':name_overrides.get(name[:4],name[:4]), 'filenum':None, 'fields':[], 'iolist':[], 'key':None})['fields']
+                fields = TABLES.setdefault(name, {'name':name, 'desc':desc, 'filename':NAME_OVERRIDES.get(name[:4],name[:4]), 'filenum':None, 'fields':[], 'iolist':[], 'key':None})['fields']
                 iolist = TABLES[name]['iolist']
                 table_id = name
                 filenum = ''
             else:
                 filenum = int(parts[1].split()[0])
-                fields = TABLES.setdefault(filenum, {'name':name, 'desc':desc, 'filename':name_overrides.get(name[:4],name[:4]), 'filenum':filenum, 'fields':[], 'iolist':[], 'key':None})['fields']
+                fields = TABLES.setdefault(filenum, {'name':name, 'desc':desc, 'filename':NAME_OVERRIDES.get(name[:4],name[:4]), 'filenum':filenum, 'fields':[], 'iolist':[], 'key':None})['fields']
                 if name in TABLES:
                     del TABLES[name]    # only allow names if there aren't any duplicates
                     duplicates.add(name)
@@ -172,7 +179,7 @@ def fisData (table, keymatch=None, subset=None, rematch=None, filter=None, data_
     tablename = tables[table_id]['name']
     filename = tables[table_id]['filename']
     key = table_id, keymatch, rematch, subset, filter, raw
-    diskname = file_overrides.get(CID+filename, CID+filename)
+    diskname = FILE_OVERRIDES.get(CID+filename, CID+filename)
     try:
         datafile = getfilename(data_path/diskname)
     except TableError, exc:
@@ -200,22 +207,7 @@ def fisData (table, keymatch=None, subset=None, rematch=None, filter=None, data_
     return table
 
 def setup(config):
-    # SCHEMA = Path("/opt/FIS/WholeHerb_FIS_SCHEMA")
-    # DATA = Path("/opt/FIS/whc_data")
-    # PROBLEM_TABLES = ('FCCORE')
-    # NUMERICAL_FIELDS_AS_TEXT = set([])
-    # CID = 'S'
-    # name_overrides = {'RDER': 'RDERM', 'CSMS':'CSMSM'}
-    global tables, SCHEMA, DATA, PROBLEM_TABLES, NUMERICAL_FIELDS_AS_TEXT, CID, name_overrides, file_overrides
-    ns = {'Path': Path}
-    execfile(config, ns)
-    SCHEMA = ns['SCHEMA']
-    DATA = ns['DATA']
-    PROBLEM_TABLES = ns['PROBLEM_TABLES']
-    NUMERICAL_FIELDS_AS_TEXT = ns['NUMERICAL_FIELDS_AS_TEXT']
-    CID = ns['CID']
-    name_overrides = ns['name_overrides']
-    file_overrides = ns['file_overrides']
+    global tables
     try:
         tables = parse_FIS_Schema(SCHEMA)
     except IOError:
@@ -254,11 +246,6 @@ if __name__ == '__main__':
     from scription import *
     report = echo
     virtual_env = os.environ.get('VIRTUAL_ENV')
-    config = '%s/config/fnx.fis.conf' % os.environ['VIRTUAL_ENV']
-    ns = {'Path': Path}
-    execfile(config, ns)
-    DATA = ns['DATA']
-    CID = ns['CID']
     print('schema: %s' % (SCHEMA, ))
     print('data:   %s' % (DATA, ))
     print('CID:    %s' % (CID, ))
