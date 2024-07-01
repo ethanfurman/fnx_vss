@@ -16,7 +16,10 @@ import threading
 from datetime import timedelta
 from math import floor
 from socket import socket, AF_INET, SOCK_DGRAM
-from dbf import Date, Time, baseinteger, basestring
+from dbf import Date, Time
+from dbf.bridge import baseinteger, basestring
+from dbf.data_types import days_per_month, days_per_leap_month
+from dbf.utils import is_leapyear
 from VSS.time_machine import Sentinel, simplegeneric
 
 one_day = timedelta(1)
@@ -75,7 +78,7 @@ def Table(fn, *args, **kwds):
 
 
 def days_per_month(year):
-    return (dbf.days_per_month, dbf.days_per_leap_month)[dbf.is_leapyear(year)]
+    return (days_per_month, days_per_leap_month)[is_leapyear(year)]
 
 
 def all_equal(iterator, test=None):
@@ -527,11 +530,11 @@ def fix_date(text, format='mdy', delta_year=0):
 
 def date(year, month=None, day=None):
     if not year:
-        return dbf.Date(None)
+        return Date(None)
     elif isinstance(year, basestring):
         return text_to_date(year)
     else:
-        return dbf.Date(year, month, day)
+        return Date(year, month, day)
 
 def get_local_ip(target):
     "get local ip address needed to talk to target"
