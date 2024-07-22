@@ -62,8 +62,10 @@ def applyfieldmap(record, fieldmap):
     return retval
 
 
-def unicode_strip(text=u''):
-    return unicode(text).strip()
+def unicode_strip(text=b''):
+    if isinstance(text, bytes):
+        text = text.decode('utf8', 'ignore')
+    return text
 
 def Int(text=''):
     if not text.strip():
