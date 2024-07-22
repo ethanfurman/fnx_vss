@@ -629,7 +629,7 @@ def cszk(line1, line2):
         # but if we also have no country, it's garbage
         if not state and not country:
             # return what we started with (line2 ends up in city)
-            return orig_line1, orig_line2, '', '', ''
+            return orig_line1, orig_line2, '', postal, ''
         elif city : # early bail
             street, line1 = line1, ''
             return street, city, state, postal, country
