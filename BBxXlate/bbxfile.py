@@ -204,7 +204,7 @@ class BBxRec(object):
                 try:
                     width = len(unicode(self[field_def]))
                 except UnicodeDecodeError:
-                    width = len(self[field].decode('utf8','ignore')))
+                    width = len(self[field_def].decode('utf8','ignore'))
             widths.append(width)
             max_width = max(max_width, width)
         self._width = max_width
