@@ -1481,6 +1481,18 @@ def standardize_address(street1, street2, city, state, postal_code, country=''):
     return street1, street2, city, state, postal_code, country
 
 
+def format_address(street1, street2, city, state, postal, country, place_holder=False):
+    lines = [s for s in (street1, street2) if s]
+    if place_holder:
+        city = city or '-------'
+        state = state or '--'
+        postal = postal or '-----'
+        country = country or '---------'
+    lines.append(' '.join([p for p in (city, state, postal) if p]))
+    if country:
+        lines.append(country)
+    return '\n'.join(lines)
+
 class AddressSegment(AutoEnum):
     misc = "not currently tracked"
     ordinal = "N S E W etc"

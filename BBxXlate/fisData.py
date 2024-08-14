@@ -19,6 +19,16 @@ SCHEMA = config.fis_imports.schema
 FILE_OVERRIDES = config.fis_imports.file_overrides
 NAME_OVERRIDES = config.fis_imports.name_overrides
 
+# WHC mappings
+# NVTY - 135
+# CSMS - 33
+# CSMSB - 140
+# CSMSS - 34
+# VNMS - 65
+# POSM - 163
+# CNVZc - 122
+# NVBA - 250
+
 
 def sizefrom(mask):
     if not(mask): return ""
