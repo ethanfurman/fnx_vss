@@ -139,11 +139,12 @@ def parse_FIS_Schema(source):
             fieldsize = int(fieldsize) if fieldsize else 0
             if fieldnum != '*':
                 fields.append(["f%s_%s" % (filenum,fieldnum), fielddesc, fieldsize, fieldvar, sizefrom(fieldmask)])
-            desc = fielddesc.replace(' ','').replace('-','=').lower()
+            desc = fielddesc.replace(' ','').replace('-','=')
+            ldesc = desc.lower()
             if (fieldvar.startswith(iolist[0])
-            and desc.startswith(('key','keygroup','keytyp','rectype','recordtype','sequencekey','type'))
-            and desc.count('=') == 1):
-                if desc.startswith('type') and '"' not in desc and "'" not in desc:
+            and ldesc.startswith(('key','keygroup','keytyp','rectype','recordtype','sequencekey','type'))
+            and ldesc.count('=') == 1):
+                if ldesc.startswith('type') and '"' not in ldesc and "'" not in ldesc:
                     continue
                     # can try the below when we have records in 152
                     #

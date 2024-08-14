@@ -62,8 +62,10 @@ def applyfieldmap(record, fieldmap):
     return retval
 
 
-def unicode_strip(text=u''):
-    return unicode(text).strip()
+def unicode_strip(text=b''):
+    if isinstance(text, bytes):
+        text = text.decode('utf8', 'ignore')
+    return text.strip()
 
 def Int(text=''):
     if not text.strip():
@@ -199,7 +201,10 @@ class BBxRec(object):
                 width = int(field_def.split(',')[1].strip(')'))
             else:
                 # get width by measurement
-                width = len(unicode(self[field_def]))
+                try:
+                    width = len(unicode(self[field_def]))
+                except UnicodeDecodeError:
+                    width = len(self[field_def].decode('utf8','ignore'))
             widths.append(width)
             max_width = max(max_width, width)
         self._width = max_width
