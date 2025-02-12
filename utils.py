@@ -18,7 +18,7 @@ from math import floor
 from socket import socket, AF_INET, SOCK_DGRAM
 from dbf import Date, Time
 from dbf.bridge import baseinteger, basestring
-from dbf.data_types import days_per_month, days_per_leap_month
+from dbf.data_types import days_per_month as dbf_days_per_month, days_per_leap_month as dbf_days_per_leap_month
 from dbf.utils import is_leapyear
 from VSS.time_machine import Sentinel, simplegeneric
 
@@ -78,7 +78,7 @@ def Table(fn, *args, **kwds):
 
 
 def days_per_month(year):
-    return (days_per_month, days_per_leap_month)[is_leapyear(year)]
+    return (dbf_days_per_month, dbf_days_per_leap_month)[is_leapyear(year)]
 
 
 def all_equal(iterator, test=None):
