@@ -4,7 +4,7 @@ import os, logging
 import bbxfile
 from bbxfile import BBxFile, getfilename, TableError
 from antipathy import Path
-from scription import Var, OrmFile
+from scription import Var, OrmFile, error
 import re
 import sys
 _logger = logging.getLogger(__name__)
@@ -133,12 +133,22 @@ def parse_FIS_Schema(source):
                 basevar = fieldvar.split("(")[0]
             else:
                 basevar = fieldvar
-            basevar = basevar
             if not basevar in iolist:
                 iolist.append(basevar)
             fieldsize = int(fieldsize) if fieldsize else 0
             if fieldnum != '*':
                 fields.append(["f%s_%s" % (filenum,fieldnum), fielddesc, fieldsize, fieldvar, sizefrom(fieldmask)])
+            # check subfield specs
+            if sub_spec(basevar[0], fieldvar):
+                start, length = map(int, sub_spec.groups())
+                if start == 1:
+                    next_start = start + length
+                elif start != next_start:
+                    error('bad field definition in %s: %r, removing %s' % (name, fieldvar))
+                    next_start += length
+                else:
+                    next_start += length
+            # check first field for a key type
             desc = fielddesc.replace(' ','').replace('-','=')
             ldesc = desc.lower()
             if (fieldvar.startswith(iolist[0])
@@ -173,6 +183,7 @@ def parse_FIS_Schema(source):
     return TABLES
 
 key_spec = Var(lambda haystack: re.search(".*(!?=)(.*)", haystack))
+sub_spec = Var(lambda base, haystack: re.match(base+r'.\$\((\d*),(\d*)\)', haystack))
 
 DATACACHE = {}
 
