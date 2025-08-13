@@ -144,7 +144,7 @@ def parse_FIS_Schema(source):
                 if start == 1:
                     next_start = start + length
                 elif start != next_start:
-                    error('bad field definition in %s: %r, removing %s' % (name, fieldvar))
+                    error('bad field definition in %s: %r' % (name, fieldvar))
                     next_start += length
                 else:
                     next_start += length
