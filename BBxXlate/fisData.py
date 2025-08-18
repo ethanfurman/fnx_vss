@@ -1,14 +1,15 @@
 #!/usr/local/bin/python
 from __future__ import print_function
 import os, logging
-import bbxfile
-from bbxfile import BBxFile, getfilename, TableError
+from . import bbxfile
+from .bbxfile import BBxFile, getfilename, TableError
 from antipathy import Path
+from enhlib.misc import basestring, baseinteger
 from scription import Var, OrmFile, error
 import re
 import sys
 _logger = logging.getLogger(__name__)
-config = OrmFile(Path('%s/config/fnx.ini' % os.environ['VIRTUAL_ENV']), types={'_path':Path})
+config = OrmFile(Path('%s/config/fnx.ini' % os.environ.get('VIRTUAL_ENV', '/opt/openerp')), types={'_path':Path})
 SELF_TEST = False
 
 CID = config.fis_imports.cid
@@ -18,16 +19,6 @@ DATA = config.fis_imports.data
 SCHEMA = config.fis_imports.schema
 FILE_OVERRIDES = config.fis_imports.file_overrides
 NAME_OVERRIDES = config.fis_imports.name_overrides
-
-# WHC mappings
-# NVTY - 135
-# CSMS - 33
-# CSMSB - 140
-# CSMSS - 34
-# VNMS - 65
-# POSM - 163
-# CNVZc - 122
-# NVBA - 250
 
 
 def sizefrom(mask):
@@ -46,9 +37,9 @@ def slicendice(line, *nums):
         start = num
     return tuple(results)
 
-def parse_FIS_Schema(source):
+def parse_FIS_Schema(data):
     iolist = None
-    contents = open(source).readlines()
+    contents = data
     TABLES = {}
     skip_table = False
     duplicates = set()
@@ -133,6 +124,7 @@ def parse_FIS_Schema(source):
                 basevar = fieldvar.split("(")[0]
             else:
                 basevar = fieldvar
+            basevar = basevar
             if not basevar in iolist:
                 iolist.append(basevar)
             fieldsize = int(fieldsize) if fieldsize else 0
@@ -204,7 +196,7 @@ def fisData (table, keymatch=None, subset=None, rematch=None, filter=None, data_
     diskname = FILE_OVERRIDES.get(CID+filename, CID+filename)
     try:
         datafile = getfilename(data_path/diskname)
-    except TableError, exc:
+    except TableError as exc:
         exc.filename = diskname
         raise
     mtime = os.stat(datafile).st_mtime
@@ -228,10 +220,11 @@ def fisData (table, keymatch=None, subset=None, rematch=None, filter=None, data_
         DATACACHE[key] = table, mtime
     return table
 
-def setup(config):
+def init():
     global tables
+    from .schema import data
     try:
-        tables = parse_FIS_Schema(SCHEMA)
+        tables = parse_FIS_Schema(data)
     except IOError:
         _logger.error("unable to parse FIS Schema")
         _logger.error("uid: %r, gid: %r, euid: %r, egid: %r" %
@@ -248,7 +241,8 @@ def setup(config):
         tables = tables()
     bbxfile.tables = tables
 
-setup('%s/config/fnx.fis.conf' % os.environ['VIRTUAL_ENV'])
+init()
+# setup('%s/config/fnx.fis.conf' % os.environ['VIRTUAL_ENV'])
 
 #tables['NVTY1']['fields'][77]
 
@@ -267,7 +261,7 @@ if __name__ == '__main__':
     from antipathy import Path
     from scription import *
     report = echo
-    virtual_env = os.environ.get('VIRTUAL_ENV')
+    virtual_env = os.environ.get('VIRTUAL_ENV', '/opt/openerp')
     print('schema: %s' % (SCHEMA, ))
     print('data:   %s' % (DATA, ))
     print('CID:    %s' % (CID, ))
@@ -290,10 +284,10 @@ if __name__ == '__main__':
         int_keys = []
         str_keys = []
         target_tables = table
-        for k in sorted(tables.keys()):
+        for k in sorted(tables.keys(), key=lambda k: isinstance(k, baseinteger) and (0, str(k)) or (1, k)):
             if isinstance(k, basestring):
                 str_keys.append(k)
-            elif isinstance(k, (int, long)):
+            elif isinstance(k, baseinteger):
                 int_keys.append(k)
             else:
                 raise ValueError('invalid key type: %r is %r' % (k, type(k)))
