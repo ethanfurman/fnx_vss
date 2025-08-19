@@ -14,6 +14,7 @@ import re
 import warnings
 
 _logger = logging.getLogger('BBx')
+_logger.addHandler(logging.NullHandler())
 
 class TableError(Exception):
     'generic problem'

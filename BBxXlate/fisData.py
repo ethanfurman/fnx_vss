@@ -8,7 +8,10 @@ from enhlib.misc import basestring, baseinteger
 from scription import Var, OrmFile, error
 import re
 import sys
+
 _logger = logging.getLogger(__name__)
+_logger.addHandler(logging.NullHandler())
+
 config = OrmFile(Path('%s/config/fnx.ini' % os.environ.get('VIRTUAL_ENV', '/opt/openerp')), types={'_path':Path})
 SELF_TEST = False
 
