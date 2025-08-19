@@ -19,7 +19,7 @@ DATA = config.fis_imports.data
 SCHEMA = config.fis_imports.schema
 FILE_OVERRIDES = config.fis_imports.file_overrides
 NAME_OVERRIDES = config.fis_imports.name_overrides
-
+SCHEMA_ERRORS = []
 
 def sizefrom(mask):
     if not(mask): return ""
@@ -136,7 +136,7 @@ def parse_FIS_Schema(data):
                 if start == 1:
                     next_start = start + length
                 elif start != next_start:
-                    error('bad field definition in %s: %r' % (name, fieldvar))
+                    SCHEMA_ERRORS.append('bad field definition in %s: %r' % (name, fieldvar))
                     next_start += length
                 else:
                     next_start += length
@@ -222,7 +222,10 @@ def fisData (table, keymatch=None, subset=None, rematch=None, filter=None, data_
 
 def init():
     global tables
-    from .schema import data
+    try:
+        from .schema import data
+    except ImportError:
+        return
     try:
         tables = parse_FIS_Schema(data)
     except IOError:
@@ -329,8 +332,24 @@ if __name__ == '__main__':
         echo('  ', '-' * 30)
         echo('   total: %d records' % last_total)
         if missing_tables:
-            print('=======\nMISSING\n=======\nfile : tables\n-------------')
+            echo('=======\nMISSING\n=======\nfile : tables\n-------------')
             for filename, tables in sorted(missing_tables.items()):
-                print('%-5s: %s' % (filename, ', '.join(tables)))
+                echo('%-5s: %s' % (filename, ', '.join(tables)))
+        if SCHEMA_ERRORS:
+            echo('=======\nSCHEMA ERRORS\n=======')
+            echo('\n'.join(SCHEMA_ERRORS))
+
+
+    @Command(
+            schema_file=Spec('file to create schema.py')
+            )
+    def create_schema(schema_file):
+        """
+        create schema.py file (holds all FIS table definitions)
+        """
+        with open(Path.abspath(__file__).dirname/'schema.py', 'w') as dest:
+            dest.write('data = """\n')
+            dest.write(open(schema_file).read())
+            dest.write('""".split("\\n")')
 
     Main()
